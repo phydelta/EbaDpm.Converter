@@ -6,6 +6,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## 1.2.0 - 2026-10-08
+
 ### Added
 
 - `--cutoff-release <code>`: converts a DPM 2.0 database as of an earlier release, selected by
