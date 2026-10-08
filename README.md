@@ -1,8 +1,8 @@
 # EbaDpm.Converter
 
-[![CI](https://github.com/OWNER/EbaDpm.Converter/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/EbaDpm.Converter/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/OWNER/EbaDpm.Converter/actions/workflows/codeql.yml/badge.svg)](https://github.com/OWNER/EbaDpm.Converter/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/github/v/release/OWNER/EbaDpm.Converter)](https://github.com/OWNER/EbaDpm.Converter/releases/latest)
+[![CI](https://github.com/phydelta/EbaDpm.Converter/actions/workflows/ci.yml/badge.svg)](https://github.com/phydelta/EbaDpm.Converter/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/phydelta/EbaDpm.Converter/actions/workflows/codeql.yml/badge.svg)](https://github.com/phydelta/EbaDpm.Converter/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/phydelta/EbaDpm.Converter)](https://github.com/phydelta/EbaDpm.Converter/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A command-line tool that converts the **EBA DPM Database** (Data Point Model) from the Microsoft
@@ -63,7 +63,7 @@ on any other SQLite edition existing.
 ## Download
 
 Ready-to-run executables are published on the
-[Releases](https://github.com/OWNER/EbaDpm.Converter/releases) page as
+[Releases](https://github.com/phydelta/EbaDpm.Converter/releases) page as
 `EbaDpm.Converter-X.Y.Z-win-x64.zip`, with a `SHA256SUMS.txt` file and a build provenance
 attestation (see [docs/releasing.md](docs/releasing.md#verifying-a-downloaded-release)).
 

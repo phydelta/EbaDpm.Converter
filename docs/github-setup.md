@@ -3,14 +3,16 @@
 Most of the collaboration infrastructure lives in the repository (`.github/`), but some settings
 only exist on GitHub. This is the one-time checklist after creating the repository.
 
-## 1. Replace the placeholders
+## 1. Owner and contacts
 
-`OWNER` stands for the GitHub user or organisation that owns the repository:
+The repository is set up for the owner **`phydelta`**:
 
-- [`.github/CODEOWNERS`](../.github/CODEOWNERS): `@OWNER` → `@your-user` (or `@org/team`).
-- [`README.md`](../README.md) badges and [`docs/releasing.md`](releasing.md): `OWNER/EbaDpm.Converter`.
-- [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md): `[CONTACT]` → the address that receives
-  code-of-conduct reports.
+- [`.github/CODEOWNERS`](../.github/CODEOWNERS) requests a review from `@phydelta` on every pull
+  request. Add further maintainers or teams there as the project grows.
+- The badges in [`README.md`](../README.md) and the commands in [`docs/releasing.md`](releasing.md)
+  point to `phydelta/EbaDpm.Converter`. If the repository is created under another account or
+  name, update those references.
+- Code-of-conduct reports go to the address in [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md).
 
 ## 2. General settings
 

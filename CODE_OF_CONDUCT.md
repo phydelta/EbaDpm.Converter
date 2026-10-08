@@ -41,8 +41,8 @@ reviews) and when an individual officially represents the project in public spac
 ## Reporting
 
 Instances of abusive, harassing or otherwise unacceptable behaviour may be reported to the
-maintainers at **[CONTACT]**. All complaints will be reviewed and investigated promptly and fairly,
-and the privacy and security of the reporter will be respected.
+maintainers at joseluis@phydelta.net. All complaints will be reviewed and investigated promptly
+and fairly, and the privacy and security of the reporter will be respected.
 
 ## Enforcement guidelines
 

@@ -55,7 +55,7 @@ The workflow then:
 Get-FileHash .\EbaDpm.Converter-X.Y.Z-win-x64.zip -Algorithm SHA256   # compare with SHA256SUMS.txt
 
 # Provenance: proves the file was built by this repository's release workflow
-gh attestation verify .\EbaDpm.Converter-X.Y.Z-win-x64.zip --repo OWNER/EbaDpm.Converter
+gh attestation verify .\EbaDpm.Converter-X.Y.Z-win-x64.zip --repo phydelta/EbaDpm.Converter
 ```
 
 ## Fixing a release

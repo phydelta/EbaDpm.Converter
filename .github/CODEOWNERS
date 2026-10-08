@@ -1,12 +1,11 @@
 # Code owners are requested for review automatically on every pull request.
-# Replace @OWNER with the GitHub user (or team) that maintains the project.
 
-*                         @OWNER
+*                         @phydelta
 
 # Release and CI infrastructure: changes here affect how the project is built and published.
-/.github/                 @OWNER
-/Directory.Build.props    @OWNER
-/global.json              @OWNER
+/.github/                 @phydelta
+/Directory.Build.props    @phydelta
+/global.json              @phydelta
 
 # The output format contract.
-/src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql  @OWNER
+/src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql  @phydelta
