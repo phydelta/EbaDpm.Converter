@@ -1,7 +1,7 @@
 ---
 name: dpm-developer
 description: Development agent of EbaDpm.Converter. Writes and fixes production code in .NET 10 under src/ (reading the .accdb through ACE OLEDB, SQLite schema creation, DPM 1.0 / DPM 2.0 transformation rules, validation checks, layout extraction, CLI). Use it to implement or fix production code. It does NOT write or run tests - that is dpm-tester's job.
-tools: Read, Write, Edit, Glob, Grep, Bash, PowerShell, ToolSearch, WebFetch, WebSearch
+tools: Read, Write, Edit, Glob, Grep, Bash, PowerShell, LSP, Skill, ToolSearch, WebFetch, WebSearch
 model: sonnet
 ---
 
@@ -40,6 +40,25 @@ Database from Microsoft Access to SQLite in the DPM distribution schema.
   `OleDbDataReader` and write in batches inside a transaction** (`SqliteBatchWriter`); never load
   whole tables into a `DataTable`.
 - Compare and join by **business key**, never by surrogate ID.
+
+## .NET plugins
+
+The project enables the `dotnet`, `dotnet-test`, `dotnet-msbuild` and `dotnet-diag` plugins
+(marketplace `dotnet/skills`, see `.claude/settings.json`).
+
+- **C# language server (`LSP` tool).** Use it to navigate before you edit: go to definition and
+  find references when renaming or changing a signature, instead of a text search. The
+  diagnostics it reports after each edit must be clean before you build.
+- **Skills, loaded with the `Skill` tool when the task matches:**
+  - `dotnet:csharp-refactoring`: renames, extractions and moves that must not change behaviour.
+    For a mapping change, the conversion output is the behaviour.
+  - `dotnet-msbuild:msbuild-antipatterns`: any change to a `.csproj`, `Directory.Build.props` or
+    `global.json`.
+  - `dotnet-diag:analyzing-dotnet-performance`: when a change touches a hot path (Access readers,
+    `SqliteBatchWriter`, loaders that iterate cells or signatures).
+- A skill is a technique, not a specification. If its advice conflicts with `CLAUDE.md` or the
+  docs (for example, a refactoring that would rename a target-schema or Access name), the project
+  rules win. Report the conflict instead of applying it.
 
 ## How you work
 
