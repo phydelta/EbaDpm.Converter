@@ -31,22 +31,24 @@ internal static class RepoPaths
     public const string AccessDatabaseFileName = "DPM 1.0 Database_v4_1_20250709.accdb";
 
     /// <summary>
-    /// File name of the DPM 2.0 Access database, release 4.2. Only read by the tests of the
-    /// DPM 2.0 pipeline.
+    /// File name of the DPM 2.0 Access database published as 4.2.1 (its [Release] declares 4.2 and
+    /// 4.2.1; natural cutoff "4.2.1"). The tests that mean "the 4.2 release" read it with the
+    /// explicit cutoff <see cref="Cutoff42ReleaseCode"/>; the natural cutoff is exercised by
+    /// <c>Dpm2042_1ValidateFixture</c>. Only read by the tests of the DPM 2.0 pipeline.
     /// </summary>
-    public const string AccessDpm20DatabaseFileName = "DPM2 Database_v 4_2_20251125.accdb";
+    public const string AccessDpm20DatabaseFileName = "DPM2 Database_v 4_2_1.accdb";
 
     /// <summary>
-    /// File name of the 2014 Access database (DPM 1.0, old schema), a candidate for a light
-    /// fixture. It lives at the root of the data directory. <b>Optional</b>: it may not be
-    /// available in every environment, and the tests that use it must check for it first.
+    /// <c>Release.Code</c> of the 4.2 release: the explicit cutoff (<c>--cutoff-release 4.2</c> /
+    /// <c>cutoffReleaseCode: "4.2"</c>) with which the tests that mean "the 4.2 release" read
+    /// <see cref="AccessDpm20DatabaseFileName"/>.
     /// </summary>
-    public const string AccessDpm2014DatabaseFileName = "DPM Database 2.1.0.1.accdb";
+    public const string Cutoff42ReleaseCode = "4.2";
 
     /// <summary>
     /// File name of the DPM 2.0 Access database of the 4.3 publication. Its cut-off release is
     /// derived by <c>Dpm20AccessReader.ResolveCutoffRelease</c> (Max(ReleaseID) = 1.010.000.050 =
-    /// "4.3"), unlike the "_4_2_" file (which derives "4.2"). Only read by the tests that exercise
+    /// "4.3"), unlike the 4.2.1 file (which derives "4.2.1"). Only read by the tests that exercise
     /// the later publication.
     /// </summary>
     public const string AccessDpm20Release43DatabaseFileName = "DPM2 Database_v 4_3_20260622.accdb";
@@ -106,9 +108,6 @@ internal static class RepoPaths
     public static string AccessDatabasePath => Path.Combine(DataDirectory, AccessDatabaseFileName);
 
     public static string AccessDpm20DatabasePath => Path.Combine(DataDirectory, AccessDpm20DatabaseFileName);
-
-    public static string AccessDpm2014DatabasePath =>
-        Path.Combine(DataDirectory, AccessDpm2014DatabaseFileName);
 
     public static string AccessDpm20Release43DatabasePath => Path.Combine(DataDirectory, AccessDpm20Release43DatabaseFileName);
 
@@ -184,12 +183,6 @@ internal static class RepoPaths
     /// <summary>Verifies that the DPM 2.0 Access database exists.</summary>
     public static void EnsureAccessDpm20DatabaseExists() => EnsureFileExists(
         AccessDpm20DatabasePath, $"the DPM 2.0 Access database '{AccessDpm20DatabaseFileName}'");
-
-    /// <summary>
-    /// The 2014 Access database is OPTIONAL: not every environment has it. Tests that depend on
-    /// it must call this and skip (never fail) if it is missing.
-    /// </summary>
-    public static bool AccessDpm2014DatabaseExists() => File.Exists(AccessDpm2014DatabasePath);
 
     /// <summary>Verifies that the DPM 2.0 Access database of the 4.3 publication exists.</summary>
     public static void EnsureAccessDpm20Release43DatabaseExists() => EnsureFileExists(

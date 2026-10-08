@@ -14,11 +14,11 @@ namespace EbaDpm.Converter.Core.Access.Dpm20;
 /// <see cref="Date"/> is TEXT already in ISO format (<c>"2024-02-06"</c>...) — it is copied as is
 /// to <c>mRelease.PublicationDate</c>, never passed through <see cref="DateTime"/> (culture and
 /// time-zone non-determinism). <see cref="Status"/> and <see cref="Description"/> may be NULL
-/// (<see cref="Description"/> only exists in 4.1 and 4.2). <see cref="IsCurrent"/> is copied to
-/// <c>mRelease.IsCurrent</c> with a DIRECT MAPPING, without normalizing: it is a DYNAMIC source
-/// value (true only for the most recent release of this Access database) that changes from one
-/// Access publication to the next, so <c>Dpm20SkeletonLoader</c> does not pin it to any constant
-/// nor "fix" it to match any reference.
+/// (<see cref="Description"/> only exists in 4.1 and 4.2). <see cref="IsCurrent"/> is the Access value
+/// (true only for the most recent release of this Access database) and is NO LONGER emitted:
+/// <c>mRelease.IsCurrent</c> is derived by <c>Dpm20SkeletonLoader</c> as 1 exactly for the cutoff
+/// release (by <c>ReleaseID</c>) and 0 for the rest, because with an earlier cutoff the Access
+/// flag would mark a release newer than the output as current. With the natural cutoff both agree.
 /// </summary>
 public sealed record Dpm20ReleaseRow(
     int ReleaseId,

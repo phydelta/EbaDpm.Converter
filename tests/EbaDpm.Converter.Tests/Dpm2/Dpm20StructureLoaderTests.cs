@@ -9,7 +9,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// It reuses <see cref="Dpm20SkeletonFixture"/> (collection <c>Dpm2Skeleton</c>): the same
 /// <c>--all</c> conversion already loads the complete structure
 /// (<see cref="EbaDpm.Converter.Core.Mapping.Dpm20.Dpm20StructureLoader"/> always runs, without a
-/// separate flag), so the 755 MB Access database does not need to be re-read for this.
+/// separate flag), so the large DPM 2.0 Access database does not need to be re-read for this.
 ///
 /// The matches against the source are by CODE (109/563/788); what is emitted, and what is checked
 /// here, are ROWS (111/572/847). The figures were verified beforehand against the real .db
@@ -332,7 +332,7 @@ public sealed class Dpm20StructureLoaderTests(Dpm20SkeletonFixture fixture)
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
-        using var reader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath);
+        using var reader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath, cutoffReleaseCode: RepoPaths.Cutoff42ReleaseCode);
         reader.Open();
         var tableVersionsWithTrailingSpaceName = reader.ReadTableVersions()
             .Where(tv => tv.Name is not null && tv.Name.EndsWith(' '))

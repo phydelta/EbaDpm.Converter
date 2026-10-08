@@ -10,7 +10,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// particular the naming law that decides the string type, and the fact that the property code is
 /// also versioned (window crossing). It reuses <see cref="Dpm20SkeletonFixture"/> (collection
 /// <c>Dpm2Skeleton</c>): the same <c>--all</c> conversion already loads the six dictionary tables,
-/// so the 755 MB Access database does not need to be re-read.
+/// so the large DPM 2.0 Access database does not need to be re-read.
 ///
 /// The count figures (2,107 <c>mMetric</c>, 1,100 <c>mDimension</c>) are the ones MEASURED over the
 /// real <c>.db</c>, as they come out of <see cref="Dpm20DictionaryLoaderTests"/>.
@@ -108,7 +108,7 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
-        using var reader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath);
+        using var reader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath, cutoffReleaseCode: RepoPaths.Cutoff42ReleaseCode);
         reader.Open();
 
         var dataTypeCodeById = reader.ReadDataTypes().ToDictionary(dt => dt.DataTypeId, dt => dt.Code);
@@ -432,7 +432,7 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
-        using var reader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath);
+        using var reader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath, cutoffReleaseCode: RepoPaths.Cutoff42ReleaseCode);
         reader.Open();
 
         var categories = reader.ReadCategories().ToList();

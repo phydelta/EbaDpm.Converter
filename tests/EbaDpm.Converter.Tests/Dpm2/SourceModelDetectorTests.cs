@@ -30,24 +30,36 @@ public sealed class SourceModelDetectorTests
     }
 
     /// <summary>
-    /// The 2014 Access database (old schema) is DPM 1.0 with a DIFFERENT schema. It is the concrete
-    /// case for which the detector must look at BOTH tables (<c>Domain</c> present AND
-    /// <c>Category</c> absent/irrelevant) and not just one: if the detector looked only at
-    /// <c>Category</c>, this file could be silently misclassified.
-    /// OPTIONAL: if the file is not available in this environment, the test returns without asserting.
+    /// Documented rule (docs/source-models.md): a table named <c>Domain</c> means DPM 1.0, and it
+    /// wins even when <c>Category</c> also exists (the old-schema DPM 1.0 files have both). If the
+    /// detector looked only at <c>Category</c>, such a file would be silently misclassified.
     /// </summary>
-    [DataFact]
-    public void Dpm2014Accdb_IfAvailable_IsDetectedAsDpm10_NotAnException()
+    [AceFact]
+    public void SyntheticAccdb_DomainAndCategory_IsDpm10() =>
+        AssertDetected(DpmSourceModel.Dpm10, "Domain", "Category");
+
+    [AceFact]
+    public void SyntheticAccdb_OnlyDomain_IsDpm10() =>
+        AssertDetected(DpmSourceModel.Dpm10, "Domain");
+
+    [AceFact]
+    public void SyntheticAccdb_OnlyCategory_IsDpm20() =>
+        AssertDetected(DpmSourceModel.Dpm20, "Category");
+
+    private static void AssertDetected(DpmSourceModel expected, params string[] tables)
     {
-        if (!RepoPaths.AccessDpm2014DatabaseExists())
+        var tempPath = Dpm2TestAccdbFactory.CreateAccdbWithTables(tables);
+        try
         {
-            // The file is not invented: the omission is documented and the test moves on.
-            return;
+            Assert.Equal(expected, SourceModelDetector.Detect(tempPath));
         }
-
-        var model = SourceModelDetector.Detect(RepoPaths.AccessDpm2014DatabasePath);
-
-        Assert.Equal(DpmSourceModel.Dpm10, model);
+        finally
+        {
+            OleDbConnection.ReleaseObjectPool();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            File.Delete(tempPath);
+        }
     }
 
     /// <summary>

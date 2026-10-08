@@ -7,7 +7,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <summary>
 /// Verification of <c>mOpenAxisValueRestriction</c> and of the signature bracket. It reuses
 /// <see cref="Dpm20SkeletonFixture"/> (collection <c>Dpm2Skeleton</c>): the same <c>--all</c>
-/// conversion always runs <c>Dpm20AxisAndCellLoader.Load</c>, so the 755 MB Access database does
+/// conversion always runs <c>Dpm20AxisAndCellLoader.Load</c>, so the large DPM 2.0 Access database does
 /// not need to be re-read.
 ///
 /// It confirms the measured figures: 207 rows, 199 business keys on each side with an intersection

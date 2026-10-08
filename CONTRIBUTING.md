@@ -69,6 +69,7 @@ The data-dependent tests look for the data files in the directory given by the `
 environment variable, or in `./Data` at the repository root when it is not set. When the
 directory is missing, those tests are reported as skipped with a message pointing to
 [docs/test-data.md](docs/test-data.md), which lists the files they expect.
+`./scripts/Initialize-TestData.ps1` sets up `./Data` in one step.
 
 ```powershell
 $env:EBADPM_TEST_DATA = "D:\eba-data"

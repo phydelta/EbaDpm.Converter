@@ -49,7 +49,7 @@ All rows of `[Release]`, not filtered by the selection.
 | `ReleaseID`, `ReleaseCode` | `ReleaseID`, `Code` |
 | `ReleaseDescription`, `Status` | `Description`, `Status` |
 | `PublicationDate` | `Date`, copied as ISO text (never round-tripped through a date type, which would depend on the machine's time zone) |
-| `IsCurrent` | `IsCurrent`, mapped directly; it changes from one publication to the next |
+| `IsCurrent` | `1` for the cutoff release, `0` for the others. With the natural cutoff this equals the Access `IsCurrent` (measured on the 4.2.1 and 4.3 databases); with `--cutoff-release` it marks the requested release |
 | `ConceptID` | minted (type `Release`) |
 
 ### mReportingFramework

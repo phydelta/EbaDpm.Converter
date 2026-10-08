@@ -12,6 +12,29 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// </summary>
 internal static class Dpm2TestAccdbFactory
 {
+    /// <summary>
+    /// Creates an <c>.accdb</c> containing one table per given name, each with a single column
+    /// (<c>Id</c>, integer). Used to exercise the detection rule on the catalog alone.
+    /// </summary>
+    public static string CreateAccdbWithTables(params string[] tableNames)
+    {
+        var path = CreateEmptyAccdb();
+        using (var connection = new System.Data.OleDb.OleDbConnection(
+            $"Provider=Microsoft.ACE.OLEDB.16.0;Data Source={path};"))
+        {
+            connection.Open();
+            foreach (var table in tableNames)
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = $"CREATE TABLE [{table}] ([Id] INTEGER)";
+                command.ExecuteNonQuery();
+            }
+        }
+
+        System.Data.OleDb.OleDbConnection.ReleaseObjectPool();
+        return path;
+    }
+
     public static string CreateEmptyAccdb()
     {
         var path = Path.Combine(Path.GetTempPath(), $"empty-neither-model_{Environment.ProcessId}_{Guid.NewGuid():N}.accdb");

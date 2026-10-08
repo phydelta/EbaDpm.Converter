@@ -8,9 +8,10 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 public sealed class Dpm20AccessReaderTests(Dpm20AccessReaderFixture fixture)
 {
     [DataFact]
-    public void ReadReleases_Returns5RowsWithTheExpectedCodesAndIds()
+    public void ReadReleases_Returns6RowsWithTheExpectedCodesAndIds()
     {
-        Assert.Equal(5, fixture.Releases.Count);
+        // 6 on "DPM2 Database_v 4_2_1.accdb" (5 before: [Release] now also declares 4.2.1, ReleaseID 1010000003).
+        Assert.Equal(6, fixture.Releases.Count);
 
         var byCode = fixture.Releases.ToDictionary(r => r.Code, r => r.ReleaseId);
         Assert.Equal(1, byCode["3.4"]);
@@ -18,10 +19,12 @@ public sealed class Dpm20AccessReaderTests(Dpm20AccessReaderFixture fixture)
         Assert.Equal(3, byCode["4.0"]);
         Assert.Equal(4, byCode["4.1"]);
         Assert.Equal(5, byCode["4.2"]);
+        Assert.Equal(1010000003, byCode["4.2.1"]);
     }
 
     [DataFact]
-    public void ReadFrameworks_Returns20Rows() => Assert.Equal(20, fixture.Frameworks.Count);
+    // 23 on "DPM2 Database_v 4_2_1.accdb" (20 before): [Framework] gained 22 TCB, 23 AML, 24 (code 015) AMLA.
+    public void ReadFrameworks_Returns23Rows() => Assert.Equal(23, fixture.Frameworks.Count);
 
     [DataFact]
     public void ReadOrganisations_Returns3Rows() => Assert.Equal(3, fixture.Organisations.Count);
@@ -33,8 +36,13 @@ public sealed class Dpm20AccessReaderTests(Dpm20AccessReaderFixture fixture)
     public void ReadModuleVersions_Returns53CurrentRows() => Assert.Equal(53, fixture.ModuleVersions.Count);
 
     [DataFact]
-    public void ReadModuleVersionCompositions_Returns2956Rows()
-        => Assert.Equal(2956, fixture.ModuleVersionCompositions.Count);
+    // RAW-TABLE count: ModuleVersionComposition has no release columns and the reader returns the
+    // whole table by design (pruning happens through the in-force module versions). 2,956 -> 3,112
+    // on "DPM2 Database_v 4_2_1.accdb" (+156, measured on the Access source with COUNT(1)): +155 rows of the new
+    // ModuleVID 513 (ModuleID 63, StartReleaseID 1010000003, i.e. 4.2.1, not in force at 4.2) and +1 row of a
+    // module version in force at 4.2 (1,089 -> 1,090). ModuleVersion in force at 4.2 stays 53.
+    public void ReadModuleVersionCompositions_Returns3112RawRows()
+        => Assert.Equal(3112, fixture.ModuleVersionCompositions.Count);
 
     [DataFact]
     public void ReadTableVersions_Returns929CurrentRows() => Assert.Equal(929, fixture.TableVersions.Count);

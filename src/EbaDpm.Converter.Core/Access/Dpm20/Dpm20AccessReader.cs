@@ -36,22 +36,50 @@ public sealed class Dpm20AccessReader : IDisposable
 {
     private readonly string _connectionString;
     private readonly int? _requestedCutoffReleaseId;
+    private readonly string? _requestedCutoffReleaseCode;
     private OleDbConnection? _connection;
     private bool _disposed;
     private int? _cutoffReleaseId;
     private string? _cutoffReleaseCode;
 
-    public Dpm20AccessReader(string accdbPath, int? cutoffReleaseId = null)
+    /// <param name="accdbPath">Path of the <c>.accdb</c> file.</param>
+    /// <param name="cutoffReleaseId">
+    /// Cutoff by surrogate <c>ReleaseID</c>. Mutually exclusive with <paramref name="cutoffReleaseCode"/>.
+    /// </param>
+    /// <param name="cutoffReleaseCode">
+    /// Cutoff by <c>Release.Code</c> (the business key, e.g. "4.2"): exact, case-sensitive match
+    /// after trimming. Mutually exclusive with <paramref name="cutoffReleaseId"/>. When neither is
+    /// given, the cutoff is the greatest <c>ReleaseID</c> of <c>[Release]</c>.
+    /// </param>
+    public Dpm20AccessReader(string accdbPath, int? cutoffReleaseId = null, string? cutoffReleaseCode = null)
     {
         if (string.IsNullOrWhiteSpace(accdbPath))
         {
             throw new ArgumentException("The .accdb file path cannot be empty.", nameof(accdbPath));
         }
 
+        if (cutoffReleaseId is not null && cutoffReleaseCode is not null)
+        {
+            throw new ArgumentException(
+                "The cutoff release can be requested by ReleaseID or by Code, not both.", nameof(cutoffReleaseCode));
+        }
+
+        if (cutoffReleaseCode is not null && string.IsNullOrWhiteSpace(cutoffReleaseCode))
+        {
+            throw new ArgumentException("The cutoff release code cannot be empty.", nameof(cutoffReleaseCode));
+        }
+
         _connectionString =
             $"Provider=Microsoft.ACE.OLEDB.16.0;Data Source={accdbPath};Persist Security Info=False;";
         _requestedCutoffReleaseId = cutoffReleaseId;
+        _requestedCutoffReleaseCode = cutoffReleaseCode?.Trim();
     }
+
+    /// <summary>
+    /// True when the cutoff was requested (by ID or by Code) instead of defaulting to the latest
+    /// release of <c>[Release]</c>. For the CLI log.
+    /// </summary>
+    public bool CutoffReleaseRequested => _requestedCutoffReleaseId is not null || _requestedCutoffReleaseCode is not null;
 
     /// <summary>
     /// Cutoff <c>ReleaseID</c>. Resolved in <see cref="Open"/>: the one requested in the
@@ -105,7 +133,16 @@ public sealed class Dpm20AccessReader : IDisposable
         }
 
         int cutoffId;
-        if (_requestedCutoffReleaseId is { } requested)
+        if (_requestedCutoffReleaseCode is { } requestedCode)
+        {
+            // Business key: exact, case-sensitive match on the trimmed Code.
+            var byCode = releases.FirstOrDefault(r => string.Equals(r.Code.Trim(), requestedCode, StringComparison.Ordinal))
+                ?? throw new InvalidOperationException(
+                    $"The requested cutoff release (Code='{requestedCode}') does not exist in [Release]. "
+                    + $"Available release codes: {string.Join(", ", releases.OrderBy(r => r.ReleaseId).Select(r => r.Code.Trim()))}.");
+            cutoffId = byCode.ReleaseId;
+        }
+        else if (_requestedCutoffReleaseId is { } requested)
         {
             cutoffId = requested;
         }
@@ -288,7 +325,8 @@ public sealed class Dpm20AccessReader : IDisposable
         // Date/Status/Description are read here because the mapping (Dpm20SkeletonLoader) needs
         // them for mRelease.PublicationDate/Status/ReleaseDescription (the source provides them
         // and a third-party reference export leaves them empty). IsCurrent is read for row
-        // completeness; see the doc of Dpm20ReleaseRow for how the mapping uses it.
+        // completeness only: it is no longer emitted (mRelease.IsCurrent is derived from the
+        // cutoff release); see the doc of Dpm20ReleaseRow.
         const string sql = "SELECT [ReleaseID], [Code], [Date], [Status], [Description], [IsCurrent] FROM [Release]";
 
         foreach (var row in Query(sql))

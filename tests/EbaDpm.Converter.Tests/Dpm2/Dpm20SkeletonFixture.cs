@@ -7,13 +7,13 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <summary>
 /// Collection fixture: runs ONCE, through the real CLI (<see cref="CliRunner.Run"/>, exactly the
 /// path a user follows with <c>--all</c>), the conversion of the complete DPM 2.0 skeleton over
-/// <c>Data/DPM2 Database_v 4_2_20251125.accdb</c>, and leaves the resulting <c>.db</c> open in
+/// <c>Data/DPM2 Database_v 4_2_1.accdb</c>, and leaves the resulting <c>.db</c> open in
 /// read-only mode so that the count and column-by-column tests query the same file, without
-/// reopening the 755 MB Access database for every test.
+/// reopening the large DPM 2.0 Access database for every test.
 ///
 /// The skeleton conversion is "cheap" (skeleton only): it does not need its own collection for
 /// memory reasons, but it does live in its own xUnit collection (distinct from "Dpm2") so that it
-/// does not compete for the same 755 MB Access database at the same time as
+/// does not compete for the same large Access database at the same time as
 /// <see cref="Dpm20AccessReaderFixture"/> if xUnit decides to parallelise collections.
 ///
 /// This fixture also covers what used to be a separate validation fixture: both ran the SAME
@@ -60,7 +60,7 @@ public sealed class Dpm20SkeletonFixture : IDisposable
         var stderr = new StringWriter();
 
         ExitCode = CliRunner.Run(
-            ["--source", RepoPaths.AccessDpm20DatabasePath, "--output", GeneratedDatabasePath, "--all"],
+            ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", GeneratedDatabasePath, "--all"],
             stdout,
             stderr);
 
@@ -106,7 +106,7 @@ public sealed class Dpm20SkeletonFixture : IDisposable
 
 /// <summary>
 /// xUnit collection definition for <see cref="Dpm20SkeletonFixture"/> -- separate from "Dpm2" so
-/// that both reads of the 755 MB DPM 2.0 Access database do not compete if xUnit parallelises
+/// that both reads of the DPM 2.0 Access database do not compete if xUnit parallelises
 /// collections.
 /// </summary>
 [CollectionDefinition("Dpm2Skeleton")]
