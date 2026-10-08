@@ -68,6 +68,17 @@ Data/                       EBA data files, NOT versioned, read-only (see docs/t
 - Windows x64, .NET SDK 10 (`global.json`), `Microsoft.ACE.OLEDB.16.0` x64 installed.
 - No `sqlite3` CLI: use Python's `sqlite3` module for SQLite files.
 - GitHub repository `phydelta/EbaDpm.Converter`, with the `gh` CLI available.
+- .NET plugins for Claude Code, from the `dotnet/skills` marketplace, enabled in
+  `.claude/settings.json`: `dotnet` (C# language server and `csharp-refactoring`), `dotnet-test`,
+  `dotnet-msbuild` and `dotnet-diag`. Enabling them in the committed settings does not download
+  them. Each collaborator installs them once:
+  ```powershell
+  foreach ($p in 'dotnet','dotnet-test','dotnet-msbuild','dotnet-diag') {
+      claude plugin install "$p@dotnet-agent-skills" --scope project
+  }
+  ```
+  The agents in `.claude/agents/` list which skills to use and when; the project rules in this
+  file win over any skill.
 
 ## Commands
 
