@@ -17,7 +17,7 @@ source metamodel.
 
 | | |
 |---|---|
-| **Version** | 1.1.0 |
+| **Version** | See the [latest release](https://github.com/phydelta/EbaDpm.Converter/releases/latest) |
 | **Sources** | DPM 1.0 (e.g. release 4.1) and DPM 2.0 (e.g. releases 4.2, 4.3), detected automatically |
 | **Output** | SQLite database with the 45 tables of the DPM distribution schema |
 | **Platform** | Windows x64 |
