@@ -34,7 +34,8 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 /// label</b>: the 5 <c>Release</c> rows (<c>mRelease</c> has no label column — there is no row to
 /// emit, not a NULL), the <c>MET</c> dimension (<c>DimensionID=9999</c>) and the sentinel member
 /// <c>Open</c> — these last two DO have a label in their table, but are explicitly excluded. All
-/// the rest, including <c>Taxonomy</c> (whose <c>TaxonomyLabel</c> is always NULL), carry their
+/// the rest, including <c>Taxonomy</c> (whose <c>TaxonomyLabel</c> is derived by
+/// <c>Dpm20TaxonomyMetadataCalculator</c> and may be NULL if unresolved), carry their
 /// <c>mConceptTranslation</c> row with whatever text their label column has — NULL included: it is
 /// what the entity already has emitted, no more and no less. No <c>description</c> role is
 /// emitted — the 12 source texts of the reference do not exist in any DPM 2.0 table.
@@ -218,7 +219,7 @@ public static class Dpm20ConceptLoader
         while (reader.Read())
         {
             var id = reader.GetInt32(0);
-            var label = reader.IsDBNull(1) ? null : reader.GetString(1); // TaxonomyLabel: always NULL, reproduced as is.
+            var label = reader.IsDBNull(1) ? null : reader.GetString(1); // TaxonomyLabel: as emitted by the skeleton loader (NULL when unresolved).
             var taxonomyCode = reader.IsDBNull(2) ? null : reader.GetString(2);
             var releaseId = ResolveReleaseFromTaxonomyCode(taxonomyCode, releaseIdByCode);
             seeds.Add(new EntitySeed("mTaxonomy", "TaxonomyID", id, "Taxonomy", EmitTranslation: true, label, releaseId));

@@ -430,6 +430,37 @@ public sealed class Dpm20AccessReader : IDisposable
     }
 
     /// <summary>
+    /// Reads the <c>ModuleVersion</c> HISTORY up to <see cref="CutoffReleaseId"/>
+    /// (<c>StartReleaseID &lt;= cutoff</c>, regardless of the end release), joined with
+    /// <c>[Module]</c> for the framework. Source of the derived <c>mTaxonomy</c> columns; distinct
+    /// from <see cref="ReadModuleVersions"/>, which keeps only the versions current at the cutoff.
+    /// </summary>
+    public IEnumerable<Dpm20ModuleVersionHistoryRow> ReadModuleVersionHistory()
+    {
+        var cutoff = CutoffReleaseId;
+        const string sql =
+            """
+            SELECT mv.[ModuleVID], mv.[ModuleID], m.[FrameworkID], mv.[StartReleaseID], mv.[EndReleaseID],
+                   mv.[VersionNumber], mv.[FromReferenceDate]
+            FROM [ModuleVersion] mv INNER JOIN [Module] m ON m.[ModuleID] = mv.[ModuleID]
+            WHERE mv.[StartReleaseID] <= ?
+            """;
+
+        foreach (var row in Query(sql, [cutoff]))
+        {
+            yield return new Dpm20ModuleVersionHistoryRow(
+                ModuleVId: Convert.ToInt32(row.GetValue(0)),
+                ModuleId: Convert.ToInt32(row.GetValue(1)),
+                FrameworkId: Convert.ToInt32(row.GetValue(2)),
+                StartReleaseId: Convert.ToInt32(row.GetValue(3)),
+                EndReleaseId: GetNullableInt32(row, 4),
+                VersionNumber: GetNullableString(row, 5),
+                // TEXT in the source; normalised to yyyy-MM-dd by Dpm20TaxonomyMetadataCalculator.
+                FromReferenceDate: GetNullableString(row, 6));
+        }
+    }
+
+    /// <summary>
     /// Reads the whole <c>ModuleVersionComposition</c> table, unfiltered: the table itself is not
     /// versioned — the currency of each pair is decided by <c>ModuleVID</c> and <c>TableVID</c>
     /// separately, each via its own versioned table.

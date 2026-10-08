@@ -59,6 +59,22 @@ public sealed record Dpm20ModuleVersionRow(
     int? EndReleaseId);
 
 /// <summary>
+/// Row of <c>ModuleVersion</c> joined with <c>[Module]</c>, from the HISTORY up to the cutoff
+/// release (<c>StartReleaseID &lt;= cutoff</c>, NOT filtered by currency): the input of
+/// <see cref="Dpm20TaxonomyMetadataCalculator"/>. <see cref="VersionNumber"/> and
+/// <see cref="FromReferenceDate"/> are TEXT in the source (<c>"4.1.0"</c>, <c>"2026-03-31"</c>),
+/// null when the source has none.
+/// </summary>
+public sealed record Dpm20ModuleVersionHistoryRow(
+    int ModuleVId,
+    int ModuleId,
+    int FrameworkId,
+    int StartReleaseId,
+    int? EndReleaseId,
+    string? VersionNumber,
+    string? FromReferenceDate);
+
+/// <summary>
 /// Row of <c>ModuleVersionComposition</c>. It is NOT itself versioned: whether a (module, table)
 /// pair is current is decided by the currency of <see cref="ModuleVId"/> and of
 /// <see cref="TableVId"/> separately, each in its own table.

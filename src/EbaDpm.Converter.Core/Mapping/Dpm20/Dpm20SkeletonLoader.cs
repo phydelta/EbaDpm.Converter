@@ -14,8 +14,8 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 /// This is a NEW pipeline, PARALLEL to the DPM 1.0
 /// <see cref="EbaDpm.Converter.Core.Mapping.SkeletonLoader"/>: it has the SAME SHAPE by style, but
 /// it neither reuses nor depends on it — the business rules differ at several points, starting
-/// with the fact that here <c>mTaxonomy.TaxonomyLabel</c> stays NULL whereas in DPM 1.0 it is
-/// populated.
+/// with the fact that here <c>mTaxonomy.TaxonomyLabel</c> and its four sibling columns are
+/// derived (<see cref="Dpm20TaxonomyMetadataCalculator"/>) whereas in DPM 1.0 they are read.
 ///
 /// Out of scope here: <c>mConcept</c> and <c>mConceptTranslation</c> (<c>ConceptID</c> stays NULL
 /// in everything this class writes) and everything after the skeleton (dictionary, structure,
@@ -33,7 +33,8 @@ public static class Dpm20SkeletonLoader
         int LanguageRows,
         int RewriteUriRows,
         int TaxonomyPackageRows,
-        int DatabasePropertiesRows);
+        int DatabasePropertiesRows,
+        IReadOnlyList<string>? UnresolvedTaxonomyColumns = null);
 
     // ------------------------------------------------------------------
     // mRelease — the 5 rows of [Release], not filtered by selected taxonomy.
@@ -99,13 +100,27 @@ public static class Dpm20SkeletonLoader
     }
 
     // ------------------------------------------------------------------
-    // mTaxonomy — TaxonomyLabel/Version/PublicationDate/FromDate/ToDate/ExcelTemplate are NULL,
-    // there is no source. TechnicalStandard comes already computed (lowercase framework) from
-    // Dpm20TaxonomyDeriver.
+    // mTaxonomy — there is no Taxonomy table in the source: TaxonomyLabel/Version/PublicationDate/
+    // FromDate/ToDate are derived from Release and the ModuleVersion history by
+    // Dpm20TaxonomyMetadataCalculator (a column it cannot resolve stays NULL and is reported).
+    // ExcelTemplate is NULL, there is no source. TechnicalStandard comes already computed
+    // (lowercase framework) from Dpm20TaxonomyDeriver.
     // ------------------------------------------------------------------
 
-    private static void LoadTaxonomies(SqliteConnection destination, IReadOnlyList<AccessTaxonomyRow> selectedTaxonomies)
+    private static IReadOnlyList<string> LoadTaxonomies(
+        SqliteConnection destination,
+        IReadOnlyList<Dpm20ReleaseRow> releases,
+        IReadOnlyList<Dpm20FrameworkRow> frameworks,
+        IReadOnlyList<AccessTaxonomyRow> selectedTaxonomies,
+        IReadOnlyList<Dpm20ModuleVersionHistoryRow>? moduleVersionHistory,
+        int cutoffReleaseId)
     {
+        // Without the ModuleVersion history (caller that does not supply it) the five derived
+        // columns stay NULL: nothing is invented.
+        var metadata = moduleVersionHistory is null
+            ? null
+            : Dpm20TaxonomyMetadataCalculator.Compute(releases, frameworks, moduleVersionHistory, selectedTaxonomies, cutoffReleaseId);
+
         using var writer = new SqliteBatchWriter(
             destination,
             "mTaxonomy",
@@ -113,20 +128,24 @@ public static class Dpm20SkeletonLoader
 
         foreach (var taxonomy in selectedTaxonomies)
         {
+            Dpm20TaxonomyMetadata? derived = null;
+            metadata?.ByTaxonomyId.TryGetValue(taxonomy.TaxonomyId, out derived);
+
             writer.AddRow(
                 taxonomy.TaxonomyId,
                 taxonomy.FrameworkId,
                 taxonomy.TaxonomyCode, // already lowercase + release (Dpm20TaxonomyDeriver)
-                null, // TaxonomyLabel: ALWAYS NULL. There is no Taxonomy table in the source;
-                      // filling it with the framework Name would be inventing data.
-                null, // Version: no source
-                null, // PublicationDate: no source
+                derived?.TaxonomyLabel,
+                derived?.Version,
+                derived?.PublicationDate, // Release.Date of the taxonomy's release, ISO TEXT as is
                 taxonomy.TechnicalStandard,
                 null, // ConceptID: NULL until the concept loader runs
-                null, // FromDate: no source
-                null, // ToDate: no source
+                derived?.FromDate,
+                derived?.ToDate,
                 null); // ExcelTemplate: no source
         }
+
+        return metadata?.UnresolvedCases ?? [];
     }
 
     // ------------------------------------------------------------------
@@ -258,13 +277,18 @@ public static class Dpm20SkeletonLoader
     /// <c>Dpm20AccessReader.CutoffReleaseId</c>: the only release written with <c>IsCurrent=1</c>.
     /// </param>
     /// <param name="destination">Destination SQLite connection, already open on the created schema.</param>
+    /// <param name="moduleVersionHistory">
+    /// <c>Dpm20AccessReader.ReadModuleVersionHistory</c>: source of the derived <c>mTaxonomy</c>
+    /// columns. When <see langword="null"/> they are left NULL.
+    /// </param>
     public static Result Load(
         IReadOnlyList<Dpm20ReleaseRow> releases,
         IReadOnlyList<Dpm20FrameworkRow> frameworks,
         IReadOnlyList<AccessTaxonomyRow> selectedTaxonomies,
         string cutoffReleaseCode,
         int cutoffReleaseId,
-        SqliteConnection destination)
+        SqliteConnection destination,
+        IReadOnlyList<Dpm20ModuleVersionHistoryRow>? moduleVersionHistory = null)
     {
         ArgumentNullException.ThrowIfNull(releases);
         ArgumentNullException.ThrowIfNull(frameworks);
@@ -278,7 +302,8 @@ public static class Dpm20SkeletonLoader
 
         var emittedFrameworks = LoadReportingFrameworks(destination, frameworks, selectedTaxonomies);
 
-        LoadTaxonomies(destination, selectedTaxonomies);
+        var unresolvedTaxonomyColumns = LoadTaxonomies(
+            destination, releases, frameworks, selectedTaxonomies, moduleVersionHistory, cutoffReleaseId);
 
         // mTaxonomyPackage before mOwner/.../mRewriteURI: mRewriteURI.TaxonomyPackageID references
         // it (with foreign_keys=OFF the order is not mandatory, but it is kept for clarity).
@@ -301,7 +326,8 @@ public static class Dpm20SkeletonLoader
             LanguageRows: 1,
             RewriteUriRows: 4,
             TaxonomyPackageRows: 1,
-            DatabasePropertiesRows: 2);
+            DatabasePropertiesRows: 2,
+            UnresolvedTaxonomyColumns: unresolvedTaxonomyColumns);
     }
 
     private static void ApplyBulkLoadPragmas(SqliteConnection destination)

@@ -521,39 +521,63 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     }
 
     // ------------------------------------------------------------------
-    // 7 - The 32 taxonomies DO carry a translation row, with a NULL Text (it keeps the shape "one
-    // concept, one translation" without inventing text). Reference: 31/31/31 with a NULL Text - ours
-    // has 32 because we emit one more taxonomy than the reference (pay 4.1).
+    // 7 - The 32 taxonomies carry exactly one 'label' translation row whose Text is the
+    // mTaxonomy.TaxonomyLabel of the same taxonomy (issue #11 retired the former NULL Text: the
+    // label is now derived, and the concept loader passes on whatever label the entity has).
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MConceptTranslation_Taxonomy_All32CarryARowWithNullText()
+    public void MConceptTranslation_Taxonomy_All32CarryOneLabelRow_WhoseTextIsTheTaxonomyLabel()
     {
-        Assert.Equal(32, Scalar("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'Taxonomy'"));
+        Assert.Equal(32, Scalar("SELECT COUNT(1) FROM \"mConcept\" WHERE \"ConceptType\" = 'Taxonomy'"));
 
-        var translationCount = Scalar(
+        // Exactly one translation per Taxonomy concept, and it is a 'label'.
+        Assert.Equal(32, Scalar(
             """
-            SELECT COUNT(*) FROM "mConceptTranslation" ct
+            SELECT COUNT(1) FROM "mConceptTranslation" ct
             JOIN "mConcept" c ON c."ConceptID" = ct."ConceptID"
-            WHERE c."ConceptType" = 'Taxonomy'
-            """);
-        Assert.Equal(32, translationCount);
-
-        var nonNullText = Scalar(
+            WHERE c."ConceptType" = 'Taxonomy' AND ct."Role" = 'label'
+            """));
+        Assert.Equal(0, Scalar(
             """
-            SELECT COUNT(*) FROM "mConceptTranslation" ct
-            JOIN "mConcept" c ON c."ConceptID" = ct."ConceptID"
-            WHERE c."ConceptType" = 'Taxonomy' AND ct."Text" IS NOT NULL
-            """);
-        Assert.Equal(0, nonNullText);
-
-        var nonLabelRole = Scalar(
-            """
-            SELECT COUNT(*) FROM "mConceptTranslation" ct
+            SELECT COUNT(1) FROM "mConceptTranslation" ct
             JOIN "mConcept" c ON c."ConceptID" = ct."ConceptID"
             WHERE c."ConceptType" = 'Taxonomy' AND ct."Role" <> 'label'
+            """));
+        Assert.Equal(0, Scalar(
+            """
+            SELECT COUNT(1) FROM (
+              SELECT ct."ConceptID" FROM "mConceptTranslation" ct
+              JOIN "mConcept" c ON c."ConceptID" = ct."ConceptID"
+              WHERE c."ConceptType" = 'Taxonomy' GROUP BY ct."ConceptID" HAVING COUNT(1) <> 1)
+            """));
+
+        // Positive control: the join taxonomy -> concept -> translation really examines 32 rows,
+        // so a zero count of mismatches cannot come from an empty join.
+        var joined = Scalar(
+            """
+            SELECT COUNT(1) FROM "mTaxonomy" t
+            JOIN "mConceptTranslation" ct ON ct."ConceptID" = t."ConceptID" AND ct."Role" = 'label'
             """);
-        Assert.Equal(0, nonLabelRole);
+        Assert.Equal(32, joined);
+
+        var mismatches = Scalar(
+            """
+            SELECT COUNT(1) FROM "mTaxonomy" t
+            JOIN "mConceptTranslation" ct ON ct."ConceptID" = t."ConceptID" AND ct."Role" = 'label'
+            WHERE ct."Text" IS NULL OR t."TaxonomyLabel" IS NULL OR ct."Text" <> t."TaxonomyLabel"
+            """);
+        Assert.Equal(0, mismatches);
+
+        // Positive control of the predicate itself: compared against a deliberately different
+        // text, the same join finds all 32 rows.
+        var controlMismatches = Scalar(
+            """
+            SELECT COUNT(1) FROM "mTaxonomy" t
+            JOIN "mConceptTranslation" ct ON ct."ConceptID" = t."ConceptID" AND ct."Role" = 'label'
+            WHERE ct."Text" IS NULL OR ct."Text" <> t."TaxonomyLabel" || ' (mutated)'
+            """);
+        Assert.Equal(32, controlMismatches);
     }
 
     // ------------------------------------------------------------------

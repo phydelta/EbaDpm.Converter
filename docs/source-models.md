@@ -153,6 +153,8 @@ StartReleaseID <= R  AND  (EndReleaseID IS NULL OR EndReleaseID > R)
 makes two versions of the same entity valid at the same time, which the model forbids; with the
 exclusive reading there are no such overlaps in any versioned table. The predicate is applied in
 SQL inside the reader, once per method, so no versioned row reaches the mapping layer unfiltered.
+The one deliberate exception is the `ModuleVersion` history described below, filtered by
+`StartReleaseID <= R` only.
 
 **What is cut and what is not.**
 
@@ -164,6 +166,12 @@ The dictionary is shared across taxonomies and the distribution format keeps ren
 by side (for example both `FGT` and `old-FGT`), so it is exported in full. `PropertyCategory`
 validity windows are still read, because the start release of each window becomes the release
 suffix of the dimension code (`eba_dim_4.0:…`).
+
+`ModuleVersion` is also read a second time, as its history up to the cutoff
+(`StartReleaseID <= R`, without the end condition), to describe the derived taxonomies: the
+version, `FromDate` and `ToDate` of a taxonomy depend on the module versions published in earlier
+releases (see [mapping-dpm2.md](mapping-dpm2.md#mtaxonomy)). This history only feeds those
+columns; no superseded module version is emitted.
 
 **Taxonomies and the cutoff.** Each emitted table version produces up to two derived taxonomies:
 `(framework, cutoff release)` and `(framework, release in which that table version started)`.
