@@ -209,7 +209,7 @@ public static class Dpm20AxisAndCellLoader
     // ==================================================================
 
     public static Result Load(
-        Dpm20AccessReader reader,
+        IDpm20AxisAndCellSource reader,
         SqliteConnection destination,
         IReadOnlyDictionary<int, int> tableVIdByTableId,
         IReadOnlyList<Dpm20TableVersionRow> currentTableVersions,

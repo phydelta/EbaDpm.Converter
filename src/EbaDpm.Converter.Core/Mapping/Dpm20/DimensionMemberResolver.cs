@@ -76,7 +76,7 @@ internal sealed class DimensionMemberResolver
     /// </summary>
     public int UnresolvedOpenAxisRestrictions;
 
-    public static DimensionMemberResolver Build(Dpm20AccessReader reader, SqliteConnection destination, List<string> structuralAnomalies)
+    public static DimensionMemberResolver Build(IDpm20AxisAndCellSource reader, SqliteConnection destination, List<string> structuralAnomalies)
     {
         var categories = reader.ReadCategories().ToList();
         var categoryCodeById = categories.ToDictionary(c => c.CategoryId, c => c.Code);
