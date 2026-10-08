@@ -148,13 +148,56 @@ public sealed class InvariantChecksSyntheticTests : IDisposable
         Exec(c, "INSERT INTO mMember (MemberID, DomainID, MemberCode) VALUES (101, 2, 'q1B'), (102, 2, 'ZZZ_NOT_DECLARED')");
         Exec(c, "INSERT INTO mHierarchyNode (HierarchyID, MemberID, ParentMemberID, Level, Path) VALUES (1, 101, NULL, 1, '101.'), (1, 102, NULL, 1, '102.')");
 
-        var results = DictionaryChecks.Run(c, ValidationSourceModel.Dpm2).ToList();
+        var sink = new List<KnownExceptions.Outcome>();
+        var results = DictionaryChecks.Run(c, ValidationSourceModel.Dpm2, sink).ToList();
         var itre07b = Assert.Single(results, r => r.Id == "I-TRE-07b");
 
         Assert.Equal(CheckStatus.Fail, itre07b.Status);
         Assert.Equal(1, itre07b.Failed);
         Assert.Contains(itre07b.Samples, s => s.BusinessKey == "GA4:qIO:ZZZ_NOT_DECLARED");
         Assert.DoesNotContain(itre07b.Samples, s => s.BusinessKey.Contains("q1B", StringComparison.Ordinal));
+
+        // The declared key that violates is matched; every other AO-3 key is OneSided and not stale.
+        var matched = Assert.Single(sink, o => o.Exception.BusinessKey == "GA4:qIO:q1B");
+        Assert.Equal("AO-3", matched.Exception.Id);
+        Assert.True(matched.AppliesToThisReference);
+        Assert.Equal(1, matched.Matched);
+        Assert.False(matched.Stale);
+        Assert.DoesNotContain(sink, o => o.Exception.BusinessKey == "GA4:qIO:ZZZ_NOT_DECLARED");
+        Assert.All(sink.Where(o => o.Exception.Id == "AO-3" && o.Exception.BusinessKey != "GA4:qIO:q1B"), o =>
+        {
+            Assert.Equal(0, o.Matched);
+            Assert.False(o.Stale);
+        });
+    }
+
+    /// <summary>
+    /// AO-3 is OneSided: with NO violating node at all, none of the 104 declared keys is stale
+    /// (shrinkage is not watched) and each reports Matched 0. Positive control: the previous test
+    /// shows the same sink DOES report Matched 1 for a violating declared key.
+    /// </summary>
+    [Fact]
+    public void ITre07b_DeclaredKeysThatDoNotViolate_AreNotStale()
+    {
+        using var c = CreateAndOpen("ao3-none-violating.db");
+
+        Exec(c, "INSERT INTO mDomain (DomainID, DomainCode) VALUES (1, 'GA4dom')");
+        Exec(c, "INSERT INTO mHierarchy (HierarchyID, HierarchyCode, DomainID) VALUES (1, 'GA4', 1)");
+        Exec(c, "INSERT INTO mMember (MemberID, DomainID, MemberCode) VALUES (101, 1, 'q1B')");
+        Exec(c, "INSERT INTO mHierarchyNode (HierarchyID, MemberID, ParentMemberID, Level, Path) VALUES (1, 101, NULL, 1, '101.')");
+
+        var sink = new List<KnownExceptions.Outcome>();
+        var results = DictionaryChecks.Run(c, ValidationSourceModel.Dpm2, sink).ToList();
+        var itre07b = Assert.Single(results, r => r.Id == "I-TRE-07b");
+
+        Assert.Equal(CheckStatus.Pass, itre07b.Status);
+        var ao3 = sink.Where(o => o.Exception.Id == "AO-3").ToList();
+        Assert.Equal(104, ao3.Count);
+        Assert.All(ao3, o =>
+        {
+            Assert.Equal(0, o.Matched);
+            Assert.False(o.Stale);
+        });
     }
 
     /// <summary>
@@ -173,7 +216,8 @@ public sealed class InvariantChecksSyntheticTests : IDisposable
         Exec(c, "INSERT INTO mMember (MemberID, DomainID, MemberCode) VALUES (101, 2, 'q1B')");
         Exec(c, "INSERT INTO mHierarchyNode (HierarchyID, MemberID, ParentMemberID, Level, Path) VALUES (1, 101, NULL, 1, '101.')");
 
-        var results = DictionaryChecks.Run(c, ValidationSourceModel.Dpm2).ToList();
+        var sink = new List<KnownExceptions.Outcome>();
+        var results = DictionaryChecks.Run(c, ValidationSourceModel.Dpm2, sink).ToList();
         var itre07b = Assert.Single(results, r => r.Id == "I-TRE-07b");
 
         Assert.Equal(CheckStatus.Pass, itre07b.Status);
@@ -485,5 +529,80 @@ public sealed class InvariantChecksSyntheticTests : IDisposable
         {
             Assert.DoesNotContain(bdic019.Samples, s => s.BusinessKey.Contains(stillClean, StringComparison.Ordinal));
         }
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // I-XBR-01c / AO-1 (DPM 1.0 path): TwoSided - growth AND shrinkage count, and the outcomes
+    // reach the sink so the validator can gate on a stale entry.
+    // -----------------------------------------------------------------------------------------
+
+    private const int Ao1Count = 50;
+
+    /// <summary>
+    /// One AO-1 key ("qIT:TI:x19": DomainCode "qIT", MemberCode "TI:x19", MemberXBRLCode whose local
+    /// part "x19" differs from the MemberCode) still violates; the other 49 do not exist in the
+    /// fixture. Outcome of the violating key: Matched 1, not stale. The 49 others: stale. The check
+    /// fails with exactly those 49 (shrinks), and the matched one is not reported as a sample.
+    /// </summary>
+    [Fact]
+    public void IXbr01c_Dpm1_AViolatingAo1Key_IsMatchedAndNotStale()
+    {
+        using var c = CreateAndOpen("ao1-one-violating.db");
+
+        Exec(c, "INSERT INTO mDomain (DomainID, DomainCode) VALUES (1, 'qIT')");
+        Exec(c, "INSERT INTO mMember (MemberID, DomainID, MemberCode, MemberXBRLCode) VALUES (1, 1, 'TI:x19', 'eba_TI:x19')");
+
+        var sink = new List<KnownExceptions.Outcome>();
+        var results = IntegrityChecks.Run(c, ValidationSourceModel.Dpm1, sink).ToList();
+        var ixbr = Assert.Single(results, r => r.Id == "I-XBR-01c");
+
+        var matched = Assert.Single(sink, o => o.Exception.Id == "AO-1" && o.Exception.BusinessKey == "qIT:TI:x19");
+        Assert.True(matched.AppliesToThisReference);
+        Assert.Equal(1, matched.Matched);
+        Assert.False(matched.Stale);
+
+        var ao1 = sink.Where(o => o.Exception.Id == "AO-1").ToList();
+        Assert.Equal(Ao1Count, ao1.Count);
+        Assert.Equal(Ao1Count - 1, ao1.Count(o => o.Stale));
+        Assert.All(ao1.Where(o => o.Exception.BusinessKey != "qIT:TI:x19"), o =>
+        {
+            Assert.True(o.Stale);
+            Assert.Equal(0, o.Matched);
+        });
+
+        // Exactly the 49 stale keys fail the check (TwoSided); the matched one does not.
+        Assert.Equal(CheckStatus.Fail, ixbr.Status);
+        Assert.Equal(Ao1Count - 1, ixbr.Failed);
+        Assert.DoesNotContain(ixbr.Samples, s => s.BusinessKey.Contains("qIT:TI:x19", StringComparison.Ordinal));
+        Assert.Contains(ixbr.Samples, s => s.BusinessKey.Contains("qIT:TI:x102", StringComparison.Ordinal) && s.BusinessKey.Contains("no longer violates", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// No mMember violates at all: every one of the 50 AO-1 keys is stale (TwoSided) and the check
+    /// fails with 50. Positive control for the previous test (same code path, opposite outcome).
+    /// </summary>
+    [Fact]
+    public void IXbr01c_Dpm1_WhenNoAo1KeyViolates_AllFiftyAreStale()
+    {
+        using var c = CreateAndOpen("ao1-none-violating.db");
+
+        Exec(c, "INSERT INTO mDomain (DomainID, DomainCode) VALUES (1, 'qIT')");
+        Exec(c, "INSERT INTO mMember (MemberID, DomainID, MemberCode, MemberXBRLCode) VALUES (1, 1, 'x19', 'eba_TI:x19')");
+
+        var sink = new List<KnownExceptions.Outcome>();
+        var results = IntegrityChecks.Run(c, ValidationSourceModel.Dpm1, sink).ToList();
+        var ixbr = Assert.Single(results, r => r.Id == "I-XBR-01c");
+
+        var ao1 = sink.Where(o => o.Exception.Id == "AO-1").ToList();
+        Assert.Equal(Ao1Count, ao1.Count);
+        Assert.All(ao1, o =>
+        {
+            Assert.True(o.Stale);
+            Assert.Equal(0, o.Matched);
+        });
+        Assert.Contains(ao1, o => o.Exception.BusinessKey == "qIT:TI:x19");
+
+        Assert.Equal(CheckStatus.Fail, ixbr.Status);
+        Assert.Equal(Ao1Count, ixbr.Failed);
     }
 }

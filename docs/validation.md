@@ -185,7 +185,7 @@ for documented reasons. Counts are row counts.
 | `mTable` · `mTaxonomyTable` · `mTemplateOrTable` | 847 · 847 · 1,530 | 846 · 846 · 1,529 | +1 each | One table the Access database declares and the reference does not (`pay 4.1` / `S_04.00`) |
 | `mAxis` · `mTableAxis` · `mAxisOrdinate` | 1,993 · 1,993 · 20,712 | 1,991 · 1,991 · 20,705 | +2 · +2 · +7 | Follows from the previous row |
 | `mTableCell` · `mCellPosition` | 163,218 · 415,586 | 163,206 · 415,562 | +12 · +24 | Follows from the previous row |
-| `mDimension` | 1,100 | 1,101 | −1 | `TNS`, a dimension with no use in the reference itself |
+| `mDimension` | 1,100 | 1,101 | −1 | `TNS`, a dimension that nothing in the Access database or in the reference itself uses (known exception DD-26) |
 | `mTaxonomy` | 32 | 31 | +1 | `pay 4.1`, declared by the Access database |
 | `aDatabaseProperties` | 2 | 1 | +1 | The output adds the `Source model` property |
 

@@ -124,5 +124,91 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
             stale.Count == 0,
             $"{stale.Count} stale plane B known exception(s) apply to the 4.2 reference: "
             + string.Join(" | ", stale.Select(e => $"Id={e.Id}, BusinessKey={e.BusinessKey}, Scope={e.Scope}")));
+
+        // An exception that applies to this reference and was evaluated must either match or be
+        // stale. Matched == 0 and not stale means the exception was silently dropped (DD-26 was
+        // once skipped by the containment filter and went unnoticed).
+        var silentlyDropped = applicablePlaneB.Where(e => e.Evaluated && e.Matched == 0 && !e.Stale).ToList();
+        Assert.True(
+            silentlyDropped.Count == 0,
+            $"{silentlyDropped.Count} plane B known exception(s) apply to the 4.2 reference, were evaluated, "
+            + "and have Matched == 0 without being stale: "
+            + string.Join(" | ", silentlyDropped.Select(e => $"Id={e.Id}, Check={e.Scope}, BusinessKey={e.BusinessKey}")));
+    }
+
+    /// <summary>
+    /// DD-26: dimension <c>TNS</c> is in the 4.2 reference but deliberately not emitted (issue #10).
+    /// Both DD-26 entries (dimension code census and dimension XBRL census) must apply to this
+    /// reference, be matched and not stale, and the two critical censuses B-DIC-01.3 and
+    /// B-DIC-01.6 must pass: no other dimension may be missing. Positive control: TNS is read
+    /// from the reference and from the generated file by business key, so the test cannot pass
+    /// vacuously (TNS present in the reference, absent from the output).
+    /// </summary>
+    [DataFact]
+    public void Validate_WithReference42_Dd26UnusedDimensionTns_IsMatchedAndDimensionCensusesPass()
+    {
+        RepoPaths.EnsureReferenceDatabaseExists();
+
+        // Positive control: the divergence is real.
+        Assert.Equal(1, CountDimension(RepoPaths.ReferenceDatabasePath, "TNS"));
+        Assert.Equal(0, CountDimension(fixture.ValidatedDatabasePath, "TNS"));
+
+        var result = ValidatorRunCache.Run(fixture.ValidatedDatabasePath, RepoPaths.ReferenceDatabasePath);
+
+        // All problems are collected so one run shows the complete evidence.
+        var problems = new List<string>();
+
+        foreach (var scope in new[] { "B-DIC-01-DIMENSION-CODE", "B-DIC-01-DIMENSION-XBRL" })
+        {
+            var dd26 = Assert.Single(result.Report.Exceptions, e => e.Id == "DD-26" && e.Scope == scope);
+            Assert.Equal("TNS", dd26.BusinessKey);
+            if (!dd26.AppliesToThisReference)
+            {
+                problems.Add($"DD-26 ({scope}) does not apply to the 4.2 reference.");
+            }
+
+            if (dd26.Matched < 1)
+            {
+                problems.Add($"DD-26 ({scope}) expected matched >= 1, actual {dd26.Matched} (evaluated={dd26.Evaluated}, stale={dd26.Stale}).");
+            }
+
+            if (dd26.Stale)
+            {
+                problems.Add($"DD-26 ({scope}) is reported stale.");
+            }
+        }
+
+        foreach (var id in new[] { "B-DIC-01.3", "B-DIC-01.6" })
+        {
+            var check = Assert.Single(result.Report.Checks, c => c.Id == id);
+            var samples = string.Join(" | ", check.Samples.Select(s => s.BusinessKey));
+            if (check.Status != "pass" || check.Failed != 0)
+            {
+                problems.Add($"{id} status={check.Status}, failed={check.Failed}, examined={check.Examined}; keys: {samples}");
+            }
+
+            if (check.Examined <= 0)
+            {
+                problems.Add($"{id} examined nothing.");
+            }
+        }
+
+        Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
+    }
+
+    private static long CountDimension(string path, string dimensionCode)
+    {
+        var connectionString = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+        {
+            DataSource = path,
+            Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadOnly,
+            Pooling = false,
+        }.ToString();
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection(connectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(1) FROM \"mDimension\" WHERE \"DimensionCode\" = $code";
+        command.Parameters.AddWithValue("$code", dimensionCode);
+        return (long)command.ExecuteScalar()!;
     }
 }

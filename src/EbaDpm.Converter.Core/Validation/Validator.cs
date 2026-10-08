@@ -35,7 +35,7 @@ public static class Validator
             var checks = new List<CheckInfo>();
             var exceptionOutcomes = new List<KnownExceptions.Outcome>();
 
-            foreach (var result in RunPlaneA(generated, sourceModel))
+            foreach (var result in RunPlaneA(generated, sourceModel, exceptionOutcomes))
             {
                 checks.Add(ToCheckInfo(result));
             }
@@ -123,9 +123,10 @@ public static class Validator
         }
     }
 
-    private static IEnumerable<CheckResult> RunPlaneA(SqliteConnection c, ValidationSourceModel model) =>
-        IntegrityChecks.Run(c, model)
-            .Concat(DictionaryChecks.Run(c, model))
+    private static IEnumerable<CheckResult> RunPlaneA(
+        SqliteConnection c, ValidationSourceModel model, List<KnownExceptions.Outcome> exceptionSink) =>
+        IntegrityChecks.Run(c, model, exceptionSink)
+            .Concat(DictionaryChecks.Run(c, model, exceptionSink))
             .Concat(TemplateChecks.Run(c))
             .Concat(AxisChecks.Run(c))
             .Concat(CellChecks.Run(c, model))

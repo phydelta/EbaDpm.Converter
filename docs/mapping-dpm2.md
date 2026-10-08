@@ -216,7 +216,12 @@ One row per `MET` member, in the same order, `CorrespondingMemberID` pointing to
 ### mDimension
 
 Dimension properties are those used in `ContextComposition` or as the property of a `key`
-variable. Each produces **one row per `PropertyCategory` row** (the domain of its values over a
+variable. A property used by neither is not emitted, even when it is in force and has a
+`PropertyCategory` row: `Property.IsMetric = 0` does not identify a dimension, since most such
+properties are metrics, and the source gives no other signal for an unused one. (Measured on
+2026-10-08 in the 4.2.1 and 4.3 databases: 15 properties with a dimension code are in this
+situation; the 4.2 reference export keeps one of them, `TNS`, declared as known exception DD-26.)
+Each dimension property produces **one row per `PropertyCategory` row** (the domain of its values over a
 release window), crossed with the property code valid in the same window — so a property whose
 domain or code changed between releases yields one dimension per period (`LEA` / `qLEA`).
 
