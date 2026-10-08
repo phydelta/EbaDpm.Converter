@@ -248,9 +248,9 @@ public static class Dpm20TaxonomyDeriver
                 TaxonomyId: taxonomyId,
                 FrameworkId: framework.FrameworkId,
                 TaxonomyCode: taxonomyCode,
-                // ALWAYS NULL. framework.Name is the label of the FRAMEWORK, not of the taxonomy —
-                // the source has no Taxonomy table and there is no label to read. Filling it with
-                // the framework name would be inventing data.
+                // NULL here: the derivation of this row does not compute it. mTaxonomy.TaxonomyLabel
+                // (and Version/PublicationDate/FromDate/ToDate) are derived later, from the
+                // ModuleVersion history, by Dpm20TaxonomyMetadataCalculator.
                 TaxonomyLabel: null,
                 TechnicalStandard: framework.Code.ToLowerInvariant(),
                 NotionalPublicationDate: null,

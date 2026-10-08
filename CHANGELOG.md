@@ -19,6 +19,9 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Changed
 
+- DPM 2.0: `mTaxonomy.TaxonomyLabel`, `Version`, `PublicationDate`, `FromDate` and `ToDate` are
+  now derived from `Release` and `ModuleVersion` instead of being `NULL`; the last taxonomy of a
+  framework is open with `ToDate` `9999-12-31` (#11).
 - Validation: removed the known exception E-1 (dimension `EXC` against the 4.2 reference). The
   output has contained both versions of `EXC` for some time, so the exception was stale; a
   test now fails if any plane B exception for the 4.2 reference goes stale.

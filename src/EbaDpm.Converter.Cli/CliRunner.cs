@@ -477,6 +477,7 @@ public static class CliRunner
         var moduleVersions = accessReader.ReadModuleVersions().ToList();
         var compositions = accessReader.ReadModuleVersionCompositions().ToList();
         var tableVersions = accessReader.ReadTableVersions().ToList();
+        var moduleVersionHistory = accessReader.ReadModuleVersionHistory().ToList();
 
         var derivation = Dpm20TaxonomyDeriver.Derive(
             releases, frameworks, modules, moduleVersions, compositions, tableVersions, accessReader.CutoffReleaseId);
@@ -495,7 +496,8 @@ public static class CliRunner
         using var destination = new SqliteConnection(connectionString);
         destination.Open();
 
-        var skeleton = Dpm20SkeletonLoader.Load(releases, frameworks, selectedTaxonomies, accessReader.CutoffReleaseCode, accessReader.CutoffReleaseId, destination);
+        var skeleton = Dpm20SkeletonLoader.Load(releases, frameworks, selectedTaxonomies, accessReader.CutoffReleaseCode, accessReader.CutoffReleaseId, destination, moduleVersionHistory);
+        WriteDiagnosticList(stdout, "mTaxonomy: unresolved label/version/date columns", skeleton.UnresolvedTaxonomyColumns ?? []);
 
         var dictionary = Dpm20DictionaryLoader.Load(accessReader, destination, out var dictionaryDiagnostics);
 

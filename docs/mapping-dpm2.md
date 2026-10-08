@@ -27,7 +27,7 @@ Loaders run in this order (`src/EbaDpm.Converter.Core/Mapping/Dpm20/`):
 
 | Rule | Detail |
 |---|---|
-| **Read as of the cutoff release.** | Versioned tables are filtered with `Start <= R AND (End IS NULL OR End > R)`, `EndReleaseID` exclusive. The dictionary is not filtered. See [source-models.md](source-models.md#the-cutoff-release-dpm-20). |
+| **Read as of the cutoff release.** | Versioned tables are filtered with `Start <= R AND (End IS NULL OR End > R)`, `EndReleaseID` exclusive. The dictionary is not filtered, and the `ModuleVersion` history up to the cutoff is read to describe taxonomies ([mTaxonomy](#mtaxonomy)). See [source-models.md](source-models.md#the-cutoff-release-dpm-20). |
 | **The source decides.** | Where the source has a value, it is exported; where it has none, the column stays empty. Nothing is invented to resemble another export of the format. |
 | **One row per (table, taxonomy) pair.** | A table version that belongs to two derived taxonomies produces its structure twice, once per taxonomy, with fresh IDs. |
 | **IDs are minted deterministically.** | DPM 2.0 has no entity matching axes, ordinates, cells or concepts one-to-one, so their IDs are counters assigned in a fixed order. |
@@ -79,7 +79,44 @@ DPM 2.0 has no `Taxonomy` table; taxonomies are **derived** (`Dpm20TaxonomyDeriv
 | `TaxonomyID` | synthetic, by `TaxonomyCode` ordinal order |
 | `FrameworkID` | the framework |
 | `TechnicalStandard` | framework code in lower case |
-| `TaxonomyLabel`, `Version`, `PublicationDate`, `FromDate`, `ToDate`, `ExcelTemplate` | `NULL` — the source has no taxonomy entity. The framework name is not used as a label: it names the framework, not the taxonomy, and would lose the release. |
+| `Version` | `Release.Code` of R |
+| `PublicationDate` | `Release.Date` of R, as text |
+| `TaxonomyLabel` | `<Framework.Name> <version> (DPM <R>)`, e.g. `Common Reporting 4.1.0 (DPM 4.3)`; `<version>` is the highest `VersionNumber` (numeric order) of the module versions of F that start in R′ |
+| `FromDate` | lowest `FromReferenceDate` of the module versions of F that start in R′ |
+| `ToDate` | the day before the `FromDate` of the next publication of F with a later `FromDate`; `9999-12-31` when there is none |
+| `ExcelTemplate` | `NULL` (no source) |
+
+The descriptive columns come from `ModuleVersion`, which declares per module a `VersionNumber`
+and a `FromReferenceDate`. For a taxonomy T = (framework F, release R), with releases ordered by
+`ReleaseID` and only releases up to the cutoff considered:
+
+- **R′** is the latest release ≤ R in which a module version of F starts (`StartReleaseID`) that
+  is still current at R. When F publishes module versions in R, R′ = R. Otherwise the taxonomy
+  has the content of R′ (for example `corep 4.3` on the 4.3 database, unchanged since 4.2) and
+  takes its version and `FromDate`.
+- The **publications** of F are the releases in which some module version of F starts, over the
+  whole `ModuleVersion` history up to the cutoff, not only the emitted taxonomies. They form a
+  chain: `ToDate` is the day before the `FromDate` of the first later publication (in release
+  order) whose `FromDate` is strictly later. `FromDate` is not monotonic in release order (COREP
+  3.5 applies from 2025-03-31, COREP 4.0 from 2024-12-31), so chaining to the immediate
+  successor would produce inverted intervals. Taxonomies that share a `FromDate` through R′ stay
+  open together.
+- The label version is that of the module versions published in R′, not of the framework as a
+  whole: a release that only updates a minor module shows that module's version. On the 4.3
+  database, `finrep 4.2.1` is `Financial Reporting 1.1.0 (DPM 4.2.1)` (module `FINREP9DP`), while
+  `finrep 4.2` is `3.3.0` (`FINREP9`). DPM 1.0 does the same (`Payments 1.0.0 (DPM 4.1)` after
+  `Payments 1.1.0 (DPM 4.0)`).
+- `9999-12-31` is a deliberate sentinel for "open": the last publication of a framework has no
+  end of application declared anywhere in the source.
+- When R′ or a needed value cannot be found, the affected columns stay `NULL` and the case is
+  reported in the conversion log.
+
+The rule was checked against DPM 1.0, which declares taxonomy labels and dates, on the releases
+both models share (3.4 to 4.1; measured 2026-10-08 on the DPM 1.0 4.1 and DPM 2.0 4.3
+databases): the label version and `FromDate` match in 28 of 28 comparable taxonomies, and the
+`ToDate` chain matches 70 of the 84 closed DPM 1.0 taxonomies, the rest being irregular cases of
+the DPM 1.0 history (one-day windows, parallel `-Ind` variants). The R′ case has no DPM 1.0
+counterpart. See issue #11.
 
 ### Fixed rows
 

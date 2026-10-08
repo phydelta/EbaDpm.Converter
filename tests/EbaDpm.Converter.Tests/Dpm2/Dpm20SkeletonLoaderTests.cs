@@ -161,20 +161,29 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// <c>TaxonomyLabel</c> stays NULL in all 32 rows: the DPM 2.0 source has NO <c>Taxonomy</c>
-    /// table, so there is no data to map -- filling it with the framework <c>Name</c> would be
-    /// INVENTING the label of a different object. It is not filled "because it looks better": this
-    /// test records the reason so that nobody "fixes" it without rethinking it.
+    /// Issue #11 retired the former rule "<c>TaxonomyLabel</c> is NULL in all 32 rows": the label,
+    /// <c>Version</c>, <c>PublicationDate</c>, <c>FromDate</c> and <c>ToDate</c> are now derived
+    /// from the <c>ModuleVersion</c> history (<c>docs/mapping-dpm2.md</c>). They are non-NULL TEXT in
+    /// all 32 rows; <c>ExcelTemplate</c> stays NULL (no source). The exact values are checked in
+    /// <c>Dpm2042CutoffTaxonomyMetadataTests</c>.
     /// </summary>
     [DataFact]
-    public void MTaxonomy_TaxonomyLabel_IsNullInAll32Rows_BecauseTheSourceHasNoTaxonomyTable()
+    public void MTaxonomy_MetadataColumns_AreNonNullTextInAll32Rows_AndExcelTemplateStaysNull()
     {
         using var command = fixture.GeneratedConnection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM mTaxonomy WHERE TaxonomyLabel IS NOT NULL";
+        command.CommandText = """
+            SELECT COUNT(1),
+                   SUM(typeof(TaxonomyLabel) = 'text' AND typeof(Version) = 'text' AND typeof(PublicationDate) = 'text'
+                       AND typeof(FromDate) = 'text' AND typeof(ToDate) = 'text'),
+                   SUM(ExcelTemplate IS NULL)
+            FROM mTaxonomy
+            """;
 
-        var nonNullCount = Convert.ToInt64(command.ExecuteScalar());
-
-        Assert.Equal(0, nonNullCount);
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal(32L, reader.GetInt64(0));
+        Assert.Equal(32L, reader.GetInt64(1));
+        Assert.Equal(32L, reader.GetInt64(2));
     }
 
     /// <summary><c>TechnicalStandard</c>: 18 distinct values for the 32 rows, each one the lowercase code of its framework.</summary>

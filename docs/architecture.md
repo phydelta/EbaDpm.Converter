@@ -73,7 +73,8 @@ with DPM 1.0.
 
 1. Open the source with `Dpm20AccessReader` and resolve the **cutoff release**: the latest release
    in the database. Every versioned table is read as of that release
-   (`StartRelease <= R AND (EndRelease IS NULL OR EndRelease > R)`).
+   (`StartRelease <= R AND (EndRelease IS NULL OR EndRelease > R)`); the only extra read is the
+   `ModuleVersion` history up to the cutoff, which describes the derived taxonomies.
 2. Derive taxonomies from frameworks, modules and releases (`Dpm20TaxonomyDeriver`), since
    DPM 2.0 has no taxonomy entity, and apply the selector.
 3. Create the schema and load, in order: skeleton (`Dpm20SkeletonLoader`), dictionary
