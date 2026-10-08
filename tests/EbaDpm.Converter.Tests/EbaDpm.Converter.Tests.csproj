@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- SchemaCreator (EbaDpm.Converter.Core) is marked [SupportedOSPlatform("windows")] -->
+    <SupportedOSPlatform>windows</SupportedOSPlatform>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test collections run serially (parallelizeTestCollections=false in xunit.runner.json): the
+         Microsoft.ACE.OLEDB.16.0 provider is not safe for concurrent use within one process, and
+         several fixtures keep an Access connection open while the tests run. -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EbaDpm.Converter.Core\EbaDpm.Converter.Core.csproj" />
+    <ProjectReference Include="..\..\src\EbaDpm.Converter.Cli\EbaDpm.Converter.Cli.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,96 @@
+# Contributing
+
+Contributions are welcome: bug reports, mapping corrections backed by evidence, support for new
+EBA releases, documentation and tests.
+
+## Prerequisites
+
+- Windows x64
+- .NET 10 SDK
+- Microsoft Access Database Engine 2016 Redistributable (x64), which provides
+  `Microsoft.ACE.OLEDB.16.0` — needed to run the converter and the data-dependent tests
+
+## Build
+
+```powershell
+dotnet build EbaDpm.Converter.sln
+```
+
+Warnings are treated as errors.
+
+## Test
+
+The test project is `tests/EbaDpm.Converter.Tests` (xUnit). Tests fall into two groups:
+
+| Suite | Needs | How to run |
+|---|---|---|
+| **Fast suite** — unit tests, schema tests, synthetic fixtures | Nothing but the SDK | `dotnet test --filter "Tier!=RealData"` |
+| **Data-dependent suite** — conversions of the real EBA databases, comparisons against layouts and reference exports | The EBA data files and ACE OLEDB | `dotnet test` |
+
+The data-dependent tests look for the data files in the directory given by the `EBADPM_TEST_DATA`
+environment variable, or in `./Data` at the repository root when it is not set. When the
+directory is missing, those tests are reported as skipped with a message pointing to
+[docs/test-data.md](docs/test-data.md), which lists the files they expect.
+
+```powershell
+$env:EBADPM_TEST_DATA = "D:\eba-data"
+dotnet test
+```
+
+The full suite converts several large Access databases and takes several minutes. Use the fast
+suite while iterating and run the full suite before opening a pull request that touches the
+conversion or the validation.
+
+Test collections run sequentially (`xunit.runner.json`): the ACE OLEDB provider is not safe for
+concurrent use within one process. Do not enable parallel collections.
+
+Never modify the data files; tests treat them as read-only.
+
+## Coding conventions
+
+- **English** for code, identifiers, comments, messages and documentation.
+- **Target schema names are literal.** Table and column names of the distribution schema
+  (`mConcept`, `TaxonomyID`, `mOrdinateCategorisation`...) and of the Access source are used
+  exactly as defined, never renamed or "improved". The same applies to DPM codes (`MET`, `qTR`,
+  `COREP 4.2`...) and to property keys stored in the output.
+- **The schema DDL is a contract.** Changes to
+  [`dpm-distribution-schema.sql`](src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql)
+  change the output format and need a strong justification.
+- **Read the semantics, do not infer them from names.** Before changing how a table is mapped,
+  check the documented meaning of its columns ([docs/target-schema.md](docs/target-schema.md),
+  [docs/source-models.md](docs/source-models.md)).
+- **No invented data.** Emit what the Access database declares. A difference against a third-party
+  reference export is not, by itself, a reason to change the output: the Access database and the
+  EBA Annotated Table Layouts are the sources of truth.
+- **Large tables are streamed** with `OleDbDataReader` and written with `SqliteBatchWriter`; do not
+  load whole source tables into memory.
+- **Compare by business key** in tests and checks, never by surrogate ID.
+- Follow the existing style of the surrounding code; keep comments focused on *why* a rule exists.
+
+## Validation checks and known exceptions
+
+- New invariants belong in plane A (`src/EbaDpm.Converter.Core/Validation/Checks`), with a stable
+  check code (`A-XXX-nn`) and a clear statement.
+- A known exception must name **one object by its exact business key**, for one specific check,
+  with the reason and the evidence. Never relax a threshold or exclude by pattern.
+- For a new EBA release, regenerate the plane C known-divergences file for that release instead of
+  editing the existing one. See [docs/validation.md](docs/validation.md#plane-c-known-divergences).
+
+## Pull requests
+
+- Keep each pull request focused on one change: one mapping rule, one group of tables, one check
+  family.
+- Include tests. A mapping fix should come with a test that fails without it, keyed by business
+  key; a new check should come with a positive control showing it can detect the problem.
+- Explain the evidence: which Access rows, layout cells or metamodel definitions justify the
+  change. Quote measured effects (rows added or removed per table) when the output changes.
+- Make sure `dotnet build` passes without warnings and the fast suite passes. If the change
+  affects conversion or validation, run the full suite and state the result.
+- State whether the change modifies the output for DPM 1.0, DPM 2.0 or both.
+- Update the documentation and `CHANGELOG.md` when behaviour changes.
+
+## Reporting issues
+
+Please include the tool version, the exact command line, the source file name (EBA release), the
+console output and, for validation issues, the JSON report produced with `--report`. Do not attach
+the EBA data files; refer to them by name and release.

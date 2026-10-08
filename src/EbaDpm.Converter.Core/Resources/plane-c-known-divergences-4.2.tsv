@@ -1,0 +1,29 @@
+# Known plane C divergences against the EBA Annotated Table Layout 4.2
+# Source: DPM 2.0 Access database v4.2 compared with the 4.2 Annotated Table Layouts.
+# Criterion: every layout signature must be CONTAINED in one of ours and must not contradict any member.
+# Type: 'contradicts' = the layout mentions a dimension with ANOTHER member; 'no-match' = no signature of ours contains it.
+# Dated, not pinned: every release is measured again and this list is regenerated.
+# CorpusRelease: 4.2 -- this census is evaluated ONLY against a DPM 2.0 output whose cut release
+# (mRelease.IsCurrent=1) is this one. Against any other release, C-DPS-01 is marked NOT EVALUATED,
+# never expired for comparing tables that are not the same. A future
+# plane-c-known-divergences-4.3.tsv declares its own release here, without touching KnownExceptions.cs.
+#
+# Nothing else is listed here besides defects of the LAYOUT itself, arbitrated against the Access
+# database. The key column of an open table is not listed: the layout draws it as one more grid
+# column, but in the destination that key IS the axis, not a cell, so the comparer
+# (PlaneCComparer.IsOpenAxisKeyColumnSignature) removes those signatures from the compared
+# population beforehand (see C-KEY-01). The remaining entries are layout defects: the .dp sheets
+# draw ordinates that the Access does not give to that table.
+# F_18.00.a.dp draws columns 0030 and 0055 when the Access gives it exactly four X headers
+# (0010, 0020, 0060, 0070); F_02.00.dp draws rows 0440 and 0450 when the Access jumps from 0430
+# to 0455. Our output matches the Access. This list is not a census of suspicions: it is a census
+# of defects of someone else's artifact that have already been arbitrated.
+TableCode	Type	LayoutSignature
+F_02.00.dp	no-match	MET(qBCU)|qCAA(qx2022)|qLHL(qx2001)|qLJM(qx2095)|qLLI(qx2051)|qLLJ(qx2021)|qMKJ(qx2017)
+F_02.00.dp	contradicts	MET(qBCU)|qCAA(qx2022)|qLJM(qx2140)|qLLI(qx2051)|qMKJ(qx2017)
+F_18.00.a.dp	no-match	MET(qHNN)|qAFF(qx2001)|qBFA(qx2005)|qBFB(qx2004)|qBRO(qx2053)|qCAA(qx2017)|qEEG(qx2056)
+F_18.00.a.dp	no-match	MET(qHNN)|qAFF(qx2001)|qBFA(qx2005)|qBFB(qx2004)|qBZR(qx2060)|qCAA(qx2017)|qEEG(qx2056)
+F_18.00.a.dp	no-match	MET(qHNN)|qAFF(qx2001)|qBFA(qx2006)|qBFB(qx2004)|qBRO(qx2053)|qCAA(qx2017)|qEEG(qx2057)
+F_18.00.a.dp	no-match	MET(qHNN)|qAFF(qx2001)|qBFA(qx2006)|qBFB(qx2004)|qBZR(qx2060)|qCAA(qx2017)|qEEG(qx2057)
+F_18.00.a.dp	no-match	MET(qHNN)|qAFF(qx2001)|qBFB(qx2004)|qBRO(qx2053)|qCAA(qx2017)|qEEG(qx2055)
+F_18.00.a.dp	no-match	MET(qHNN)|qAFF(qx2001)|qBFB(qx2004)|qBZR(qx2060)|qCAA(qx2017)|qEEG(qx2055)

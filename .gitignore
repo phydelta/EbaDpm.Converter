@@ -1,0 +1,42 @@
+# Build output
+bin/
+obj/
+[Bb]uild/
+artifacts/
+
+# Published single-file executable
+dist/
+
+# Conversion and validation output
+output/
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# EBA data files (large, downloaded separately; see docs/test-data.md)
+Data/
+*.accdb
+*.laccdb
+*.mdb
+
+# Test results and coverage
+TestResults/
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+*.coverage
+
+# IDE and editor files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.DotSettings.user
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
