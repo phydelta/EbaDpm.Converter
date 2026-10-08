@@ -7,7 +7,7 @@ namespace EbaDpm.Converter.Core.Validation.Checks;
 /// </summary>
 public static class DictionaryChecks
 {
-    public static IEnumerable<CheckResult> Run(SqliteConnection c, ValidationSourceModel model)
+    public static IEnumerable<CheckResult> Run(SqliteConnection c, ValidationSourceModel model, List<KnownExceptions.Outcome> exceptionSink)
     {
         // ---- A-DIC-01/02/03: typed domain <=> no default member ----
         yield return SqlHelpers.CountCheck(
@@ -156,7 +156,7 @@ public static class DictionaryChecks
             "SELECT COUNT(*) FROM \"mAxis\" WHERE \"IsOpenAxis\" = 1");
 
         // ---- A-HIE-01..07: hierarchies ----
-        foreach (var result in HierarchyChecks(c, model))
+        foreach (var result in HierarchyChecks(c, model, exceptionSink))
         {
             yield return result;
         }
@@ -333,7 +333,7 @@ public static class DictionaryChecks
             .Select(r => new HierarchyNode(int.Parse(r[0]!), int.Parse(r[1]!), r[2] is null ? null : int.Parse(r[2]!), int.Parse(r[3]!), r[4]))
             .ToList();
 
-    private static IEnumerable<CheckResult> HierarchyChecks(SqliteConnection c, ValidationSourceModel model)
+    private static IEnumerable<CheckResult> HierarchyChecks(SqliteConnection c, ValidationSourceModel model, List<KnownExceptions.Outcome> exceptionSink)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var nodes = LoadHierarchyNodes(c);
@@ -476,7 +476,7 @@ public static class DictionaryChecks
         // the member is that of the hierarchy OR a domain UNITED to it.
         if (model == ValidationSourceModel.Dpm2)
         {
-            yield return WrongDomainMembersExceptKnownAnomaly(c);
+            yield return WrongDomainMembersExceptKnownAnomaly(c, exceptionSink);
         }
         else
         {
@@ -527,7 +527,7 @@ public static class DictionaryChecks
     /// still protects: 105 cases, or 104 different ones, fail all the same. The keys live in the
     /// single <see cref="KnownExceptions"/> registry (<c>Sidedness.OneSided</c>).
     /// </summary>
-    private static CheckResult WrongDomainMembersExceptKnownAnomaly(SqliteConnection c)
+    private static CheckResult WrongDomainMembersExceptKnownAnomaly(SqliteConnection c, List<KnownExceptions.Outcome> exceptionSink)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var total = SqlHelpers.Scalar(c, "SELECT COUNT(*) FROM \"mHierarchyNode\"");
@@ -548,7 +548,8 @@ public static class DictionaryChecks
         sw.Stop();
 
         var violating = rows.Select(r => r[0]!).ToHashSet(StringComparer.Ordinal);
-        var (unresolved, _) = KnownExceptions.ApplyOriginAnomalyExceptions("I-TRE-07b", violating, ValidationPlane.A);
+        var (unresolved, outcomes) = KnownExceptions.ApplyOriginAnomalyExceptions("I-TRE-07b", violating, ValidationPlane.A);
+        exceptionSink.AddRange(outcomes);
         var unexpected = unresolved.Select(k => new CheckSample(k)).ToList();
 
         return CheckResult.FromViolationCount(

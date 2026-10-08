@@ -27,6 +27,14 @@ All notable changes to this project are documented in this file. The format is b
   test now fails if any plane B exception for the 4.2 reference goes stale.
 - Validation: new known exception DD-25 for the label of module `CODIS`, which the EBA corrected
   in the 4.2.1 database while the 4.2 reference export keeps the earlier text.
+- Validation: new known exception DD-26 for dimension `TNS`, which the 4.2 reference export keeps
+  although nothing in the DPM 2.0 database uses it. The converter still emits only used
+  dimensions (#10).
+- Validation: every check that applies known exceptions now reports their outcome. Before, the
+  plane B exceptions DD-16 and E-7 and the plane A anomalies AO-1 and AO-3 were applied but
+  reported as matching nothing, so a stale one went unnoticed; a stale AO-1 now fails plane A as
+  documented. Plane B containment checks now also apply declared divergences, not only reference
+  defects.
 - DPM 2.0: `mRelease.IsCurrent` marks the cutoff release. With the default cutoff the output is
   unchanged; with `--cutoff-release` the requested release is the current one.
 - The data-dependent tests use the DPM 2.0 database 4.2.1 (2026-02-27), the 4.2 edition the EBA

@@ -100,11 +100,11 @@ public static class DictionaryCensusChecks
         // ---- B-DIC-01.8: census of mHierarchy by domain:code, the hook for the declared
         // divergence of 59 hierarchies. ----
         sw.Restart();
-        yield return HierarchyCensus(generated, reference, referenceRole, sw);
+        yield return HierarchyCensus(generated, reference, referenceRole, exceptionSink, sw);
 
         // ---- B-DIC-01.9: GeneratedCensus mode, the hook for the qIO members exception. ----
         sw.Restart();
-        yield return QioMemberGeneratedCensus(generated, reference, referenceRole, sw);
+        yield return QioMemberGeneratedCensus(generated, reference, referenceRole, exceptionSink, sw);
     }
 
     /// <summary>
@@ -165,7 +165,8 @@ public static class DictionaryCensusChecks
     /// and the list of 109 keys lives in the registry, separating "what we check" from "what is
     /// declared".
     /// </summary>
-    private static CheckResult QioMemberGeneratedCensus(SqliteConnection generated, SqliteConnection reference, string referenceRole, System.Diagnostics.Stopwatch sw)
+    private static CheckResult QioMemberGeneratedCensus(SqliteConnection generated, SqliteConnection reference, string referenceRole,
+        List<KnownExceptions.Outcome> exceptionSink, System.Diagnostics.Stopwatch sw)
     {
         const string id = "B-DIC-01.9";
         var statement = CensusStatement(id);
@@ -174,7 +175,8 @@ public static class DictionaryCensusChecks
         var referenceXbrl = PlaneBSupport.Codes(reference, "SELECT \"MemberXBRLCode\" FROM \"mMember\" WHERE \"MemberXBRLCode\" IS NOT NULL");
         sw.Stop();
 
-        var (failing, _) = KnownExceptions.ApplyGeneratedCensusExceptions(id, referenceRole, generatedXbrl, referenceXbrl, ValidationPlane.B);
+        var (failing, outcomes) = KnownExceptions.ApplyGeneratedCensusExceptions(id, referenceRole, generatedXbrl, referenceXbrl, ValidationPlane.B);
+        exceptionSink.AddRange(outcomes);
         var declaredCount = KnownExceptions.For(id, ValidationPlane.B).Count(e => e.Kind == ExceptionKind.Defect);
         var samples = failing.Select(f => new CheckSample(f)).ToList();
 
@@ -190,7 +192,8 @@ public static class DictionaryCensusChecks
     /// which does not relax the criterion but declares it. The publication guard was already
     /// evaluated in <see cref="Run"/> for the whole family.
     /// </summary>
-    private static CheckResult HierarchyCensus(SqliteConnection generated, SqliteConnection reference, string referenceRole, System.Diagnostics.Stopwatch sw)
+    private static CheckResult HierarchyCensus(SqliteConnection generated, SqliteConnection reference, string referenceRole,
+        List<KnownExceptions.Outcome> exceptionSink, System.Diagnostics.Stopwatch sw)
     {
         const string id = "B-DIC-01.8";
         const string table = "mHierarchy";
@@ -209,11 +212,27 @@ public static class DictionaryCensusChecks
         // signal: "grows" (an undeclared key is missing) is a new violation; "shrinks" (one of the
         // 59 declared ones is NO LONGER missing because the mapping started to produce it) means
         // the exemption became obsolete and must be reviewed, not silently celebrated.
-        var declared = KnownExceptions.For(id, ValidationPlane.B)
-            .Where(e => e.Kind == ExceptionKind.DeclaredDivergence && e.Sidedness == Sidedness.TwoSided
-                        && (e.Reference == "*" || e.Reference == referenceRole))
+        var declaredExceptions = KnownExceptions.For(id, ValidationPlane.B)
+            .Where(e => e.Kind == ExceptionKind.DeclaredDivergence && e.Sidedness == Sidedness.TwoSided)
+            .ToList();
+        var declared = declaredExceptions
+            .Where(e => e.Reference == "*" || e.Reference == referenceRole)
             .Select(e => e.BusinessKey)
             .ToHashSet(StringComparer.Ordinal);
+
+        // One outcome per exception: the divergence holds (Matched=1) while the declared key is in
+        // the reference and absent from the generated output; otherwise the exception is stale.
+        foreach (var exception in declaredExceptions)
+        {
+            if (!(exception.Reference == "*" || exception.Reference == referenceRole))
+            {
+                exceptionSink.Add(new KnownExceptions.Outcome(exception, false, 0, false));
+                continue;
+            }
+
+            var holds = missing.Contains(exception.BusinessKey);
+            exceptionSink.Add(new KnownExceptions.Outcome(exception, true, holds ? 1 : 0, !holds));
+        }
 
         var unexpectedMissing = missing.Where(k => !declared.Contains(k))
             .Select(k => new CheckSample(k)).ToList();

@@ -52,7 +52,7 @@ public static class IntegrityChecks
         return SqlHelpers.ViolationCheck(c, id, layer, childTable, $"{childTable}.{childColumn} -> {parentTable}.{parentColumn}: no orphans", totalSql, violationSql);
     }
 
-    public static IEnumerable<CheckResult> Run(SqliteConnection c, ValidationSourceModel model)
+    public static IEnumerable<CheckResult> Run(SqliteConnection c, ValidationSourceModel model, List<KnownExceptions.Outcome> exceptionSink)
     {
         // ---- A-INT-01: foreign_key_check only reports the root sentinel (ParentTemplateOrTableID = 0) ----
         yield return ForeignKeyCheckOnlyRootSentinel(c, model);
@@ -245,7 +245,7 @@ public static class IntegrityChecks
         // looking for it. Critical in BOTH models; in DPM 1.0 the 50 are registered as an
         // exception NAMED by exact business key, the same pattern already used by
         // A-DIC-11/DPM 1.0: if the set grows (a 51st appears) or shrinks, the check fails. ----
-        yield return MemberXbrlCodeLocalPartMatchesMemberCode(c, model);
+        yield return MemberXbrlCodeLocalPartMatchesMemberCode(c, model, exceptionSink);
     }
 
     /// <summary>
@@ -277,7 +277,7 @@ public static class IntegrityChecks
     /// one of the 50 stops violating (shrinkage, a sign that the Access changed), the check
     /// fails. It is never left unchecked.
     /// </summary>
-    private static CheckResult MemberXbrlCodeLocalPartMatchesMemberCode(SqliteConnection c, ValidationSourceModel model)
+    private static CheckResult MemberXbrlCodeLocalPartMatchesMemberCode(SqliteConnection c, ValidationSourceModel model, List<KnownExceptions.Outcome> exceptionSink)
     {
         if (model == ValidationSourceModel.Dpm2)
         {
@@ -306,7 +306,8 @@ public static class IntegrityChecks
         sw.Stop();
 
         var violating = rows.Select(r => r[0]!).ToHashSet(StringComparer.Ordinal);
-        var (unresolved, _) = KnownExceptions.ApplyOriginAnomalyExceptions("I-XBR-01c", violating, ValidationPlane.A);
+        var (unresolved, outcomes) = KnownExceptions.ApplyOriginAnomalyExceptions("I-XBR-01c", violating, ValidationPlane.A);
+        exceptionSink.AddRange(outcomes);
         var samples = unresolved.Select(k => new CheckSample(k)).ToList();
 
         return CheckResult.FromViolationCount(

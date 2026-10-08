@@ -74,7 +74,7 @@ public sealed record KnownException(
     Sidedness Sidedness);
 
 /// <summary>
-/// Single registry of exceptions: E-2..E-7, DD-1..DD-23, DD-25, AO-1 and AO-3. It replaces text-duplicated
+/// Single registry of exceptions: E-2..E-7, DD-1..DD-23, DD-25, DD-26, AO-1 and AO-3. It replaces text-duplicated
 /// copies in individual tests and in several production files. The report ALWAYS lists these
 /// exceptions, applied or not.
 /// </summary>
@@ -439,6 +439,19 @@ public static class KnownExceptions
         "DD-25: The EBA corrected the module label in the DPM 2.0 database 4.2.1 (2026-02-27); the 4.2 reference export keeps the earlier typo 'Commun disclosures'. " +
         "Generated: 'Common disclosures'; reference: 'Commun disclosures'.";
 
+    /// <summary>
+    /// DD-26: dimension <c>TNS</c> (<c>eba_dim_3.4:TNS</c>). The converter emits only the dimension
+    /// properties used in <c>ContextComposition</c> or by a <c>key</c> variable; TNS is used by neither,
+    /// yet the 4.2 reference export keeps it. Two entries bound to the dimension code check and to the
+    /// XBRL census (which compares the local part, so the key is also <c>TNS</c>). Unclassified.
+    /// </summary>
+    private const string UnusedDimensionTnsKey = "TNS";
+
+    private const string UnusedDimensionTnsReason =
+        "DD-26: The 4.2 reference export keeps dimension TNS (eba_dim_3.4:TNS), which no ContextComposition row or key variable of the DPM 2.0 Access database uses. " +
+        "The converter emits only used dimension properties; the Access database has 15 properties in the same situation (measured 2026-10-08 on 4.2.1 and 4.3) " +
+        "and nothing distinguishes TNS from the other 14, so the reference choice is not derivable from the source.";
+
     private const string PlaneCTsvResourceName = "EbaDpm.Converter.Core.Resources.plane-c-known-divergences-4.2.tsv";
 
     private const string PlaneCCensusReason =
@@ -548,6 +561,8 @@ public static class KnownExceptions
         .. ModuleTemplateOrderKeys.Select(k => new KnownException("DD-20", ExceptionKind.DeclaredDivergence, k, Ref42, Sha42, "B-MOD-01.3", ModuleTemplateOrderReason, ValidationLayer.Informative, Sidedness.Unclassified)),
         .. MemberDescriptionTranslationKeys.Select(k => new KnownException("DD-22", ExceptionKind.DeclaredDivergence, k, Ref42, Sha42, "B-DIC-ConceptTranslation-Description", MemberDescriptionTranslationReason, ValidationLayer.Informative, Sidedness.Unclassified)),
         new KnownException("DD-25", ExceptionKind.DeclaredDivergence, ModuleLabelCodisKey, Ref42, Sha42, "B-MOD-01-LABEL", ModuleLabelCodisReason, ValidationLayer.Informative, Sidedness.Unclassified),
+        new KnownException("DD-26", ExceptionKind.DeclaredDivergence, UnusedDimensionTnsKey, Ref42, Sha42, "B-DIC-01-DIMENSION-CODE", UnusedDimensionTnsReason, ValidationLayer.Critical, Sidedness.Unclassified),
+        new KnownException("DD-26", ExceptionKind.DeclaredDivergence, UnusedDimensionTnsKey, Ref42, Sha42, "B-DIC-01-DIMENSION-XBRL", UnusedDimensionTnsReason, ValidationLayer.Critical, Sidedness.Unclassified),
         .. PlaneCExceptions,
     ];
 
@@ -595,11 +610,12 @@ public static class KnownExceptions
     public sealed record Outcome(KnownException Exception, bool AppliesToThisReference, long Matched, bool Stale);
 
     /// <summary>
-    /// Applies the containment exceptions of <paramref name="checkId"/> (by default
-    /// <see cref="ExceptionKind.Defect"/>, E-n, but another <paramref name="kind"/> may be passed for
-    /// containment-shaped exceptions of a different <c>Kind</c>, e.g. <c>DD-16</c>, which is
-    /// <see cref="ExceptionKind.DeclaredDivergence"/> by definition even though its SHAPE is
-    /// containment) to a "reference minus generated" set. An exception exempts its exact object
+    /// Applies the containment exceptions of <paramref name="checkId"/> to a "reference minus
+    /// generated" set. Exceptions are bound to an EXACT check id, so the kind is not a selector:
+    /// every <see cref="ExceptionKind.Defect"/> (E-n) and <see cref="ExceptionKind.DeclaredDivergence"/>
+    /// (e.g. DD-26) exception of the check is applied. <see cref="ExceptionKind.OriginAnomaly"/>
+    /// exceptions are NOT applied here (they have <c>Reference == "-"</c>; see
+    /// <see cref="ApplyOriginAnomalyExceptions"/>). An exception exempts its exact object
     /// from counting as a failure, but ONLY if the current reference is the declared one and ONLY if
     /// the object is still actually absent when it is applied (if it no longer is, the exception has
     /// expired by "unexpectedMatch", which is EXACTLY the "shrinks" of <c>Sidedness.TwoSided</c>,
@@ -607,9 +623,11 @@ public static class KnownExceptions
     /// </summary>
     public static (IReadOnlyList<string> UnresolvedMissing, IReadOnlyList<Outcome> Outcomes) ApplyContainmentExceptions(
         string checkId, string referenceFileName, IReadOnlySet<string> missingFromGenerated, IReadOnlySet<string> referenceSet,
-        ValidationPlane plane, ExceptionKind kind = ExceptionKind.Defect)
+        ValidationPlane plane)
     {
-        var applicable = For(checkId, plane).Where(e => e.Kind == kind).ToList();
+        var applicable = For(checkId, plane)
+            .Where(e => e.Kind is ExceptionKind.Defect or ExceptionKind.DeclaredDivergence)
+            .ToList();
         var outcomes = new List<Outcome>();
         var stillMissing = new HashSet<string>(missingFromGenerated, StringComparer.Ordinal);
 
