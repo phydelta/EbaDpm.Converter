@@ -21,7 +21,7 @@ env:
 
 jobs:
   build:
-    # The job name is the required status check of the branch ruleset: keep both in sync.
+    # The job name is the status check that branch protection requires: renaming it breaks merges.
     name: Build and test
     runs-on: windows-latest
     timeout-minutes: 30
@@ -34,8 +34,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: '**/*.csproj'
 
       # The converter reads Access through Microsoft.ACE.OLEDB.16.0, which hosted runners do not
       # ship. Installing it lets the ACE-dependent synthetic tests run; if the download fails,

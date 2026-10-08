@@ -39,8 +39,10 @@ Pre-releases use a SemVer suffix (`1.2.0-rc.1`).
 
 The workflow then:
 
-1. reads the version from `Directory.Build.props` and refuses to continue if it is not valid
-   SemVer, if the tag `vX.Y.Z` already exists, or if `CHANGELOG.md` has no non-empty section for it;
+1. reads the version from `Directory.Build.props` and refuses to continue if it is not run from
+   `main`, if the version is not valid SemVer, if the tag `vX.Y.Z` already exists, if the version
+   has a pre-release suffix and *prerelease* is not ticked, or if `CHANGELOG.md` has no non-empty
+   section for it;
 2. builds the solution and runs the test suite;
 3. publishes the self-contained single-file executable (`win-x64`) and packages it with
    `LICENSE`, `README.md` and `CHANGELOG.md` as `EbaDpm.Converter-X.Y.Z-win-x64.zip`;
@@ -60,6 +62,6 @@ gh attestation verify .\EbaDpm.Converter-X.Y.Z-win-x64.zip --repo phydelta/EbaDp
 
 ## Fixing a release
 
-Tags `v*` are protected and cannot be moved or deleted. If a release is broken, fix it on `main`
-and publish a new patch version. A release that should not be used can be edited on GitHub to
+Release tags (`v*`) are never moved or deleted. If a release is broken, fix it on `main` and
+publish a new patch version. A release that should not be used can be edited on GitHub to
 say so, or marked as a pre-release.

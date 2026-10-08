@@ -172,7 +172,7 @@ nine violations — the plane detects real losses rather than passing by constru
 ## Fidelity against the 4.2 reference export
 
 Comparing the output of the DPM 2.0 4.2 Access database with a 4.2 reference export, table by
-table: all 45 tables are present on both sides, **28 are identical**, and the remaining 17 differ
+table: all 45 tables are present on both sides, **25 are identical**, and the remaining 20 differ
 for documented reasons. Counts are row counts.
 
 | Table(s) | Output | Reference | Difference | Reason |

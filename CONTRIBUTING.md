@@ -36,7 +36,7 @@ maintenance branches: fixes go to `main` and ship in the next release. Releases 
 Every pull request and every push to `main` runs:
 
 - **CI** — restore, build (warnings are errors) and the fast test suite on Windows.
-- **CodeQL** — static security analysis of the C# code.
+- **CodeQL** — static security and quality analysis of the C# code (also run weekly).
 
 CI has no access to the EBA data files, so it cannot run the data-dependent suite. If your change
 touches conversion or validation, run that suite locally and report the result in the pull request.
@@ -133,6 +133,6 @@ Never modify the data files; tests treat them as read-only.
 Use the issue forms. Security problems must be reported privately, as described in
 [SECURITY.md](SECURITY.md). Participation is governed by the [code of conduct](CODE_OF_CONDUCT.md).
 
-For bug reports, please include the tool version, the exact command line, the source file name (EBA release), the
-console output and, for validation issues, the JSON report produced with `--report`. Do not attach
-the EBA data files; refer to them by name and release.
+For bug reports, please include the tool version, the exact command line, the source file name
+(EBA release), the console output and, for validation issues, the JSON report produced with
+`--report`. Do not attach the EBA data files; refer to them by name and release.

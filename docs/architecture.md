@@ -91,8 +91,8 @@ to select its scope.
 
 - Source tables are read in streaming mode with `OleDbDataReader`; large tables are never loaded
   into a `DataTable`.
-- `SqliteBatchWriter` writes with prepared statements in batches inside transactions, with bulk-load
-  pragmas during the load.
+- `SqliteBatchWriter` writes with prepared statements in batches inside transactions; bulk-load
+  pragmas (no journal, no synchronous writes) are set on the output database for the load.
 - The final `VACUUM` makes the file size stable across identical runs; the content is already
   reproducible.
 

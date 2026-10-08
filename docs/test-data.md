@@ -3,8 +3,9 @@
 The test project has two kinds of tests:
 
 - **Synthetic tests** build their own small inputs (in-memory SQLite databases, generated
-  workbooks, empty `.accdb` files) and need nothing else. They are what `dotnet test` runs on a
-  fresh clone.
+  workbooks, empty `.accdb` files) and need nothing else, except two tests that create `.accdb`
+  files and are skipped (`[AceFact]`) when the ACE OLEDB provider is not installed. They are what
+  `dotnet test` runs on a fresh clone.
 - **Data tests** run the converter on the real EBA publications. They are marked
   `[DataFact]` / `[DataTheory]` and are **skipped** unless a data directory is available.
 

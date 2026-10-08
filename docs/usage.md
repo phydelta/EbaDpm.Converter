@@ -21,7 +21,7 @@ When running from source, replace `EbaDpm.Converter` with
 - An option that takes a value must be followed by it; a value cannot start with `--`.
 - Values containing spaces must be quoted.
 - List values (`--taxonomies`, `--taxonomykeys`, `--releases`) are comma-separated; surrounding
-  spaces are trimmed.
+  spaces are trimmed, and values are matched case-insensitively.
 - Any argument not recognised by the selected mode is an error (exit code 1).
 - The help flags win over everything else and need no other argument.
 - Mode precedence, if several mode flags are given: help, `--schema-only`, `--list-taxonomies`,
@@ -40,7 +40,7 @@ EbaDpm.Converter --source "<input.accdb>" --output "<output.db>"
 | `--source <path>` | yes | The Access DPM database (`.accdb`). Opened read-only |
 | `--output <path>` | yes | The SQLite database to create. Parent directories are created if needed |
 | `--all` | one selector | Convert every taxonomy in the source |
-| `--taxonomies <list>` | one selector | Select by `TaxonomyCode`, exactly as stored in `mTaxonomy.TaxonomyCode` (e.g. `COREP 4.2`) |
+| `--taxonomies <list>` | one selector | Select by `TaxonomyCode`, as printed by `--list-taxonomies` (e.g. `COREP 3.2` for DPM 1.0, `corep 4.2` for DPM 2.0) |
 | `--taxonomykeys <list>` | one selector | Select by `TaxonomyKey`, a derived identifier (e.g. `corep/its-005-2020/2022-03-01` up to 3.x, `sbp/4.0` from 4.0) |
 | `--releases <list>` | one selector | Select by DPM release (`DpmPackageCode`, e.g. `4.0,4.1`) |
 | `--overwrite` | no | Replace the output file if it exists. Without it, an existing output is an error |
@@ -64,7 +64,7 @@ EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output eba-4.2.db --all
 
 # Two taxonomies, replacing a previous output
 EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output corep.db `
-  --taxonomies "COREP 4.2,IF 4.2" --overwrite
+  --taxonomies "corep 4.2,if 4.2" --overwrite
 
 # By taxonomy key
 EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output corep.db --taxonomykeys corep/4.2

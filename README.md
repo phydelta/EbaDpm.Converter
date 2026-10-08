@@ -99,7 +99,7 @@ EbaDpm.Converter --list-taxonomies --source "DPM2 Database_v 4_2.accdb"
 EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output eba-4.2.db --all
 
 #    ...or only some taxonomies / releases
-EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output corep.db --taxonomies "COREP 4.2,IF 4.2"
+EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output corep.db --taxonomies "corep 4.2,if 4.2"
 EbaDpm.Converter --source "DPM 1.0 Database_v4_1.accdb" --output out.db --releases 4.0,4.1
 
 # 3. Validate the output (internal invariants; no external input needed)

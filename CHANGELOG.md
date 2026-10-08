@@ -26,8 +26,8 @@ All notable changes to this project are documented in this file. The format is b
   emitted as categorisation pairs. They are now emitted on the closed ordinates of the owning axis:
   +255 `mOrdinateCategorisation` rows for 4.2 and +510 for 4.3, none of them on an ordinate with a
   live cell. With this fix the ordinate categorisation comparison against the 4.2 reference export
-  (`B-OCA-01`) passes for all 18,556 compared ordinates, and plane B critical differences drop from
-  9 to 4.
+  (`B-OCA-01`) passes for all 18,556 compared ordinates; plane B now reports
+  4 critical differences.
 
 ### Not changed, by decision
 

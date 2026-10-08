@@ -10,6 +10,10 @@
     <Authors>Jose Luis Martin</Authors>
     <Description>Converts the EBA DPM Database (Microsoft Access, DPM 1.0 and DPM 2.0) into the SQLite DPM distribution schema.</Description>
     <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/phydelta/EbaDpm.Converter</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/phydelta/EbaDpm.Converter</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Copyright>Copyright (c) 2026 Jose Luis Martin</Copyright>
   </PropertyGroup>
 
 </Project>
