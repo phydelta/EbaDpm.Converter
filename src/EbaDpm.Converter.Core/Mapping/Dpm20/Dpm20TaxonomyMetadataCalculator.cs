@@ -138,15 +138,11 @@ public static class Dpm20TaxonomyMetadataCalculator
             int? rPrime = null;
             if (historyByFramework.TryGetValue(frameworkId, out var frameworkRows))
             {
-                foreach (var row in frameworkRows)
-                {
-                    if (row.StartReleaseId <= release.ReleaseId
-                        && (row.EndReleaseId is null || row.EndReleaseId > release.ReleaseId)
-                        && (rPrime is null || row.StartReleaseId > rPrime))
-                    {
-                        rPrime = row.StartReleaseId;
-                    }
-                }
+                rPrime = frameworkRows
+                    .Where(row => row.StartReleaseId <= release.ReleaseId
+                        && (row.EndReleaseId is null || row.EndReleaseId > release.ReleaseId))
+                    .Select(row => (int?)row.StartReleaseId)
+                    .Max();
             }
 
             // Version and PublicationDate depend on R only.
@@ -165,13 +161,14 @@ public static class Dpm20TaxonomyMetadataCalculator
                 continue;
             }
 
+            var rPrimeId = rPrime.Value;
             var publications = PublicationsOf(frameworkId);
-            var own = publications.First(p => p.StartReleaseId == rPrime.Value);
+            var own = publications.First(p => p.StartReleaseId == rPrimeId);
 
             string? label = null;
             if (own.VersionText is null)
             {
-                unresolved.Add($"{taxonomy.TaxonomyCode}: no usable ModuleVersion.VersionNumber in release ReleaseID={rPrime}; TaxonomyLabel left NULL.");
+                unresolved.Add($"{taxonomy.TaxonomyCode}: no usable ModuleVersion.VersionNumber in release ReleaseID={rPrimeId}; TaxonomyLabel left NULL.");
             }
             else
             {
@@ -182,14 +179,14 @@ public static class Dpm20TaxonomyMetadataCalculator
             string? toText = null;
             if (own.FromDate is not { } fromDate)
             {
-                unresolved.Add($"{taxonomy.TaxonomyCode}: no usable ModuleVersion.FromReferenceDate in release ReleaseID={rPrime}; FromDate and ToDate left NULL.");
+                unresolved.Add($"{taxonomy.TaxonomyCode}: no usable ModuleVersion.FromReferenceDate in release ReleaseID={rPrimeId}; FromDate and ToDate left NULL.");
             }
             else
             {
                 fromText = fromDate.ToString(DateFormat, CultureInfo.InvariantCulture);
 
                 var next = publications
-                    .Where(p => p.StartReleaseId > rPrime.Value && p.FromDate is { } f && f > fromDate)
+                    .Where(p => p.StartReleaseId > rPrimeId && p.FromDate is { } f && f > fromDate)
                     .OrderBy(p => p.StartReleaseId)
                     .FirstOrDefault();
 

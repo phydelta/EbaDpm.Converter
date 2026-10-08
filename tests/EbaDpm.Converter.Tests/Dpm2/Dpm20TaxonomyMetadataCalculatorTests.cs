@@ -324,4 +324,39 @@ public sealed class Dpm20TaxonomyMetadataCalculatorTests
         Assert.Equal("4.2", result.ByTaxonomyId[1].Version);
         Assert.Single(result.UnresolvedCases);
     }
+
+    [Fact]
+    public void RPrime_IsTheGreatestStartReleaseIdAmongSeveralCurrentRows_WhateverTheRowOrder()
+    {
+        // At R = 4.2.1 three rows are current (open-ended or ending after R), listed out of order.
+        // R' must be the greatest start (4.2), not the first listed (4.2.1 is not a start here) nor the lowest.
+        var history = new[]
+        {
+            Mv(R42, null, "2.0.0", "2026-02-28"),
+            Mv(R35, null, "1.0.0", "2024-01-31"),
+            Mv(R40, R43, "1.5.0", "2025-01-31"),
+        };
+
+        var m = Single(history, "4.2.1", R421);
+
+        Assert.Equal("Alpha Reporting 2.0.0 (DPM 4.2.1)", m.TaxonomyLabel);
+        Assert.Equal("2026-02-28", m.FromDate);
+    }
+
+    [Fact]
+    public void RPrimeNotFound_WhenTheFrameworkHasNoHistoryAtAll()
+    {
+        // History exists only for another framework: the taxonomy's framework has no rows.
+        Dpm20FrameworkRow[] frameworks = [new(Fw, "ALPHA", "Alpha Reporting"), new(2, "BETA", "Beta")];
+        var history = new[] { Mv(R42, null, "1.0.0", "2026-03-31", framework: 2) };
+
+        var result = Dpm20TaxonomyMetadataCalculator.Compute(Releases, frameworks, history, [Tax(1, "4.2")], R43);
+        var m = result.ByTaxonomyId[1];
+
+        Assert.Null(m.TaxonomyLabel);
+        Assert.Null(m.FromDate);
+        Assert.Null(m.ToDate);
+        Assert.Equal("4.2", m.Version);
+        Assert.Single(result.UnresolvedCases);
+    }
 }
