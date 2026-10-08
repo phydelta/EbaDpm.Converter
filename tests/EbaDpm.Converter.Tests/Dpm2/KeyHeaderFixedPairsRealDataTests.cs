@@ -10,22 +10,23 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// Access database, not visibility in the layout or in the reference.
 ///
 /// Witness case: <c>corep 4.2/C_08.05</c> (<c>TableVID=6965</c>), the only ordinate of the OPEN Z
-/// axis - <c>HeaderID=964</c>, <c>ContextID=759675</c>. Verified against the real corpus: the
-/// ordinate carries its open pair (<c>qEEA</c>, sentinel <c>MemberID=9999</c>) PLUS
-/// <c>APR(eba_AP:x66)</c> and <c>EXC(eba_qEC:qx4)</c> - the two fixed pairs that the dead read lost.
+/// axis - <c>HeaderID=964</c>. In the previous edition of the 4.2 database its HeaderVersion carried
+/// <c>ContextID=759675</c> and the ordinate had its open pair (<c>qEEA</c>, sentinel
+/// <c>MemberID=9999</c>) PLUS <c>APR(eba_AP:x66)</c> and <c>EXC(eba_qEC:qx4)</c>. In
+/// <c>DPM2 Database_v 4_2_1.accdb</c> the EBA set that ContextID to NULL, so the test now asserts the
+/// ABSENCE of the fixed pairs (the open pair stays). OPEN ISSUE: the mechanism has no real-data
+/// instance any more (key headers with a ContextID: 0 of 406 in force at 4.2 in the 4.2.1 file, 0 of
+/// 429 in the 4.3 file), so its positive coverage must come from a synthetic test.
 ///
 /// No census of <c>mOrdinateCategorisation</c> is asserted: what this test protects is that those
 /// two CONCRETE pairs are in the ordinate, not a global count.
-/// The case does NOT repeat in 4.3 - the same <c>HeaderVID=235107</c> exists there with a NULL
-/// <c>ContextID</c> (the source itself cleared it between releases). That is a property of that
-/// publication, not of the model, so a "0 cases in 4.3" is not pinned here.
 /// </summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
 public sealed class KeyHeaderFixedPairsRealDataTests(Dpm20SkeletonFixture fixture)
 {
     [DataFact]
-    public void Corep42_C0805_OpenZAxisOrdinate_CarriesTheOpenPairAndTheTwoFixedPairs()
+    public void Corep42_C0805_OpenZAxisOrdinate_CarriesOnlyTheOpenPair_TheEbaClearedTheFixedPairsIn421()
     {
         var connection = fixture.GeneratedConnection;
 
@@ -68,11 +69,14 @@ public sealed class KeyHeaderFixedPairsRealDataTests(Dpm20SkeletonFixture fixtur
         Assert.Equal("9999", qeea.MemberId);
         Assert.Contains("qEEA(*", qeea.Dps, StringComparison.Ordinal);
 
-        // The two FIXED pairs that the dead read of HeaderNode.ContextId lost.
-        Assert.True(byDimension.TryGetValue("APR", out var apr), "APR is missing - the key header's fixed pair was not projected onto the ordinate.");
-        Assert.Contains("APR(eba_AP:x66)", apr.Dps, StringComparison.Ordinal);
-
-        Assert.True(byDimension.TryGetValue("EXC", out var exc), "EXC is missing - the key header's fixed pair was not projected onto the ordinate.");
-        Assert.Contains("EXC(eba_qEC:qx4)", exc.Dps, StringComparison.Ordinal);
+        // NEGATIVE assertion (EBA edit in "DPM2 Database_v 4_2_1.accdb"): HeaderVersion 235107
+        // (HeaderID 964, StartReleaseID 3, still in force at 4.2) had ContextID=759675 with the two
+        // fixed pairs APR(eba_AP:x66) and EXC(eba_qEC:qx4) in the previous edition of the 4.2
+        // database; the 4.2.1 edition has ContextID NULL on that same row (measured on both Access
+        // files). The converter emits what the source declares, so the ordinate carries ONLY the
+        // open pair.
+        Assert.False(byDimension.ContainsKey("APR"), "APR is present although HeaderVersion 235107 has ContextID NULL in the 4.2.1 source.");
+        Assert.False(byDimension.ContainsKey("EXC"), "EXC is present although HeaderVersion 235107 has ContextID NULL in the 4.2.1 source.");
+        Assert.Single(byDimension);
     }
 }

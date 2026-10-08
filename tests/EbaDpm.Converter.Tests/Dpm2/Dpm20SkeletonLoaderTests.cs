@@ -19,7 +19,8 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MRelease_Has5Rows() => Assert.Equal(5, CountRows("mRelease"));
+    // 6 on "DPM2 Database_v 4_2_1.accdb" (5 before): the output lists the releases the database declares, 4.2.1 included.
+    public void MRelease_Has6Rows() => Assert.Equal(6, CountRows("mRelease"));
 
     [DataFact]
     public void MReportingFramework_Has18Rows() => Assert.Equal(18, CountRows("mReportingFramework"));
@@ -77,7 +78,9 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
         yield return [2, "3.5", "released", "2024-07-11", 0L];
         yield return [3, "4.0", "released", "2024-12-19", 0L];
         yield return [4, "4.1", "released", "2025-04-28", 0L];
-        yield return [5, "4.2", "validation", "2025-10-31", 1L];
+        // Status of 4.2 is "released" in "DPM2 Database_v 4_2_1.accdb" ("validation" in the file published before): EBA data.
+        yield return [5, "4.2", "released", "2025-10-31", 1L];
+        yield return [1010000003, "4.2.1", "validation", "2026-02-15", 0L];
     }
 
     [DataTheory]
@@ -334,12 +337,12 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
             var pathB = Path.Combine(tempDirectory, "run-b.db");
 
             var exitA = CliRunner.Run(
-                ["--source", RepoPaths.AccessDpm20DatabasePath, "--output", pathA, "--all"],
+                ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", pathA, "--all"],
                 new StringWriter(), new StringWriter());
             SqliteConnection.ClearAllPools();
 
             var exitB = CliRunner.Run(
-                ["--source", RepoPaths.AccessDpm20DatabasePath, "--output", pathB, "--all"],
+                ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", pathB, "--all"],
                 new StringWriter(), new StringWriter());
             SqliteConnection.ClearAllPools();
 

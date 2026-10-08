@@ -377,7 +377,7 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
     /// does not go unnoticed.
     /// </summary>
     [DataFact]
-    public void HierarchyMemberSets_ByBusinessKey_MatchTheMeasuredCensus_993Common_930Exact_55Contained_8NoContainment()
+    public void HierarchyMemberSets_ByBusinessKey_MatchTheMeasuredCensus_993Common_932Exact_55Contained_6NoContainment()
     {
         RepoPaths.EnsureReferenceDatabaseExists();
 
@@ -412,7 +412,14 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
             }
         }
 
-        Assert.Equal(930, exact.Count);
+        // 930 -> 932 on "DPM2 Database_v 4_2_1.accdb" (cutoff 4.2): the EBA edited in place the items of
+        // two in-force subcategory versions, and both hierarchies now equal the reference exactly.
+        // qTR_5 (SubCategoryVID 20598, Start 5, same version in both editions), ItemCategory codes of
+        // its SubCategoryItem rows, measured on the Access sources:
+        //   previous edition: qx2001, qx2035, qx2040, qx2042, qx2052, qx2053, qx2054
+        //   4.2.1 edition:    qx2035, qx2040, qx2042, qx2065, qx2066, qx2067, qx2068
+        // new_IG1 (SubCategoryVID 20534): member GA:XK became GA:qx2000 in the generated output.
+        Assert.Equal(932, exact.Count);
         Assert.Equal(55, contained.Count);
 
         // The fixed CENSUS of the 8 with no containment in either direction: the ItemID is resolved
@@ -424,8 +431,6 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
             ("GA", "GA6"),
             ("qAO", "AO_agg_3"),
             ("qCG", "new_CG0"), ("qCG", "new_CG10"), ("qCG", "new_CG7"), ("qCG", "new_CG8"),
-            ("qIG", "new_IG1"),
-            ("qTR", "qTR_5"),
         }
         .OrderBy(p => p.Item1, StringComparer.Ordinal)
         .ThenBy(p => p.Item2, StringComparer.Ordinal)
@@ -433,7 +438,7 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
 
         var actualNoContainment = noContainment.OrderBy(k => k.Domain, StringComparer.Ordinal).ThenBy(k => k.Hierarchy, StringComparer.Ordinal).ToList();
 
-        Assert.Equal(8, actualNoContainment.Count);
+        Assert.Equal(6, actualNoContainment.Count);
         Assert.Equal(expectedNoContainment, actualNoContainment.Select(k => (k.Domain, k.Hierarchy)).ToList());
     }
 

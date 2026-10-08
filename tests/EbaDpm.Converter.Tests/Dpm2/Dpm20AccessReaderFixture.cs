@@ -6,10 +6,10 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <summary>
 /// Collection fixture (xUnit <see cref="ICollectionFixture{TFixture}"/>): runs ONCE, for the whole
 /// "Dpm2" collection, the full read of the DPM 2.0 Access database
-/// (<c>Data/DPM2 Database_v 4_2_20251125.accdb</c>, 755 MB) - the expensive part.
+/// (<c>Data/DPM2 Database_v 4_2_1.accdb</c>, converted with cutoff release "4.2") - the expensive part.
 ///
 /// It leaves two readers open:
-/// - <see cref="Reader"/>: DEFAULT cutoff release (the highest, 5 = "4.2"). Used by
+/// - <see cref="Reader"/>: EXPLICIT cutoff release "4.2" (ReleaseID 5; the file also declares 4.2.1, so the default would be higher). Used by
 ///   <c>Dpm20AccessReaderTests</c> and <c>Dpm20TaxonomyDeriverTests</c>.
 /// - <see cref="ReaderCutoff3"/>: EXPLICIT cutoff release (3 = "4.0"), opened separately, for the
 ///   test that checks that the figures change with another release.
@@ -40,7 +40,7 @@ public sealed class Dpm20AccessReaderFixture : IDisposable
 
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
-        Reader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath);
+        Reader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath, cutoffReleaseCode: RepoPaths.Cutoff42ReleaseCode);
         Reader.Open();
 
         Releases = Reader.ReadReleases().ToList();
@@ -65,7 +65,7 @@ public sealed class Dpm20AccessReaderFixture : IDisposable
 
 /// <summary>
 /// xUnit collection definition: groups all the tests over the DPM 2.0 read so that they share a
-/// single run of <see cref="Dpm20AccessReaderFixture"/> (the source Access database is 755 MB).
+/// single run of <see cref="Dpm20AccessReaderFixture"/> (the source Access database is large).
 /// </summary>
 [CollectionDefinition("Dpm2")]
 public sealed class Dpm2Collection : ICollectionFixture<Dpm20AccessReaderFixture>

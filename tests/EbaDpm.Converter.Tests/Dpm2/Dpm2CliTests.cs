@@ -18,7 +18,7 @@ public sealed class Dpm2CliTests
         var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(
-            ["--list-taxonomies", "--source", RepoPaths.AccessDpm20DatabasePath], stdout, stderr);
+            ["--list-taxonomies", "--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode], stdout, stderr);
 
         Assert.Equal(CliRunner.ExitOk, exitCode);
         Assert.Empty(stderr.ToString());
@@ -73,7 +73,7 @@ public sealed class Dpm2CliTests
             var stderr = new StringWriter();
 
             var exitCode = CliRunner.Run(
-                ["--source", RepoPaths.AccessDpm20DatabasePath, "--output", outputPath, "--all"], stdout, stderr);
+                ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", outputPath, "--all"], stdout, stderr);
 
             Assert.Equal(CliRunner.ExitOk, exitCode);
             Assert.True(File.Exists(outputPath), "The complete conversion must create the output file.");

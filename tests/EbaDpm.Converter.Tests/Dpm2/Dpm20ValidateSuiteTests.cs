@@ -95,4 +95,34 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
         // of magnitude, so the report has an anchor.
         Assert.True(bOca01.Failed >= 0 && bOca01.Failed <= bOca01.Examined);
     }
+
+    /// <summary>
+    /// A plane B known exception that applies to the 4.2 reference but matches nothing is stale,
+    /// and the validator does not gate its exit code on it: this test is the gate. It reuses the
+    /// cached validator run (no extra conversion).
+    /// Positive control: DD-25 (CODIS label) must apply and be matched, so an empty or
+    /// non-evaluated exception list cannot pass.
+    /// </summary>
+    [DataFact]
+    public void Validate_WithReference42_NoPlaneBKnownExceptionIsStale()
+    {
+        RepoPaths.EnsureReferenceDatabaseExists();
+
+        var result = ValidatorRunCache.Run(fixture.ValidatedDatabasePath, RepoPaths.ReferenceDatabasePath);
+
+        var applicablePlaneB = result.Report.Exceptions
+            .Where(e => e.Plane == "B" && e.AppliesToThisReference)
+            .ToList();
+
+        // Positive control: the list is not empty and a known-matched exception is in it.
+        var dd25 = Assert.Single(applicablePlaneB, e => e.Id == "DD-25" && e.BusinessKey == "pillar3_4.2|CODIS");
+        Assert.True(dd25.Matched >= 1, $"DD-25 (CODIS) expected matched >= 1, actual {dd25.Matched}.");
+        Assert.False(dd25.Stale, "DD-25 (CODIS) is reported stale.");
+
+        var stale = applicablePlaneB.Where(e => e.Stale).ToList();
+        Assert.True(
+            stale.Count == 0,
+            $"{stale.Count} stale plane B known exception(s) apply to the 4.2 reference: "
+            + string.Join(" | ", stale.Select(e => $"Id={e.Id}, BusinessKey={e.BusinessKey}, Scope={e.Scope}")));
+    }
 }

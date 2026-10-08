@@ -9,7 +9,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// (<see cref="Dpm20SkeletonFixture"/>, collection <c>Dpm2Skeleton</c>): the same <c>--all</c>
 /// conversion already loads these four tables (<c>Dpm20DictionaryLoader</c> is invoked
 /// unconditionally in <c>CliRunner.RunConvertDpm20</c>), so the fixture is reused instead of
-/// repeating a 755 MB read.
+/// repeating a large Access read.
 ///
 /// <c>mMetric</c> and <c>mDimension</c> are covered elsewhere: this class does NOT touch them.
 ///
@@ -37,7 +37,8 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
     }
 
     [DataFact]
-    public void MMember_Has12949Rows() => Assert.Equal(12949, CountRows("mMember"));
+    // 12,949 -> 12,952 on "DPM2 Database_v 4_2_1.accdb" (cutoff 4.2): +3 members of 4.2.1 (qTR:qx2065..qx2067), non-versioned dictionary content.
+    public void MMember_Has12952Rows() => Assert.Equal(12952, CountRows("mMember"));
 
     [DataFact]
     public void MHierarchy_Has1154Rows() => Assert.Equal(1154, CountRows("mHierarchy"));
@@ -298,7 +299,7 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
-        using var reader = new EbaDpm.Converter.Core.Access.Dpm20.Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath);
+        using var reader = new EbaDpm.Converter.Core.Access.Dpm20.Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath, cutoffReleaseCode: RepoPaths.Cutoff42ReleaseCode);
         reader.Open();
         var subCategoryCount = reader.ReadSubCategories().Count();
 

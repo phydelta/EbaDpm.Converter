@@ -7,7 +7,7 @@ converter supports both:
 | Model | Typical files | Releases covered | Pipeline |
 |---|---|---|---|
 | **DPM 1.0** | `DPM 1.0 Database_v4_1_20250709.accdb` | Up to release **4.1** (the last DPM 1.0 publication) | `Access/Dpm10AccessReader` + `Mapping/*Loader` |
-| **DPM 2.0** | `DPM2 Database_v 4_2_20251125.accdb`, `DPM2 Database_v 4_3_20260622.accdb` | Release **4.2** onwards | `Access/Dpm20/Dpm20AccessReader` + `Mapping/Dpm20/*` |
+| **DPM 2.0** | `DPM2 Database_v 4_2_1.accdb`, `DPM2 Database_v 4_3_20260622.accdb` | Release **4.2** onwards | `Access/Dpm20/Dpm20AccessReader` + `Mapping/Dpm20/*` |
 
 Both pipelines write the **same** 45-table SQLite distribution schema (see
 [target-schema.md](target-schema.md)). The distribution format was originally designed around
@@ -91,11 +91,19 @@ Differences from DPM 1.0 that matter to the converter (details in
 | File | Releases in `[Release]` | Cutoff derived |
 |---|---|---|
 | `DPM2 Database_v 4_2_20251125.accdb` | 3.4, 3.5, 4.0, 4.1, 4.2 | 4.2 |
+| `DPM2 Database_v 4_2_1.accdb` (2026-02-27) | the above plus 4.2.1 | 4.2.1 |
 | `DPM2 Database_v 4_3_20260622.accdb` | the above plus 4.2.1, 4.2.1.1, 4.2.1.2, 4.3 | 4.3 |
 
 The `ReleaseID` numbering is not stable between publications (release 4.3 uses IDs in the
 `1010000xxx` range while 4.2 used 1–5), so the converter never relies on ID ranges or positions —
 only on the maximum ID and on `Release.Code`.
+
+A later publication can be converted as of an earlier release with `--cutoff-release <code>`
+(for example `--cutoff-release 4.2` on the 4.2.1 database), which selects the release by
+`Release.Code`. On `DPM2 Database_v 4_2_1.accdb`, the rows in force at 4.2 are the same in
+number as in `DPM2 Database_v 4_2_20251125.accdb` (53 module versions, 929 table versions,
+19843 header versions, 117993 variable versions; measured 2026-10-08), while 3 table versions
+end at 4.2.1. The 2025-11-25 edition is no longer published by the EBA.
 
 ---
 
@@ -113,7 +121,8 @@ Detection happens once, at the start of every command that reads an `.accdb`
 
 Table names are compared case-insensitively. Requiring `Category` *and* the absence of `Domain`
 keeps older DPM 1.0 schemas (for example the 2014 *DPM Database 2.1.0.1*) from being
-misclassified by a single-table test.
+misclassified by a single-table test. The tests check the rule on synthetic `.accdb` files built
+with each combination of tables.
 
 If the file cannot be opened as an Access database at all (wrong path, a `.db` file, a
 truncated file), the provider error is re-raised with the file path and the expected formats,

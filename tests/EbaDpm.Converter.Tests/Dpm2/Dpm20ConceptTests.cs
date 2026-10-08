@@ -8,7 +8,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// Verification of <c>mConcept</c> and <c>mConceptTranslation</c> for the DPM 2.0 source. Reuses
 /// <see cref="Dpm20SkeletonFixture"/> (collection <c>Dpm2Skeleton</c>): the same <c>--all</c>
 /// conversion always runs <c>Dpm20ConceptLoader.Load</c>, as the final phase after the six
-/// loaders, so the 755 MB Access database does not need to be read again.
+/// loaders, so the large DPM 2.0 Access database does not need to be read again.
 ///
 /// There is no golden comparison applicable to these two tables (DPM 2.0 has no <c>Concept</c>
 /// table to copy, and the reference IDs are not comparable): what is checked here are the INTERNAL
@@ -54,18 +54,22 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     // same figure: the new mTable/mAxis/mAxisOrdinate rows that the rule adds are translated like any
     // other, with no extra concepts without a translation). Re-measured against the real output
     // after the change.
+    // Dated/scoped to "DPM2 Database_v 4_2_1.accdb" converted with cutoff 4.2: 57,077 -> 57,081 (+4:
+    // the release concept 4.2.1 and 3 members introduced by 4.2.1, qTR:qx2065..qx2067; the dictionary tables
+    // are not versioned, so a cutoff-4.2 conversion keeps them). Measured on the Access source.
     [DataFact]
-    public void MConcept_Has57077Rows_57078Minus1ForTheSentinelDomain() => Assert.Equal(57077, Scalar("SELECT COUNT(*) FROM \"mConcept\""));
+    public void MConcept_Has57081Rows_57082Minus1ForTheSentinelDomain() => Assert.Equal(57081, Scalar("SELECT COUNT(*) FROM \"mConcept\""));
 
     [DataFact]
-    public void MConceptTranslation_Has57070Rows_57077Minus7() =>
-        Assert.Equal(57070, Scalar("SELECT COUNT(*) FROM \"mConceptTranslation\""));
+    // 57,070 -> 57,073 on "DPM2 Database_v 4_2_1.accdb" (cutoff 4.2): +3 labelled members of 4.2.1 (the 4.2.1 release concept has no label).
+    public void MConceptTranslation_Has57073Rows_57081Minus8() =>
+        Assert.Equal(57073, Scalar("SELECT COUNT(*) FROM \"mConceptTranslation\""));
 
     public static IEnumerable<object[]> ExpectedConceptTypeCounts() =>
     [
         ["HierarchyNode", 16538],
         ["Ordinate", 20712], // 20,679 before the abstract-closure rule (+33: the ordinates of C_34.02.b/if 4.2)
-        ["Member", 12949],
+        ["Member", 12952], // 12,949 before the 4.2.1 file: +3 members (qTR:qx2065..qx2067) of "DPM2 Database_v 4_2_1.accdb"
         ["Axis", 1993], // 1,990 before the abstract-closure rule (+3: the axes of C_34.02.b/if 4.2)
         ["Hierarchy", 1154],
         ["TemplateOrTable", 1530], // 1,529 before the abstract-closure rule (+1: the BusinessTable of C_34.02.b/if 4.2)
@@ -75,7 +79,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
         ["Module", 50],
         ["Taxonomy", 32],
         ["ReportingFramework", 18],
-        ["Release", 5],
+        ["Release", 6], // 5 before the 4.2.1 file: [Release] now also declares 4.2.1 ("DPM2 Database_v 4_2_1.accdb")
     ];
 
     [DataTheory]
@@ -199,7 +203,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     {
         var sentinelDomainId = Scalar("SELECT \"DomainID\" FROM \"mDomain\" WHERE \"DomainCode\" = '' AND \"DomainLabel\" = 'Open'");
         AssertLabelMatchesEmittedValue(
-            "mMember", "MemberLabel", conceptCountExpected: 12949 - 1, extraWhere: $"t.\"DomainID\" <> {sentinelDomainId}");
+            "mMember", "MemberLabel", conceptCountExpected: 12952 - 1, extraWhere: $"t.\"DomainID\" <> {sentinelDomainId}");
     }
 
     // Axis 1,990 -> 1,993, Table 846 -> 847 after the abstract-closure rule - re-measured after the
@@ -286,11 +290,12 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
             """,
             2);
 
-        Assert.Equal(7, unlabeled.Count);
+        // 8 on "DPM2 Database_v 4_2_1.accdb" (7 before: [Release] now declares 6 releases).
+        Assert.Equal(8, unlabeled.Count);
 
-        // (1) to (5): the 5 releases - mRelease has no label column, there is no row to emit.
+        // (1) to (6): the 6 releases - mRelease has no label column, there is no row to emit.
         var releaseConceptIds = unlabeled.Where(r => r[1] == "Release").Select(r => r[0]).ToHashSet();
-        Assert.Equal(5, releaseConceptIds.Count);
+        Assert.Equal(6, releaseConceptIds.Count);
 
         var actualReleaseConceptIdsFromMRelease = QueryHelpers.Rows(Connection, "SELECT \"ConceptID\" FROM \"mRelease\" ORDER BY \"ReleaseID\"", 1)
             .Select(r => r[0]).ToHashSet();
@@ -376,7 +381,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     public void MConcept_ReleaseID_Release_IsAlwaysNull()
     {
         var total = Scalar("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'Release'");
-        Assert.Equal(5, total);
+        Assert.Equal(6, total); // 5 before "DPM2 Database_v 4_2_1.accdb" ([Release] now also declares 4.2.1)
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'Release' AND \"ReleaseID\" IS NOT NULL"));
     }
 
@@ -451,7 +456,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
             """,
             3);
 
-        Assert.Equal(12948, rows.Count);
+        Assert.Equal(12951, rows.Count); // 12,948 before "DPM2 Database_v 4_2_1.accdb" (+3 members of 4.2.1)
         AssertReleaseIdMatchesColonSuffixOracle(rows, releaseIdByCode, "MemberID");
     }
 

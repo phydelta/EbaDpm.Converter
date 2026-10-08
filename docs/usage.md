@@ -32,7 +32,7 @@ When running from source, replace `EbaDpm.Converter` with
 ```text
 EbaDpm.Converter --source "<input.accdb>" --output "<output.db>"
                  (--taxonomies "..." | --taxonomykeys "..." | --releases "..." | --all)
-                 [--overwrite] [--report <file.json>] [--verbose]
+                 [--cutoff-release <code>] [--overwrite] [--report <file.json>] [--verbose]
 ```
 
 | Option | Required | Description |
@@ -43,6 +43,7 @@ EbaDpm.Converter --source "<input.accdb>" --output "<output.db>"
 | `--taxonomies <list>` | one selector | Select by `TaxonomyCode`, as printed by `--list-taxonomies` (e.g. `COREP 3.2` for DPM 1.0, `corep 4.2` for DPM 2.0) |
 | `--taxonomykeys <list>` | one selector | Select by `TaxonomyKey`, a derived identifier (e.g. `corep/its-005-2020/2022-03-01` up to 3.x, `sbp/4.0` from 4.0) |
 | `--releases <list>` | one selector | Select by DPM release (`DpmPackageCode`, e.g. `4.0,4.1`) |
+| `--cutoff-release <code>` | no | DPM 2.0 sources only: convert as of the release with that `Release.Code` (e.g. `4.2`) instead of the latest one. An unknown code is an error that lists the available codes; with a DPM 1.0 source the option is an error |
 | `--overwrite` | no | Replace the output file if it exists. Without it, an existing output is an error |
 | `--report <path>` | no | Accepted for compatibility; the conversion summary is currently written to standard output only |
 | `--verbose` | no | Accepted for compatibility; currently has no additional effect |
@@ -53,7 +54,9 @@ name together with the valid values.
 
 The source model (DPM 1.0 or DPM 2.0) is detected automatically and printed on the first line of
 output. For a DPM 2.0 source the conversion is made as of the **cutoff release**, the latest
-release declared in the database, which is also printed. The run ends with a per-area summary
+release declared in the database, which is also printed. `--cutoff-release` selects an earlier
+release instead (for example `4.2` on the 4.2.1 database), and the printed line marks it as
+requested. The run ends with a per-area summary
 (rows written per table group, plus any unresolved cases listed by name) and a final `VACUUM`.
 
 Examples:
@@ -69,6 +72,9 @@ EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output corep.db `
 # By taxonomy key
 EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output corep.db --taxonomykeys corep/4.2
 
+# The 4.2.1 publication as of release 4.2
+EbaDpm.Converter --source "DPM2 Database_v 4_2_1.accdb" --output eba-4.2.db --all --cutoff-release 4.2
+
 # By release, from a DPM 1.0 source
 EbaDpm.Converter --source "DPM 1.0 Database_v4_1.accdb" --output dpm1.db --releases 4.0,4.1
 ```
@@ -76,13 +82,13 @@ EbaDpm.Converter --source "DPM 1.0 Database_v4_1.accdb" --output dpm1.db --relea
 ## List taxonomies
 
 ```text
-EbaDpm.Converter --list-taxonomies --source "<input.accdb>"
+EbaDpm.Converter --list-taxonomies --source "<input.accdb>" [--cutoff-release <code>]
 ```
 
 Prints the detected source model and one row per taxonomy with its `TaxonomyKey`, `TaxonomyCode`,
 DPM package (release), publication date and number of tables. Use it to find the values to pass to
 `--taxonomies`, `--taxonomykeys` or `--releases`. For DPM 2.0 sources taxonomies are derived
-(framework plus release), so the publication date column shows `-`.
+(framework plus release), so the publication date column shows `-`; `--cutoff-release` lists them as of an earlier release.
 
 ## Schema only
 

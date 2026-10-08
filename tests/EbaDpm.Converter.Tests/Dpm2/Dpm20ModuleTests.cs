@@ -9,7 +9,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// Verification of <c>mModule</c>, <c>mConceptualModule</c> and <c>mModuleBusinessTemplate</c> for
 /// the DPM 2.0 source. It reuses <see cref="Dpm20SkeletonFixture"/> (collection
 /// <c>Dpm2Skeleton</c>): the same <c>--all</c> conversion already runs <c>Dpm20ModuleLoader.Load</c>,
-/// so the 755 MB Access database does not need to be re-read for the generated content.
+/// so the large DPM 2.0 Access database does not need to be re-read for the generated content.
 ///
 /// <b>The third module filter</b>: without excluding <c>[Module].isDocumentModule</c>,
 /// <c>mModule</c> emits 52 rows, not 50 -- <c>P3_NONREM_DIS_DOCS</c> and <c>P3_REM_DIS_DOCS</c> are
@@ -85,8 +85,8 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
             .ToHashSet(StringComparer.Ordinal);
         Assert.Equal(50, generatedCodes.Count);
 
-        // Fresh, cheap read: only ModuleVersion (the rest of the 755 MB Access database is not needed).
-        using var rawReader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath);
+        // Fresh, cheap read: only ModuleVersion (the rest of the large DPM 2.0 Access database is not needed).
+        using var rawReader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath, cutoffReleaseCode: RepoPaths.Cutoff42ReleaseCode);
         rawReader.Open();
         var rawModuleVersions = rawReader.ReadModuleVersions().ToList();
 
@@ -140,7 +140,14 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
             }
         }
 
-        Assert.True(mismatches.Count == 0, $"{mismatches.Count}/50 ModuleLabel values differ from the reference:\n" + string.Join("\n", mismatches));
+        // The single expected difference, named by business key: CODIS. The EBA corrected the label in
+        // "DPM2 Database_v 4_2_1.accdb" ("Common disclosures"); the reference export keeps the typo
+        // ("Commun disclosures"). Both sides are asserted exactly, so if either changes this fails
+        // (a stale exception must fail). Everything else must match the reference exactly.
+        var expected = new[] { "CODIS: generated='Common disclosures' reference='Commun disclosures'" };
+        Assert.True(
+            mismatches.SequenceEqual(expected, StringComparer.Ordinal),
+            $"{mismatches.Count}/50 ModuleLabel values differ from the reference; expected exactly {string.Join(", ", expected)}. Actual:\n" + string.Join("\n", mismatches));
     }
 
     // ------------------------------------------------------------------

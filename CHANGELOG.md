@@ -6,6 +6,29 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Added
+
+- `--cutoff-release <code>`: converts a DPM 2.0 database as of an earlier release, selected by
+  its `Release.Code` (for example `--cutoff-release 4.2` on the 4.2.1 database). Also accepted by
+  `--list-taxonomies`.
+- `scripts/Initialize-TestData.ps1`: sets up the data directory of the data-dependent tests in
+  one step, downloading the EBA DPM databases and Annotated Table Layouts and extracting the
+  reference SQLite exports (see `docs/test-data.md`).
+- The reference SQLite exports used by the regression tests are versioned, compressed, in
+  `tests/reference-exports/`.
+
+### Changed
+
+- Validation: removed the known exception E-1 (dimension `EXC` against the 4.2 reference). The
+  output has contained both versions of `EXC` for some time, so the exception was stale; a
+  test now fails if any plane B exception for the 4.2 reference goes stale.
+- Validation: new known exception DD-25 for the label of module `CODIS`, which the EBA corrected
+  in the 4.2.1 database while the 4.2 reference export keeps the earlier text.
+- DPM 2.0: `mRelease.IsCurrent` marks the cutoff release. With the default cutoff the output is
+  unchanged; with `--cutoff-release` the requested release is the current one.
+- The data-dependent tests use the DPM 2.0 database 4.2.1 (2026-02-27), the 4.2 edition the EBA
+  now publishes, instead of the 2025-11-25 edition.
+
 ## 1.1.1 - 2026-10-08
 
 First public release on GitHub. The conversion output is unchanged from 1.1.0.

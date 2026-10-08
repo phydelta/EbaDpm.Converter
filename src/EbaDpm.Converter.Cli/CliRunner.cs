@@ -31,9 +31,9 @@ public static class CliRunner
         """
         EbaDpm.Converter --source "<path.accdb>" --output "<path.db>"
                          (--taxonomies "..." | --taxonomykeys "..." | --releases "..." | --all)
-                         [--overwrite] [--report <path.json>] [--verbose]
+                         [--cutoff-release <code>] [--overwrite] [--report <path.json>] [--verbose]
 
-        EbaDpm.Converter --list-taxonomies --source "<path.accdb>"
+        EbaDpm.Converter --list-taxonomies --source "<path.accdb>" [--cutoff-release <code>]
         EbaDpm.Converter --schema-only --output "<path.db>"
         EbaDpm.Converter --validate "<generated.db>" [--reference "<ref.db>"] [--layouts "<layouts-repository.db>"] [--report <path.json>]
         EbaDpm.Converter --extract-layouts "<directory>" --out "<repository.db>"
@@ -48,6 +48,9 @@ public static class CliRunner
           --all                             all taxonomies
 
         --list-taxonomies shows both columns (TaxonomyKey and TaxonomyCode) in case you do not know what to type.
+
+        --cutoff-release <code>: DPM 2.0 sources only. Converts the database as of the release with that
+        Release.Code (e.g. 4.2). Without it, the cutoff is the latest release declared in the database.
 
         --validate: --reference is OPTIONAL. Without it, only plane A is run (internal invariants).
         With it, plane B is added (semantic diff against the reference SQLite database).
@@ -119,12 +122,20 @@ public static class CliRunner
 
         var recognized = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "--list-taxonomies", "--source",
+            "--list-taxonomies", "--source", "--cutoff-release",
         };
-        var unknown = FindUnknownTokens(args, recognized, optionsWithValue: ["--source"]);
+        var unknown = FindUnknownTokens(args, recognized, optionsWithValue: ["--source", "--cutoff-release"]);
         if (unknown.Count > 0)
         {
             stderr.WriteLine($"Error: unrecognized argument in --list-taxonomies mode: {unknown[0]}");
+            stderr.WriteLine();
+            stderr.WriteLine(Usage);
+            return ExitArgumentError;
+        }
+
+        if (!TryGetCutoffRelease(args, out var cutoffReleaseCode, out var cutoffError))
+        {
+            stderr.WriteLine($"Error: {cutoffError}");
             stderr.WriteLine();
             stderr.WriteLine(Usage);
             return ExitArgumentError;
@@ -137,12 +148,18 @@ public static class CliRunner
 
             if (sourceModel == DpmSourceModel.Dpm10)
             {
+                if (cutoffReleaseCode is not null)
+                {
+                    stderr.WriteLine($"Error: {CutoffReleaseDpm10Message}");
+                    return ExitArgumentError;
+                }
+
                 stdout.WriteLine("Detected source model: DPM 1.0.");
                 stdout.WriteLine();
                 return RunListTaxonomiesDpm10(source, stdout);
             }
 
-            return RunListTaxonomiesDpm20(source, stdout);
+            return RunListTaxonomiesDpm20(source, cutoffReleaseCode, stdout);
         }
         catch (SourceModelDetectionException ex)
         {
@@ -186,12 +203,40 @@ public static class CliRunner
         return ExitOk;
     }
 
-    private static int RunListTaxonomiesDpm20(string source, TextWriter stdout)
+    private const string CutoffReleaseDpm10Message = "--cutoff-release only applies to DPM 2.0 sources.";
+
+    /// <summary>
+    /// Reads the optional <c>--cutoff-release</c> value. Absent is fine (null); present without a
+    /// value is an error.
+    /// </summary>
+    private static bool TryGetCutoffRelease(string[] args, out string? cutoffReleaseCode, out string error)
     {
-        using var reader = new Dpm20AccessReader(source);
+        cutoffReleaseCode = null;
+        error = string.Empty;
+
+        if (!HasFlag(args, "--cutoff-release"))
+        {
+            return true;
+        }
+
+        if (!TryGetOptionValue(args, "--cutoff-release", out var value, out error))
+        {
+            return false;
+        }
+
+        cutoffReleaseCode = value.Trim();
+        return true;
+    }
+
+    private static string DescribeCutoff(Dpm20AccessReader reader)
+        => reader.CutoffReleaseRequested ? $"{reader.CutoffReleaseCode}, requested" : reader.CutoffReleaseCode;
+
+    private static int RunListTaxonomiesDpm20(string source, string? cutoffReleaseCode, TextWriter stdout)
+    {
+        using var reader = new Dpm20AccessReader(source, cutoffReleaseCode: cutoffReleaseCode);
         reader.Open();
 
-        stdout.WriteLine($"Detected source model: DPM 2.0 (cutoff release {reader.CutoffReleaseCode}).");
+        stdout.WriteLine($"Detected source model: DPM 2.0 (cutoff release {DescribeCutoff(reader)}).");
         stdout.WriteLine();
 
         var releases = reader.ReadReleases().ToList();
@@ -232,8 +277,9 @@ public static class CliRunner
         var recognized = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--all", "--overwrite", "--report", "--verbose",
+            "--cutoff-release",
         };
-        var optionsWithValue = new[] { "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--report" };
+        var optionsWithValue = new[] { "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--report", "--cutoff-release" };
         var unknown = FindUnknownTokens(args, recognized, optionsWithValue);
         if (unknown.Count > 0)
         {
@@ -254,6 +300,14 @@ public static class CliRunner
         if (!TryGetOptionValue(args, "--output", out var output, out var outputError))
         {
             stderr.WriteLine($"Error: {outputError}");
+            stderr.WriteLine();
+            stderr.WriteLine(Usage);
+            return ExitArgumentError;
+        }
+
+        if (!TryGetCutoffRelease(args, out var cutoffReleaseCode, out var cutoffError))
+        {
+            stderr.WriteLine($"Error: {cutoffError}");
             stderr.WriteLine();
             stderr.WriteLine(Usage);
             return ExitArgumentError;
@@ -282,7 +336,14 @@ public static class CliRunner
 
             if (sourceModel == DpmSourceModel.Dpm20)
             {
-                return RunConvertDpm20(source, output, overwrite, taxonomyCodes, taxonomyKeys, releaseCodes, all, stdout, stderr);
+                return RunConvertDpm20(
+                    source, output, overwrite, taxonomyCodes, taxonomyKeys, releaseCodes, all, cutoffReleaseCode, stdout, stderr);
+            }
+
+            if (cutoffReleaseCode is not null)
+            {
+                stderr.WriteLine($"Error: {CutoffReleaseDpm10Message}");
+                return ExitArgumentError;
             }
 
             SchemaCreator.Create(output, overwrite);
@@ -398,13 +459,17 @@ public static class CliRunner
         List<string>? taxonomyKeys,
         List<string>? releaseCodes,
         bool all,
+        string? cutoffReleaseCode,
         TextWriter stdout,
         TextWriter stderr)
     {
-        using var accessReader = new Dpm20AccessReader(source);
+        using var accessReader = new Dpm20AccessReader(source, cutoffReleaseCode: cutoffReleaseCode);
         accessReader.Open();
 
-        stdout.WriteLine($"Cutoff release: {accessReader.CutoffReleaseCode}.");
+        stdout.WriteLine(
+            accessReader.CutoffReleaseRequested
+                ? $"Cutoff release: {accessReader.CutoffReleaseCode} (requested)."
+                : $"Cutoff release: {accessReader.CutoffReleaseCode}.");
 
         var releases = accessReader.ReadReleases().ToList();
         var frameworks = accessReader.ReadFrameworks().ToList();
@@ -430,7 +495,7 @@ public static class CliRunner
         using var destination = new SqliteConnection(connectionString);
         destination.Open();
 
-        var skeleton = Dpm20SkeletonLoader.Load(releases, frameworks, selectedTaxonomies, accessReader.CutoffReleaseCode, destination);
+        var skeleton = Dpm20SkeletonLoader.Load(releases, frameworks, selectedTaxonomies, accessReader.CutoffReleaseCode, accessReader.CutoffReleaseId, destination);
 
         var dictionary = Dpm20DictionaryLoader.Load(accessReader, destination, out var dictionaryDiagnostics);
 

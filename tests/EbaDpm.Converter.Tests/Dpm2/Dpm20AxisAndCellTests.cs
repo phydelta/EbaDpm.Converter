@@ -8,7 +8,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <c>mTableCell</c>, <c>mCellPosition</c> and <c>mOrdinateCategorisation</c> tables.
 /// Reuses <see cref="Dpm20SkeletonFixture"/> (collection <c>Dpm2Skeleton</c>): the same
 /// <c>--all</c> conversion always runs <c>Dpm20AxisAndCellLoader.Load</c>, with no separate flag
-/// (<c>CliRunner.RunConvertDpm20</c>), so the 755 MB Access database does not need to be read
+/// (<c>CliRunner.RunConvertDpm20</c>), so the large DPM 2.0 Access database does not need to be read
 /// again.
 ///
 /// The counts are NOT those measured against the reference over its own 846 (table, taxonomy)

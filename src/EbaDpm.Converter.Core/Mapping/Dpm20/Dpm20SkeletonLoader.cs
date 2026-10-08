@@ -39,7 +39,8 @@ public static class Dpm20SkeletonLoader
     // mRelease — the 5 rows of [Release], not filtered by selected taxonomy.
     // ------------------------------------------------------------------
 
-    private static void LoadReleases(SqliteConnection destination, IReadOnlyList<Dpm20ReleaseRow> releases)
+    private static void LoadReleases(
+        SqliteConnection destination, IReadOnlyList<Dpm20ReleaseRow> releases, int cutoffReleaseId)
     {
         using var writer = new SqliteBatchWriter(
             destination,
@@ -54,13 +55,14 @@ public static class Dpm20SkeletonLoader
                 release.Description, // Release.Description, multi-line, only exists in 4.1/4.2
                 release.Status, // Release.Status ("released" in the first 4, "validation" in 4.2)
                 release.Date, // ISO TEXT as is ("2024-02-06"...): do NOT pass through DateTime
-                // IsCurrent: DIRECT MAPPING from the source (Release.IsCurrent), without normalizing
-                // or forcing any fixed value. It is DYNAMIC from one Access release to the next —
-                // as new Access databases are published, the row with IsCurrent=1 changes. That the
-                // references seen so far carry 1 in all five rows is a static SNAPSHOT that may
-                // coincide with the source at that point in time; it is not a format convention to
-                // reproduce here.
-                release.IsCurrent,
+                // IsCurrent: DERIVED, not copied from Release.IsCurrent. It is 1 exactly for the
+                // cutoff release (matched by ReleaseID) and 0 for every other one. Access marks
+                // only its most recent release as current, so with an earlier --cutoff-release
+                // (e.g. 4.2 on the 4.2.1 Access) copying it would declare a release that is not
+                // the cutoff as current and downstream release detection (plane C cutoff
+                // detection, B-DIC-01 publication guard) would misidentify the output. With the
+                // natural cutoff (the most recent release) the result equals the Access value.
+                release.ReleaseId == cutoffReleaseId,
                 (int?)null); // ConceptID: NULL until the concept loader runs
         }
     }
@@ -252,12 +254,16 @@ public static class Dpm20SkeletonLoader
     /// <see cref="Dpm20TaxonomyDeriver"/>.
     /// </param>
     /// <param name="cutoffReleaseCode"><c>Dpm20AccessReader.CutoffReleaseCode</c>.</param>
+    /// <param name="cutoffReleaseId">
+    /// <c>Dpm20AccessReader.CutoffReleaseId</c>: the only release written with <c>IsCurrent=1</c>.
+    /// </param>
     /// <param name="destination">Destination SQLite connection, already open on the created schema.</param>
     public static Result Load(
         IReadOnlyList<Dpm20ReleaseRow> releases,
         IReadOnlyList<Dpm20FrameworkRow> frameworks,
         IReadOnlyList<AccessTaxonomyRow> selectedTaxonomies,
         string cutoffReleaseCode,
+        int cutoffReleaseId,
         SqliteConnection destination)
     {
         ArgumentNullException.ThrowIfNull(releases);
@@ -268,7 +274,7 @@ public static class Dpm20SkeletonLoader
 
         ApplyBulkLoadPragmas(destination);
 
-        LoadReleases(destination, releases);
+        LoadReleases(destination, releases, cutoffReleaseId);
 
         var emittedFrameworks = LoadReportingFrameworks(destination, frameworks, selectedTaxonomies);
 

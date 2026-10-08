@@ -7,7 +7,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <summary>
 /// Verification of <c>mTableCell.BusinessCode</c>, <c>DatapointSignature</c> and <c>DPS</c> for the
 /// DPM 2.0 source. It reuses <see cref="Dpm20SkeletonFixture"/> (collection <c>Dpm2Skeleton</c>):
-/// the same <c>--all</c> conversion always runs <c>Dpm20AxisAndCellLoader.Load</c>, so the 755 MB
+/// the same <c>--all</c> conversion always runs <c>Dpm20AxisAndCellLoader.Load</c>, so the large
 /// Access database does not need to be re-read.
 ///
 /// The overall <c>DPS</c> match against the reference (about 90%) is not pursued here: some
