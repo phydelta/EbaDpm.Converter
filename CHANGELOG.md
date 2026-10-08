@@ -6,11 +6,28 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## 1.1.1 - 2026-10-08
+
+First public release on GitHub. The conversion output is unchanged from 1.1.0.
+
 ### Added
 
 - GitHub collaboration infrastructure: CI and CodeQL workflows, on-demand release workflow with
   checksums and build provenance, issue and pull request templates, security policy and code of
   conduct.
+- Release executables are published as `EbaDpm.Converter-X.Y.Z-win-x64.zip`, with a
+  `SHA256SUMS.txt` file and a build provenance attestation.
+- The test suite runs without the EBA data files: data-dependent tests are skipped unless
+  `EBADPM_TEST_DATA` (or `./Data`) points to them, and the tests that need the Access Database
+  Engine are skipped when it is not installed. See
+  [docs/test-data.md](https://github.com/phydelta/EbaDpm.Converter/blob/main/docs/test-data.md).
+
+### Changed
+
+- Source code, messages and documentation are now in English.
+- Updated `Microsoft.Data.Sqlite` and `System.Data.OleDb` to 10.0.12.
+- Updated test dependencies: `Microsoft.NET.Test.Sdk` 18.10.1, `xunit.runner.visualstudio` 4.0.0,
+  `coverlet.collector` 10.1.0.
 
 ## 1.1.0 - 2026-09-08
 
