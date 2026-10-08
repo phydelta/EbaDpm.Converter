@@ -50,9 +50,9 @@ public sealed class KeyHeaderFixedPairsSyntheticTests
     /// </summary>
     private static List<string> LoadAndReadOpenOrdinateCategorisation(int? keyHeaderContextId)
     {
-        var directory = Path.Combine(Path.GetTempPath(), $"EbaDpm.KeyHeaderFixedPairs_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var directory = Path.Join(Path.GetTempPath(), $"EbaDpm.KeyHeaderFixedPairs_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, "synthetic.db");
+        var path = Path.Join(directory, "synthetic.db");
         try
         {
             SchemaCreator.Create(path, overwrite: false);
