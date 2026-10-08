@@ -44,3 +44,6 @@ Desktop.ini
 # Release workflow scratch output
 publish/
 release-notes.md
+
+# Personal Claude Code settings
+.claude/settings.local.json
