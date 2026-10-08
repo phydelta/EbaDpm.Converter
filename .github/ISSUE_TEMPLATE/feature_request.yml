@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest a new capability, for example support for a new EBA release or a new validation check.
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and why is it not possible or hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: dropdown
+    id: model
+    attributes:
+      label: Source model affected
+      options:
+        - DPM 1.0
+        - DPM 2.0
+        - Both
+        - Not related to a source model
+    validations:
+      required: true

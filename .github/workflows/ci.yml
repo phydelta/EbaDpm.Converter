@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build:
+    # The job name is the required status check of the branch ruleset: keep both in sync.
+    name: Build and test
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      # The converter reads Access through Microsoft.ACE.OLEDB.16.0, which hosted runners do not
+      # ship. Installing it lets the ACE-dependent synthetic tests run; if the download fails,
+      # those tests are reported as skipped ([AceFact]) instead of failing the build.
+      - name: Install Microsoft Access Database Engine 2016 (x64)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'accessdatabaseengine_X64.exe'
+          Invoke-WebRequest -Uri 'https://download.microsoft.com/download/3/5/C/35C84C36-661A-44E6-9324-8786B8DBE231/accessdatabaseengine_X64.exe' -OutFile $installer
+          $process = Start-Process -FilePath $installer -ArgumentList '/quiet', '/norestart' -Wait -PassThru
+          Write-Host "Installer exit code: $($process.ExitCode)"
+
+      - name: Restore
+        run: dotnet restore EbaDpm.Converter.sln
+
+      - name: Build
+        run: dotnet build EbaDpm.Converter.sln --configuration Release --no-restore
+
+      # No EBA data files on CI: the data-dependent tests ([DataFact]/[DataTheory]) are skipped.
+      - name: Test
+        run: >
+          dotnet test EbaDpm.Converter.sln --configuration Release --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: ignore
+          retention-days: 14

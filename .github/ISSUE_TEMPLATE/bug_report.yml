@@ -1,0 +1,55 @@
+name: Bug report
+description: The converter crashes, rejects valid input or behaves differently from the documentation.
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. If the problem is that the **output data** looks wrong (missing rows,
+        wrong signatures, differences against a layout), use the *Conversion discrepancy* form instead.
+        Please do not attach the EBA data files: refer to them by file name and release.
+  - type: input
+    id: version
+    attributes:
+      label: Converter version
+      description: The release you downloaded (also shown in EbaDpm.Converter.exe > Properties > Details), or the commit if built from source.
+      placeholder: 1.1.0
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source file
+      description: Exact file name of the EBA Access database (and release).
+      placeholder: DPM2 Database_v 4_2_20251125.accdb
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command line
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Console output
+      description: The full output, including any exception and stack trace.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows version, how the tool was run (release executable or from source, .NET SDK version), Access Database Engine version.
+      placeholder: Windows 11 x64, release executable, Access Database Engine 2016 x64
+    validations:
+      required: false

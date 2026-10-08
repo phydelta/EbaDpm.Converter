@@ -1,5 +1,10 @@
 # EbaDpm.Converter
 
+[![CI](https://github.com/OWNER/EbaDpm.Converter/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/EbaDpm.Converter/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/OWNER/EbaDpm.Converter/actions/workflows/codeql.yml/badge.svg)](https://github.com/OWNER/EbaDpm.Converter/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/OWNER/EbaDpm.Converter)](https://github.com/OWNER/EbaDpm.Converter/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A command-line tool that converts the **EBA DPM Database** (Data Point Model) from the Microsoft
 Access edition published by the European Banking Authority (`.accdb`) into **SQLite**, using the
 45-table **DPM distribution schema** (`mXxx` / `dXxx` / `aXxx` / `vXxx` tables) consumed by
@@ -54,6 +59,13 @@ on any other SQLite edition existing.
 | Windows x64 | The tool is Windows-only because of the Access provider below |
 | Microsoft Access Database Engine 2016 Redistributable (x64) | Provides `Microsoft.ACE.OLEDB.16.0`, used to read the `.accdb`. It is a system component and cannot be bundled |
 | .NET 10 SDK | Only to build from source. The self-contained executable needs no .NET installation |
+
+## Download
+
+Ready-to-run executables are published on the
+[Releases](https://github.com/OWNER/EbaDpm.Converter/releases) page as
+`EbaDpm.Converter-X.Y.Z-win-x64.zip`, with a `SHA256SUMS.txt` file and a build provenance
+attestation (see [docs/releasing.md](docs/releasing.md#verifying-a-downloaded-release)).
 
 ## Build
 
@@ -145,7 +157,10 @@ difference against it is reported but never treated as a defect on its own. Deta
 | [docs/target-schema.md](docs/target-schema.md) | The 45-table DPM distribution schema |
 | [docs/test-data.md](docs/test-data.md) | Obtaining the EBA data files used by the data-dependent tests |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing and contributing |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing, branching strategy and pull requests |
+| [docs/releasing.md](docs/releasing.md) | Versioning and the release procedure |
+| [SECURITY.md](SECURITY.md) | Reporting vulnerabilities |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Code of conduct |
 
 ## Data files
 

@@ -1,0 +1,62 @@
+name: Conversion discrepancy
+description: The output does not match what the EBA Access database or the Annotated Table Layouts declare.
+labels: [mapping, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The Access database and the EBA Annotated Table Layouts are the sources of truth. A difference
+        against another SQLite export of the DPM is useful information, but on its own it is not a
+        defect: please show what the Access database or the layout declares.
+  - type: input
+    id: version
+    attributes:
+      label: Converter version
+      placeholder: 1.1.0
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source file and release
+      placeholder: DPM2 Database_v 4_2_20251125.accdb (release 4.2)
+    validations:
+      required: true
+  - type: input
+    id: tables
+    attributes:
+      label: Affected target tables
+      placeholder: mOrdinateCategorisation, mCellPosition
+    validations:
+      required: true
+  - type: textarea
+    id: keys
+    attributes:
+      label: Affected objects, by business key
+      description: Taxonomy, table code, ordinate or cell business codes, member codes... (not surrogate IDs, which change between runs and releases).
+      placeholder: "corep 4.2 / C_07.00.a / BusinessCode {C_07.00.a,r0010,c0010}"
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: What the converter emits
+      description: Query and result against the generated SQLite database.
+      render: sql
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence from the source of truth
+      description: The Access rows (table and columns), the layout cell/annotation, or the metamodel definition that shows the expected result.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation report (optional)
+      description: Relevant part of `--validate ... --report report.json`, if available.
+      render: json
+    validations:
+      required: false

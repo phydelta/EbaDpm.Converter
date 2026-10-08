@@ -1,0 +1,21 @@
+# Categories for GitHub's "Generate release notes" button, based on pull request labels.
+# The release workflow publishes the CHANGELOG.md section; this file only shapes the
+# automatically generated list when a maintainer uses it.
+changelog:
+  exclude:
+    labels: [skip-changelog]
+  categories:
+    - title: Breaking changes
+      labels: [breaking-change]
+    - title: Conversion fixes
+      labels: [mapping, bug]
+    - title: New features
+      labels: [enhancement]
+    - title: Validation
+      labels: [validation]
+    - title: Documentation
+      labels: [documentation]
+    - title: Dependencies and CI
+      labels: [dependencies, ci]
+    - title: Other changes
+      labels: ['*']

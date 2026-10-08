@@ -1,0 +1,136 @@
+name: Release
+
+# Releases are created on demand (Actions > Release > Run workflow), only from main.
+# The version is NOT an input: it is read from <Version> in Directory.Build.props, which a release
+# pull request bumps together with CHANGELOG.md. See docs/releasing.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Mark the GitHub release as a pre-release'
+        type: boolean
+        default: false
+      draft:
+        description: 'Create the release as a draft (publish it manually afterwards)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  release:
+    name: Build and publish release
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    # Protect this environment in the repository settings (required reviewers) so that a release
+    # needs an explicit approval before anything is published.
+    environment: release
+    permissions:
+      contents: write        # create the tag and the GitHub release
+      id-token: write        # build provenance attestation
+      attestations: write   # build provenance attestation
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read and validate version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content Directory.Build.props
+          $version = ($props.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ }) | Select-Object -First 1
+          if (-not $version) { throw 'No <Version> found in Directory.Build.props.' }
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Version '$version' is not a valid SemVer version." }
+          $tag = "v$version"
+          git fetch --tags --quiet
+          if (git tag --list $tag) { throw "Tag $tag already exists. Bump <Version> in Directory.Build.props first." }
+          if ($version -match '-' -and '${{ inputs.prerelease }}' -ne 'true') {
+            throw "Version '$version' has a pre-release suffix: run the workflow with 'prerelease' checked."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          Write-Host "Releasing $tag from $env:GITHUB_SHA"
+
+      - name: Extract release notes from CHANGELOG.md
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $lines = Get-Content CHANGELOG.md
+          $pattern = '^##\s+\[?' + [regex]::Escape($version) + '\]?(\s|$)'
+          $start = -1
+          for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match $pattern) { $start = $i; break } }
+          if ($start -lt 0) { throw "CHANGELOG.md has no section for $version. Add '## $version - YYYY-MM-DD' before releasing." }
+          $end = $lines.Count
+          for ($i = $start + 1; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^##\s') { $end = $i; break } }
+          $notes = $lines[($start + 1)..($end - 1)] -join "`n"
+          if (-not $notes.Trim()) { throw "The CHANGELOG.md section for $version is empty." }
+          Set-Content -Path release-notes.md -Value $notes.Trim() -Encoding utf8
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install Microsoft Access Database Engine 2016 (x64)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'accessdatabaseengine_X64.exe'
+          Invoke-WebRequest -Uri 'https://download.microsoft.com/download/3/5/C/35C84C36-661A-44E6-9324-8786B8DBE231/accessdatabaseengine_X64.exe' -OutFile $installer
+          Start-Process -FilePath $installer -ArgumentList '/quiet', '/norestart' -Wait
+
+      - name: Build and test
+        run: |
+          dotnet build EbaDpm.Converter.sln --configuration Release
+          dotnet test EbaDpm.Converter.sln --configuration Release --no-build
+
+      - name: Publish single-file executable
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          dotnet publish src/EbaDpm.Converter.Cli --configuration Release --runtime win-x64 `
+            --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=None -p:Version=$version -p:ContinuousIntegrationBuild=true -o publish
+          Copy-Item LICENSE, README.md, CHANGELOG.md publish/
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $zip = "dist/EbaDpm.Converter-$version-win-x64.zip"
+          Compress-Archive -Path publish/* -DestinationPath $zip
+          Push-Location dist
+          Get-ChildItem -File | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.Name -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+          } | Set-Content SHA256SUMS.txt -Encoding ascii
+          Pop-Location
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.zip
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ steps.version.outputs.tag }}'
+          $assets = (Get-ChildItem dist -File).FullName
+          $ghArgs = @('release', 'create', $tag) + $assets + @(
+                    '--target', $env:GITHUB_SHA, '--title', "EbaDpm.Converter $tag",
+                    '--notes-file', 'release-notes.md')
+          if ('${{ inputs.prerelease }}' -eq 'true') { $ghArgs += '--prerelease' }
+          if ('${{ inputs.draft }}' -eq 'true') { $ghArgs += '--draft' }
+          gh @ghArgs

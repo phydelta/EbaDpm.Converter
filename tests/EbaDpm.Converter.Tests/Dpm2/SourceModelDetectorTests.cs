@@ -56,7 +56,7 @@ public sealed class SourceModelDetectorTests
     /// empty <c>.accdb</c> (no user tables, created with ADOX) that opens fine through ACE OLEDB
     /// but has neither <c>Domain</c> nor <c>Category</c> -- the "neither of the two" case.
     /// </summary>
-    [Fact]
+    [AceFact]
     public void FileWithNeitherModel_ThrowsExplicitException_NamingFileAndExpectation()
     {
         var tempPath = Dpm2TestAccdbFactory.CreateEmptyAccdb();
@@ -94,7 +94,7 @@ public sealed class SourceModelDetectorTests
     /// without any marker" case in <see cref="SourceModelDetectionException"/>). The assertion is
     /// kept STRICT so that the failure stays documented instead of silenced.
     /// </summary>
-    [Fact]
+    [AceFact]
     public void EmptyFile_ThrowsWithMessageNamingTheFile()
     {
         var tempPath = Path.Combine(Path.GetTempPath(), $"empty-file_{Environment.ProcessId}_{Guid.NewGuid():N}.accdb");
