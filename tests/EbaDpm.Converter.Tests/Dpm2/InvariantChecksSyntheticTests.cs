@@ -23,7 +23,7 @@ public sealed class InvariantChecksSyntheticTests : IDisposable
 
     public InvariantChecksSyntheticTests()
     {
-        _dir = Path.Combine(Path.GetTempPath(), $"EbaDpm.InvariantChecksSynthetic_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        _dir = Path.Join(Path.GetTempPath(), $"EbaDpm.InvariantChecksSynthetic_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_dir);
     }
 
@@ -45,7 +45,7 @@ public sealed class InvariantChecksSyntheticTests : IDisposable
 
     private SqliteConnection CreateAndOpen(string fileName)
     {
-        var path = Path.Combine(_dir, fileName);
+        var path = Path.Join(_dir, fileName);
         SchemaCreator.Create(path, overwrite: true);
         var connectionString = new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadWrite }.ToString();
         var connection = new SqliteConnection(connectionString);

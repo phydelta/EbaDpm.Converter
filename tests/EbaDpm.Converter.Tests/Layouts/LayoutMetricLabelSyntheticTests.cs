@@ -27,17 +27,17 @@ public sealed class LayoutMetricLabelSyntheticTests
     [InlineData("Main Property")] // The label since 4.0 -- control that the fix did not break the one already in force.
     public void ASingleCodeValue_PairedWithTheMetricLabel_ResolvesAsMET(string metricLabel)
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.MetricLabel_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.MetricLabel_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
             new MinimalXlsxBuilder("T_METRIC_LABEL")
                 .WithCell("D1", metricLabel)
                 .WithCell("D2", "(qBV0)")
                 .WithCell("A3", "Rows")
                 .Save(inputDir);
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
             using var connection = Open(outputPath);
@@ -67,17 +67,17 @@ public sealed class LayoutMetricLabelSyntheticTests
     [Fact]
     public void ASimilarButDifferentLabel_DoesNotTriggerMetricRecognition()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.MetricLabelNegative_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.MetricLabelNegative_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
             new MinimalXlsxBuilder("T_METRIC_LABEL_NEG")
                 .WithCell("D1", "Metrics") // It is NEITHER "Metric" NOR "Main Property".
                 .WithCell("D2", "(qBV0)")
                 .WithCell("A3", "Rows")
                 .Save(inputDir);
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
             using var connection = Open(outputPath);

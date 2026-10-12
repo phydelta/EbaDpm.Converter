@@ -71,9 +71,9 @@ public sealed class ModulesFixture : IDisposable
         RepoPaths.EnsureReference32DatabaseExists();
         RepoPaths.EnsureReference40DatabaseExists();
 
-        TempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.ModulesTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        TempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.ModulesTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(TempDirectory);
-        GeneratedDatabasePath = Path.Combine(TempDirectory, "generated.db");
+        GeneratedDatabasePath = Path.Join(TempDirectory, "generated.db");
 
         SchemaCreator.Create(GeneratedDatabasePath, overwrite: false);
 

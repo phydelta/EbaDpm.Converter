@@ -254,7 +254,7 @@ public sealed class IntegrityTests
         {
             Assert.False(string.IsNullOrEmpty(node.Path), $"HierarchyID={node.HierarchyId} MemberID={node.MemberId}: null Path after normalisation (unexpected, one must always be produced).");
 
-            var ownSegment = node.MemberId.ToString() + ".";
+            var ownSegment = node.MemberId + ".";
             if (!node.Path!.EndsWith(ownSegment, StringComparison.Ordinal))
             {
                 pathMismatches.Add($"HierarchyID={node.HierarchyId} MemberID={node.MemberId} Path='{node.Path}'");

@@ -17,8 +17,8 @@ public sealed class CliHelpTests
     [InlineData("/?")]
     public void HelpFlag_Alone_WritesToStdout_AndReturnsZero(string flag)
     {
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run([flag], stdout, stderr);
 
@@ -34,8 +34,8 @@ public sealed class CliHelpTests
     [InlineData("/?")]
     public void HelpFlag_CombinedWithOtherArguments_StillWritesToStdout_AndReturnsZero(string flag)
     {
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         // Deliberately incoherent arguments (no real source, no selector): if --help were not
         // handled first, this would fail because of missing/invalid arguments.
@@ -49,8 +49,8 @@ public sealed class CliHelpTests
     [Fact]
     public void NoArguments_StillWritesToStderr_AndReturnsArgumentError()
     {
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run([], stdout, stderr);
 

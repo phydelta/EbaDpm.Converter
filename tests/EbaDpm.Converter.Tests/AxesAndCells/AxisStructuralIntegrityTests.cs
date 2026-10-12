@@ -368,7 +368,10 @@ public sealed class AxisStructuralIntegrityTests
                 .Where(n => n.ParentId.HasValue)
                 .GroupBy(n => n.ParentId!.Value)
                 .ToDictionary(g => g.Key, g => g.OrderBy(n => n.Order).Select(n => n.OrdinateId).ToList());
-            var byOrdinateId = nodes.ToDictionary(n => n.OrdinateId);
+            foreach (var duplicate in nodes.GroupBy(n => n.OrdinateId).Where(g => g.Count() > 1))
+            {
+                failures.Add($"AxisID={axisGroup.Key}: OrdinateID={duplicate.Key} appears {duplicate.Count()} times");
+            }
 
             var expectedOrder = new List<int>();
             void Visit(int ordinateId)

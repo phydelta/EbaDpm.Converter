@@ -302,13 +302,10 @@ public static class PlaneCEqualityChecker
 
             checkable++;
 
-            if (usedPointRelease && toleratedRuleSheetIds.Add(ruleSheetId))
+            if (usedPointRelease && toleratedRuleSheetIds.Add(ruleSheetId) && toleratedSamples.Count < 50)
             {
-                if (toleratedSamples.Count < 50)
-                {
-                    toleratedSamples.Add(
-                        $"rule {ruleId} (sheet release='{ruleRelease.ReleaseLabel}', framework='{ruleRelease.FrameworkCode}')");
-                }
+                toleratedSamples.Add(
+                    $"rule {ruleId} (sheet release='{ruleRelease.ReleaseLabel}', framework='{ruleRelease.FrameworkCode}')");
             }
 
             // The identity asserted by "==" is of the VARIABLE, not of the whole signature: it is
@@ -447,12 +444,14 @@ public static class PlaneCEqualityChecker
                 }
             }
 
-            if (failed)
+            // axisSteps always holds Y and X, so candidate is never null here; the null test only
+            // makes that explicit.
+            if (failed || candidate is null)
             {
                 continue;
             }
 
-            if (candidate!.Count > 1)
+            if (candidate.Count > 1)
             {
                 statuses.Add("ambiguous cell");
                 continue;
@@ -482,12 +481,9 @@ public static class PlaneCEqualityChecker
     private static HashSet<long> Intersect(HashSet<long> a, HashSet<long> b)
     {
         var result = new HashSet<long>();
-        foreach (var x in a)
+        foreach (var x in a.Where(b.Contains))
         {
-            if (b.Contains(x))
-            {
-                result.Add(x);
-            }
+            result.Add(x);
         }
 
         return result;

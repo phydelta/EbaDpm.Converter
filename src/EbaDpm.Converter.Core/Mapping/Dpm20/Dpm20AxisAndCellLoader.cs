@@ -769,12 +769,9 @@ public static class Dpm20AxisAndCellLoader
 
             if (resolvedContext is not null)
             {
-                foreach (var dimensionId in resolvedContext.Keys)
+                foreach (var dimensionId in resolvedContext.Keys.Where(d => d != MetDimensionId))
                 {
-                    if (dimensionId != MetDimensionId)
-                    {
-                        universeDimensionIds.Add(dimensionId);
-                    }
+                    universeDimensionIds.Add(dimensionId);
                 }
             }
 
@@ -1640,7 +1637,7 @@ public static class Dpm20AxisAndCellLoader
                 orientationRankAndAxisIdByOrdinateId[ordinateId] = (OrientationRank(axis.Orientation), axisId);
                 parentOrdinateIdByOrdinateId[ordinateId] = parentOrdinateId;
                 ownCategorisationsByOrdinateId[ordinateId] = plan.OwnCategorisationByHeaderId.TryGetValue(survivor.HeaderId, out var ownDict)
-                    ? ownDict.Select(kv => (kv.Key, kv.Value.DimensionXbrlCode, kv.Value.MemberId, kv.Value.MemberXbrlCode, kv.Value.IsDefaultMember, ((int HierarchyId, string HierarchyCode)?)null)).ToList()
+                    ? ownDict.Select(kv => (kv.Key, kv.Value.DimensionXbrlCode, kv.Value.MemberId, kv.Value.MemberXbrlCode, kv.Value.IsDefaultMember, default((int HierarchyId, string HierarchyCode)?))).ToList()
                     : []; // pairs of a CLOSED axis never carry a hierarchy restriction (only the open one does)
             }
 

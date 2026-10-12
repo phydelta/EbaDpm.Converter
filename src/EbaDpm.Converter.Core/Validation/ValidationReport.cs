@@ -41,6 +41,9 @@ public sealed record UniverseInfo(
     [property: JsonPropertyName("cells")] long Cells,
     [property: JsonPropertyName("referenceRole")] string? ReferenceRole);
 
+/// <summary>
+/// A known exception as reported: the check it is bound to and how it resolved in this run.
+/// </summary>
 /// <param name="Evaluated">
 /// <c>false</c> when NO check with <c>Id == Scope</c> ran in this execution: the exception is
 /// registered but has nothing to attach to yet (e.g. <c>DD-17</c>, <c>DD-18</c>, <c>DD-20</c>,
@@ -98,6 +101,9 @@ public sealed record SummaryBlock(
     [property: JsonPropertyName("passed")] long Passed,
     [property: JsonPropertyName("failed")] long Failed);
 
+/// <summary>
+/// Summary of the validation run: checks per layer, stale exceptions and the exit code.
+/// </summary>
 /// <param name="Critical">ALL critical checks, of the three planes.</param>
 /// <param name="StaleExceptions">ALL expired exceptions, of the three planes.</param>
 /// <param name="PlaneBCriticalFailed">

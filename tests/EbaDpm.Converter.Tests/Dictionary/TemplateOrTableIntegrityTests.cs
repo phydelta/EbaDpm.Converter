@@ -50,7 +50,7 @@ public sealed class TemplateOrTableIntegrityTests
     [DataFact]
     public void TemplateOrTable_ParentId_HasNoOrphans_ExcludingTheRootSentinelZero()
     {
-        var (orphanCount, samples) = QueryHelpers.FindOrphans(
+        var (_, samples) = QueryHelpers.FindOrphans(
             _fixture.GeneratedConnection, "mTemplateOrTable", "ParentTemplateOrTableID", "mTemplateOrTable", "TemplateOrTableID");
 
         // FindOrphans already excludes NULL; here the sentinel 0 must also be discounted, since

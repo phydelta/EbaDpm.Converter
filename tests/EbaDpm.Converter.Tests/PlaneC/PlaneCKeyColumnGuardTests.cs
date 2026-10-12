@@ -18,7 +18,7 @@ public sealed class PlaneCKeyColumnGuardTests : IDisposable
 
     public PlaneCKeyColumnGuardTests()
     {
-        _tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.KeyColumnGuardTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        _tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.KeyColumnGuardTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDirectory);
     }
 
@@ -46,11 +46,11 @@ public sealed class PlaneCKeyColumnGuardTests : IDisposable
     [Fact]
     public void CKey01_WithNoKeyColumn_Examined0_WithTheReasonWritten_NotSilent()
     {
-        var generatedPath = Path.Combine(_tempDirectory, "generated.db");
+        var generatedPath = Path.Join(_tempDirectory, "generated.db");
         SchemaCreator.Create(generatedPath, overwrite: false);
         InsertNormalTableAndTaxonomy(generatedPath);
 
-        var layoutsPath = Path.Combine(_tempDirectory, "layouts.db");
+        var layoutsPath = Path.Join(_tempDirectory, "layouts.db");
         CreateLayoutsWithNormalSheet(layoutsPath);
 
         SqliteConnection.ClearAllPools();
@@ -78,11 +78,11 @@ public sealed class PlaneCKeyColumnGuardTests : IDisposable
     [Fact]
     public void CKey01_WithAKeyColumn_ExaminedGreaterThanZero_AndNamesTheTable()
     {
-        var generatedPath = Path.Combine(_tempDirectory, "generated.db");
+        var generatedPath = Path.Join(_tempDirectory, "generated.db");
         SchemaCreator.Create(generatedPath, overwrite: false);
         InsertNormalTableAndTaxonomy(generatedPath);
 
-        var layoutsPath = Path.Combine(_tempDirectory, "layouts.db");
+        var layoutsPath = Path.Join(_tempDirectory, "layouts.db");
         using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = layoutsPath }.ToString()))
         {
             connection.Open();

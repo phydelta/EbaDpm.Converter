@@ -72,9 +72,9 @@ public sealed class DictionaryFixture : IDisposable
         RepoPaths.EnsureReference40DatabaseExists();
         RepoPaths.EnsureReferenceDatabaseExists();
 
-        TempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.DictionaryTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        TempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.DictionaryTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(TempDirectory);
-        GeneratedDatabasePath = Path.Combine(TempDirectory, "generated.db");
+        GeneratedDatabasePath = Path.Join(TempDirectory, "generated.db");
 
         SchemaCreator.Create(GeneratedDatabasePath, overwrite: false);
 

@@ -337,22 +337,26 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
-        var tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.Dpm20DeterminismTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.Dpm20DeterminismTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDirectory);
 
         try
         {
-            var pathA = Path.Combine(tempDirectory, "run-a.db");
-            var pathB = Path.Combine(tempDirectory, "run-b.db");
+            var pathA = Path.Join(tempDirectory, "run-a.db");
+            var pathB = Path.Join(tempDirectory, "run-b.db");
 
+            using var stdoutA = new StringWriter();
+            using var stderrA = new StringWriter();
             var exitA = CliRunner.Run(
                 ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", pathA, "--all"],
-                new StringWriter(), new StringWriter());
+                stdoutA, stderrA);
             SqliteConnection.ClearAllPools();
 
+            using var stdoutB = new StringWriter();
+            using var stderrB = new StringWriter();
             var exitB = CliRunner.Run(
                 ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", pathB, "--all"],
-                new StringWriter(), new StringWriter());
+                stdoutB, stderrB);
             SqliteConnection.ClearAllPools();
 
             Assert.Equal(exitA, exitB);

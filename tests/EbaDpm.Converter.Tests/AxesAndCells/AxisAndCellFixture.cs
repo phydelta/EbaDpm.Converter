@@ -93,9 +93,9 @@ public sealed class AxisAndCellFixture : IDisposable
         RepoPaths.EnsureReference40DatabaseExists();
         RepoPaths.EnsureReferenceDatabaseExists();
 
-        TempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.AxesAndCellsTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        TempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.AxesAndCellsTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(TempDirectory);
-        GeneratedDatabasePath = Path.Combine(TempDirectory, "generated.db");
+        GeneratedDatabasePath = Path.Join(TempDirectory, "generated.db");
 
         SchemaCreator.Create(GeneratedDatabasePath, overwrite: false);
 

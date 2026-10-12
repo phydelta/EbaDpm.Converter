@@ -48,20 +48,20 @@ public sealed class LayoutRepositoryFixture : IDisposable
         RepoPaths.EnsureTableLayouts43DirectoryExists();
         RepoPaths.EnsureReferenceDatabaseExists();
 
-        TempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.LayoutTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        TempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.LayoutTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(TempDirectory);
 
-        var path42Dict = Path.Combine(TempDirectory, "layouts42_dict.db");
+        var path42Dict = Path.Join(TempDirectory, "layouts42_dict.db");
         Summary42WithDictionary = LayoutExtractor.Extract(
             RepoPaths.TableLayouts42Directory, path42Dict, overwrite: false, RepoPaths.ReferenceDatabasePath);
         Repository42WithDictionary = OpenReadOnly(path42Dict);
 
-        var path42NoDict = Path.Combine(TempDirectory, "layouts42_nodict.db");
+        var path42NoDict = Path.Join(TempDirectory, "layouts42_nodict.db");
         Summary42NoDictionary = LayoutExtractor.Extract(
             RepoPaths.TableLayouts42Directory, path42NoDict, overwrite: false, dictionaryPath: null);
         Repository42NoDictionary = OpenReadOnly(path42NoDict);
 
-        var path43Dict = Path.Combine(TempDirectory, "layouts43_dict.db");
+        var path43Dict = Path.Join(TempDirectory, "layouts43_dict.db");
         Summary43WithDictionary = LayoutExtractor.Extract(
             RepoPaths.TableLayouts43Directory, path43Dict, overwrite: false, RepoPaths.ReferenceDatabasePath);
         Repository43WithDictionary = OpenReadOnly(path43Dict);

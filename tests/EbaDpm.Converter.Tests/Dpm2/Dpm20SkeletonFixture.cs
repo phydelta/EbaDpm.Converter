@@ -52,12 +52,12 @@ public sealed class Dpm20SkeletonFixture : IDisposable
 
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
-        TempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.Dpm20SkeletonTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        TempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.Dpm20SkeletonTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(TempDirectory);
-        GeneratedDatabasePath = Path.Combine(TempDirectory, "generated-dpm20-skeleton.db");
+        GeneratedDatabasePath = Path.Join(TempDirectory, "generated-dpm20-skeleton.db");
 
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         ExitCode = CliRunner.Run(
             ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", GeneratedDatabasePath, "--all"],
@@ -72,7 +72,7 @@ public sealed class Dpm20SkeletonFixture : IDisposable
         // BEFORE copying so that the copy really is the only interaction with the file at that moment.
         SqliteConnection.ClearAllPools();
 
-        ValidatedDatabasePath = Path.Combine(TempDirectory, "generated-dpm20-skeleton-validated.db");
+        ValidatedDatabasePath = Path.Join(TempDirectory, "generated-dpm20-skeleton-validated.db");
         File.Copy(GeneratedDatabasePath, ValidatedDatabasePath, overwrite: true);
 
         var connectionString = new SqliteConnectionStringBuilder

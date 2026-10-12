@@ -23,10 +23,10 @@ public sealed class LayoutFileNameFamiliesSyntheticTests
     [Fact]
     public void Extract_OverADirectoryWithTheThreeNameFamilies_ResolvesFrameworkReleaseAndModulePerEra()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.FileNameFamilies_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.FileNameFamilies_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
 
             // 3.2: "Annotated Table Layout {PHASE}-{FW} {REL}" -- NO date, NO module.
             new MinimalXlsxBuilder("TOC").SaveWithFileName(inputDir, "Annotated Table Layout 320-P1-AE 3.2.xlsx");
@@ -42,7 +42,7 @@ public sealed class LayoutFileNameFamiliesSyntheticTests
             new MinimalXlsxBuilder("TOC").SaveWithFileName(
                 inputDir, "20260106 Annotated Table Layout  AE 4.2 AEAE 4.2.xlsx");
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
             Assert.Equal(3, summary.FilesProcessed);

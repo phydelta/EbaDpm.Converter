@@ -14,8 +14,8 @@ public sealed class Dpm2CliTests
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(
             ["--list-taxonomies", "--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode], stdout, stderr);
@@ -30,8 +30,8 @@ public sealed class Dpm2CliTests
     {
         RepoPaths.EnsureAccessDatabaseExists();
 
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(
             ["--list-taxonomies", "--source", RepoPaths.AccessDatabasePath], stdout, stderr);
@@ -61,16 +61,16 @@ public sealed class Dpm2CliTests
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
-        var tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.Dpm2CliTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.Dpm2CliTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDirectory);
-        var outputPath = Path.Combine(tempDirectory, "full-conversion.db");
+        var outputPath = Path.Join(tempDirectory, "full-conversion.db");
 
         try
         {
             Assert.False(File.Exists(outputPath));
 
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliRunner.Run(
                 ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", outputPath, "--all"], stdout, stderr);

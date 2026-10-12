@@ -24,7 +24,7 @@ namespace EbaDpm.Converter.Tests.Layouts;
 /// </summary>
 public sealed class LayoutUnparsedGateTests : IDisposable
 {
-    private readonly string _tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.UnparsedGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
+    private readonly string _tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.UnparsedGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
 
     public void Dispose()
     {
@@ -47,14 +47,14 @@ public sealed class LayoutUnparsedGateTests : IDisposable
     {
         // POSITIVE control 1: a cell shaped like "(domain:member)" that NO declaration pairs (by
         // row or by column) falls into LayoutUnparsed, real code or not, with Kind=OrphanValue.
-        var inputDir = Path.Combine(_tempDir, "input1");
+        var inputDir = Path.Join(_tempDir, "input1");
         new MinimalXlsxBuilder("T_ORPHAN")
             .WithCell("A3", "Rows")
             .WithCell("B10", "Structural label, not a declaration")
             .WithCell("C10", "(ZZFAKE:ZZFAKE2) orphan two-code, nothing pairs with it")
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out1.db");
+        var outputPath = Path.Join(_tempDir, "out1.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
         Assert.Equal(1, summary.UnparsedWritten);
@@ -78,14 +78,14 @@ public sealed class LayoutUnparsedGateTests : IDisposable
         // WITHOUT adding a LayoutValue. As a consequence, the declaration "(ZZDIM:ZZDOM)" is left
         // without any associated LayoutValue -- and the final OrphanDeclaration sweep
         // (LayoutSheetParser.Parse) also flags it. Expected total: 2 rows in LayoutUnparsed, not 0.
-        var inputDir = Path.Combine(_tempDir, "input2");
+        var inputDir = Path.Join(_tempDir, "input2");
         new MinimalXlsxBuilder("T_PAIRED_FAKE")
             .WithCell("A3", "Rows")
             .WithCell("B3", "(ZZDIM:ZZDOM) fake dimension declaration")
             .WithCell("C3", "(ZZFAKE:ZZFAKE2) fake paired value")
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out2.db");
+        var outputPath = Path.Join(_tempDir, "out2.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
         Assert.Equal(2, summary.UnparsedWritten);
@@ -113,14 +113,14 @@ public sealed class LayoutUnparsedGateTests : IDisposable
         // it is recorded with Kind=GrammarFailure (EvaluateStandaloneCell,
         // AnnotationKind.NotCodeShaped with "!core.Contains(')')"): it is broken syntax, not
         // rhetorical prose of the "(-)"/"(a)"/"(EU)" kind.
-        var inputDir = Path.Combine(_tempDir, "input3");
+        var inputDir = Path.Join(_tempDir, "input3");
         new MinimalXlsxBuilder("T_BROKEN")
             .WithCell("A3", "Rows")
             .WithCell("B10", "Structural label")
             .WithCell("C10", "(ZZBROKEN unclosed parenthesis, no code shape at all")
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out3.db");
+        var outputPath = Path.Join(_tempDir, "out3.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
         Assert.Equal(1, summary.UnparsedWritten);
@@ -144,7 +144,7 @@ public sealed class LayoutUnparsedGateTests : IDisposable
         // shape -- must still not be recorded. If this test started to fail, the gate would have
         // become too sensitive (false positives, like the "347" that motivated narrowing the key
         // marker to the literal "<Key value>").
-        var inputDir = Path.Combine(_tempDir, "input5");
+        var inputDir = Path.Join(_tempDir, "input5");
         new MinimalXlsxBuilder("T_RHETORICAL")
             .WithCell("A3", "Rows")
             .WithCell("B10", "Structural label")
@@ -152,7 +152,7 @@ public sealed class LayoutUnparsedGateTests : IDisposable
             .WithCell("D10", "(EU) some rhetorical footnote")
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out5.db");
+        var outputPath = Path.Join(_tempDir, "out5.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
         Assert.Equal(0, summary.UnparsedWritten);
@@ -171,14 +171,14 @@ public sealed class LayoutUnparsedGateTests : IDisposable
         // BEFORE looking at whether the text starts with "(", and if the resulting text
         // (parse.Kind == PlainText, because it does not start with a parenthesis) contains the
         // marker, it records it as GrammarFailure -- "not preceded by '(domain:...)'".
-        var inputDir = Path.Combine(_tempDir, "input6");
+        var inputDir = Path.Join(_tempDir, "input6");
         new MinimalXlsxBuilder("T_KEY_NO_PAREN")
             .WithCell("A3", "Rows")
             .WithCell("B10", "Structural label")
             .WithCell("C10", "Reference without a leading domain marker <Key value> trailing text")
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out6.db");
+        var outputPath = Path.Join(_tempDir, "out6.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
         Assert.Equal(1, summary.UnparsedWritten);
@@ -203,7 +203,7 @@ public sealed class LayoutUnparsedGateTests : IDisposable
         // place under the model: DataType is a property of the CELL (row x column), not of the
         // identity of the row. This test does NOT require seeing it on Y: requiring it there, as
         // well as on X, would be precisely the duplication that risks falling out of sync.
-        var inputDir = Path.Combine(_tempDir, "input7");
+        var inputDir = Path.Join(_tempDir, "input7");
         new MinimalXlsxBuilder("T_ANGLE_DATATYPE")
             .WithCell("A3", "Rows")
             .WithCell("B10", "Some row label")
@@ -211,7 +211,7 @@ public sealed class LayoutUnparsedGateTests : IDisposable
             .WithCell("D10", "199116_x000D_text_x000D_<Reference portfolio/instrument for the Benchmarking exercise>")
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out7.db");
+        var outputPath = Path.Join(_tempDir, "out7.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
         Assert.Equal(0, summary.UnparsedWritten);
@@ -234,18 +234,18 @@ public sealed class LayoutUnparsedGateTests : IDisposable
         // and without a 'Main Property' row to pair it, it MUST appear in LayoutUnparsed -- but
         // only with --dictionary; without it, resolution always falls to Unknown and NOTHING is
         // recorded (no per-cell warning, only the global CLI warning).
-        var inputDir = Path.Combine(_tempDir, "input4");
+        var inputDir = Path.Join(_tempDir, "input4");
         new MinimalXlsxBuilder("T_STANDALONE_REAL")
             .WithCell("A3", "Rows")
             .WithCell("B10", "Structural label")
             .WithCell("C10", "(qLHL) standalone real dimension code, not under Main Property")
             .Save(inputDir);
 
-        var outputWithDict = Path.Combine(_tempDir, "out4_dict.db");
+        var outputWithDict = Path.Join(_tempDir, "out4_dict.db");
         var summaryWithDict = LayoutExtractor.Extract(inputDir, outputWithDict, overwrite: false, RepoPaths.ReferenceDatabasePath);
         Assert.Equal(1, summaryWithDict.UnparsedWritten);
 
-        var outputNoDict = Path.Combine(_tempDir, "out4_nodict.db");
+        var outputNoDict = Path.Join(_tempDir, "out4_nodict.db");
         var summaryNoDict = LayoutExtractor.Extract(inputDir, outputNoDict, overwrite: false, dictionaryPath: null);
 
         // Without a dictionary, the cell is NOT lost in LayoutRaw, but neither is it marked in any

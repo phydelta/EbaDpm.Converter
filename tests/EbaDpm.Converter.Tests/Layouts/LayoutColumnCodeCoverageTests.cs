@@ -74,10 +74,10 @@ public sealed class LayoutColumnCodeCoverageTests(LayoutRepositoryFixture fixtur
         // of the grid -- only grey fill. Under the earlier behaviour that column would not have
         // generated any X LayoutOrdinate (the extractor only created one when it found a
         // datapoint). It must now still exist, with its LayoutCell rows entirely shaded.
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.ColumnCoverageGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.ColumnCoverageGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
             new MinimalXlsxBuilder("T_SHADED_COLUMN_NO_DATA")
                 .WithCell("D2", "0010")
                 .WithCell("E2", "0020") // column E: a real code, but NEVER a visible datum
@@ -95,7 +95,7 @@ public sealed class LayoutColumnCodeCoverageTests(LayoutRepositoryFixture fixtur
                 .WithCell("F11", "100004_x000D_text")
                 .Save(inputDir);
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
             using var connection = Open(outputPath);

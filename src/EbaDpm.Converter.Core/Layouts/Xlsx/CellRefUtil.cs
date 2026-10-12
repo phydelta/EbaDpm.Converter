@@ -46,5 +46,5 @@ internal static class CellRefUtil
         return sb.ToString();
     }
 
-    public static string ToCellRef(int row, int col) => IndexToColumnLetter(col) + row.ToString();
+    public static string ToCellRef(int row, int col) => IndexToColumnLetter(col) + row;
 }

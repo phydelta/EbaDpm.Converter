@@ -39,6 +39,10 @@ public sealed class TaxonomySelectionException : Exception
 /// </summary>
 public static class TaxonomySelector
 {
+    /// <summary>
+    /// Resolves the selection request against the available taxonomies; an empty request or an
+    /// identifier that does not exist fails instead of being ignored.
+    /// </summary>
     /// <param name="available">Unfiltered <c>Taxonomy</c> census read from Access.</param>
     /// <param name="request">Selection request as it arrives from the CLI.</param>
     /// <param name="taxonomyKeyByTaxonomyId">

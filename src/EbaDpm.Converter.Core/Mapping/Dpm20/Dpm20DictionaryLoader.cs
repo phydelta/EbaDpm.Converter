@@ -248,11 +248,10 @@ public static class Dpm20DictionaryLoader
             false,
             null);
         isTypedDomainByDomainId[strNaDomainId] = true;
-        domainId++;
 
         // The "Open" sentinel is NO LONGER domainId (the next counter value) — it is the literal
         // 9999, measured identical in the two references (see the XML doc of OpenSentinelId).
-        // domainId (150 today) is left unused on purpose: no real domain has that value.
+        // The next counter value is left unused on purpose: no real domain has that value.
         var sentinelDomainId = OpenSentinelId;
         writer.AddRow(sentinelDomainId, string.Empty, "Open", string.Empty, string.Empty, null, false, false, null);
         isTypedDomainByDomainId[sentinelDomainId] = false;
@@ -709,6 +708,10 @@ public static class Dpm20DictionaryLoader
         IReadOnlyList<string> DimensionsWithoutPropertyCategory,
         IReadOnlyList<string> UnresolvedDimensionDomainCases);
 
+    /// <summary>
+    /// Loads the dictionary tables (domains, domain unions, members, hierarchies, metrics and
+    /// dimensions) into the destination, reading from the DPM 2.0 reader.
+    /// </summary>
     /// <param name="reader">
     /// The DPM 2.0 reader, already open. All the reads specific to the dictionary are requested
     /// from it here (<c>Category</c>, <c>ItemCategory</c>, <c>Item</c>,

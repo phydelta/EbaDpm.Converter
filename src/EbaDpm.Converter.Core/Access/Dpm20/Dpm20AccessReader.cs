@@ -42,6 +42,10 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
     private int? _cutoffReleaseId;
     private string? _cutoffReleaseCode;
 
+    /// <summary>
+    /// Creates a reader over the given <c>.accdb</c> file, with an optional cutoff release
+    /// requested by <c>ReleaseID</c> or by <c>Code</c> (not both).
+    /// </summary>
     /// <param name="accdbPath">Path of the <c>.accdb</c> file.</param>
     /// <param name="cutoffReleaseId">
     /// Cutoff by surrogate <c>ReleaseID</c>. Mutually exclusive with <paramref name="cutoffReleaseCode"/>.

@@ -21,7 +21,7 @@ public sealed class PlaneCEquGuardTests : IDisposable
 
     public PlaneCEquGuardTests()
     {
-        _tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.EquGuardTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        _tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.EquGuardTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDirectory);
     }
 
@@ -50,10 +50,10 @@ public sealed class PlaneCEquGuardTests : IDisposable
     [Fact]
     public void CEqu01_WithZeroCheckableRules_ComesOutSkippedNotPass()
     {
-        var generatedPath = Path.Combine(_tempDirectory, "generated.db");
+        var generatedPath = Path.Join(_tempDirectory, "generated.db");
         SchemaCreator.Create(generatedPath, overwrite: false);
 
-        var layoutsPath = Path.Combine(_tempDirectory, "layouts.db");
+        var layoutsPath = Path.Join(_tempDirectory, "layouts.db");
         CreateLayoutsWithEqualityRule(layoutsPath, ruleId: 1, position: 0, term: "Z_99.99, r0001, c0001",
             tableCode: "Z_99.99", rowCode: "0001", columnCode: "0001", zCode: null);
         AddEqualityRuleTerm(layoutsPath, ruleId: 1, position: 1, term: "Z_88.88, r0001, c0001",
@@ -80,11 +80,11 @@ public sealed class PlaneCEquGuardTests : IDisposable
     [Fact]
     public void CEqu01_WithCheckableRules_IsReallyEvaluated_DoesNotComeOutSkipped()
     {
-        var generatedPath = Path.Combine(_tempDirectory, "generated.db");
+        var generatedPath = Path.Join(_tempDirectory, "generated.db");
         SchemaCreator.Create(generatedPath, overwrite: false);
         InsertCheckableTablesAndRule(generatedPath, signatureA: "SIG1", signatureB: "SIG1");
 
-        var layoutsPath = Path.Combine(_tempDirectory, "layouts.db");
+        var layoutsPath = Path.Join(_tempDirectory, "layouts.db");
         CreateLayoutsWithEqualityRule(layoutsPath, ruleId: 1, position: 0, term: "A_01.01, r0010, c0020",
             tableCode: "A_01.01", rowCode: "0010", columnCode: "0020", zCode: null);
         AddEqualityRuleTerm(layoutsPath, ruleId: 1, position: 1, term: "B_02.01, r0030, c0040",
@@ -108,11 +108,11 @@ public sealed class PlaneCEquGuardTests : IDisposable
     [Fact]
     public void CEqu01_WithCellsOfGenuinelyDifferentSignature_Fails()
     {
-        var generatedPath = Path.Combine(_tempDirectory, "generated.db");
+        var generatedPath = Path.Join(_tempDirectory, "generated.db");
         SchemaCreator.Create(generatedPath, overwrite: false);
         InsertCheckableTablesAndRule(generatedPath, signatureA: "SIG1", signatureB: "SIG2-DIFFERENT");
 
-        var layoutsPath = Path.Combine(_tempDirectory, "layouts.db");
+        var layoutsPath = Path.Join(_tempDirectory, "layouts.db");
         CreateLayoutsWithEqualityRule(layoutsPath, ruleId: 1, position: 0, term: "A_01.01, r0010, c0020",
             tableCode: "A_01.01", rowCode: "0010", columnCode: "0020", zCode: null);
         AddEqualityRuleTerm(layoutsPath, ruleId: 1, position: 1, term: "B_02.01, r0030, c0040",
@@ -139,13 +139,13 @@ public sealed class PlaneCEquGuardTests : IDisposable
     [Fact]
     public void CEqu01_WithATableOfADifferentReleaseThanTheSourceSheet_ComesOutSkipped_ReasonDifferentRelease_NeverPassNorFail()
     {
-        var generatedPath = Path.Combine(_tempDirectory, "generated.db");
+        var generatedPath = Path.Join(_tempDirectory, "generated.db");
         SchemaCreator.Create(generatedPath, overwrite: false);
         InsertCheckableTablesAndRule(
             generatedPath, signatureA: "SIG1", signatureB: "SIG1",
             releaseA: "4.3"); // DIFFERENT from TableRelease ("4.2") -- not even REL.n of it (4.3 does not start with "4.2.").
 
-        var layoutsPath = Path.Combine(_tempDirectory, "layouts.db");
+        var layoutsPath = Path.Join(_tempDirectory, "layouts.db");
         CreateLayoutsWithEqualityRule(layoutsPath, ruleId: 1, position: 0, term: "A_01.01, r0010, c0020",
             tableCode: "A_01.01", rowCode: "0010", columnCode: "0020", zCode: null);
         AddEqualityRuleTerm(layoutsPath, ruleId: 1, position: 1, term: "B_02.01, r0030, c0040",

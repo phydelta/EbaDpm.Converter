@@ -349,10 +349,10 @@ public static class SkeletonLoader
         // (TaxonomyLabel): the same texts that mReportingFramework/mTaxonomy already emit.
         var translationSeeds = reportingFrameworks
             .Where(f => f.ConceptId.HasValue)
-            .Select(f => (f.ConceptId!.Value, (string?)f.FrameworkLabel, (string?)null))
+            .Select(f => (f.ConceptId!.Value, f.FrameworkLabel, default(string)))
             .Concat(selectedTaxonomies
                 .Where(t => t.ConceptId.HasValue)
-                .Select(t => (t.ConceptId!.Value, (string?)t.TaxonomyLabel, (string?)null)));
+                .Select(t => (t.ConceptId!.Value, t.TaxonomyLabel, default(string))));
         ConceptTranslationWriter.Write(destination, translationSeeds);
 
         return new Result(

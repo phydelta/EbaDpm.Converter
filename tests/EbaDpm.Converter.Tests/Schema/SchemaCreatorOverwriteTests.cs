@@ -14,7 +14,7 @@ public sealed class SchemaCreatorOverwriteTests : IDisposable
 
     public SchemaCreatorOverwriteTests()
     {
-        _tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.OverwriteTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        _tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.OverwriteTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDirectory);
     }
 
@@ -38,7 +38,7 @@ public sealed class SchemaCreatorOverwriteTests : IDisposable
     [Fact]
     public void Create_WithoutOverwrite_WhenFileDoesNotExist_Succeeds()
     {
-        var outputPath = Path.Combine(_tempDirectory, "output.db");
+        var outputPath = Path.Join(_tempDirectory, "output.db");
 
         var statementCount = SchemaCreator.Create(outputPath, overwrite: false);
 
@@ -49,7 +49,7 @@ public sealed class SchemaCreatorOverwriteTests : IDisposable
     [Fact]
     public void Create_WithoutOverwrite_WhenFileAlreadyExists_ThrowsIOException()
     {
-        var outputPath = Path.Combine(_tempDirectory, "output.db");
+        var outputPath = Path.Join(_tempDirectory, "output.db");
         File.WriteAllText(outputPath, "pre-existing content, not a valid SQLite database");
 
         var exception = Assert.Throws<IOException>(() => SchemaCreator.Create(outputPath, overwrite: false));
@@ -65,7 +65,7 @@ public sealed class SchemaCreatorOverwriteTests : IDisposable
     [Fact]
     public void Create_WithOverwrite_WhenFileAlreadyExists_ReplacesItCleanly()
     {
-        var outputPath = Path.Combine(_tempDirectory, "output.db");
+        var outputPath = Path.Join(_tempDirectory, "output.db");
         File.WriteAllText(outputPath, "pre-existing content, not a valid SQLite database");
 
         var statementCount = SchemaCreator.Create(outputPath, overwrite: true);
@@ -91,7 +91,7 @@ public sealed class SchemaCreatorOverwriteTests : IDisposable
     [Fact]
     public void Create_WithOverwrite_WhenFileDoesNotExist_SucceedsAsIfOverwriteWereFalse()
     {
-        var outputPath = Path.Combine(_tempDirectory, "output.db");
+        var outputPath = Path.Join(_tempDirectory, "output.db");
 
         var statementCount = SchemaCreator.Create(outputPath, overwrite: true);
 
@@ -102,7 +102,7 @@ public sealed class SchemaCreatorOverwriteTests : IDisposable
     [Fact]
     public void Create_CalledTwiceWithOverwrite_ProducesIdenticalTableSetBothTimes()
     {
-        var outputPath = Path.Combine(_tempDirectory, "output.db");
+        var outputPath = Path.Join(_tempDirectory, "output.db");
 
         SchemaCreator.Create(outputPath, overwrite: false);
 

@@ -32,12 +32,12 @@ public sealed class Dpm2043ValidateFixture : IDisposable
 
         RepoPaths.EnsureAccessDpm20Release43DatabaseExists();
 
-        TempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.Dpm2043ValidateSuiteTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        TempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.Dpm2043ValidateSuiteTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(TempDirectory);
-        GeneratedDatabasePath = Path.Combine(TempDirectory, "generated-dpm2043-validate.db");
+        GeneratedDatabasePath = Path.Join(TempDirectory, "generated-dpm2043-validate.db");
 
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         ExitCode = CliRunner.Run(
             ["--source", RepoPaths.AccessDpm20Release43DatabasePath, "--output", GeneratedDatabasePath, "--all"],

@@ -47,10 +47,10 @@ public sealed class LayoutCellShadedDatapointExclusionTests(LayoutRepositoryFixt
         // mechanism that XlsxReader.IsShadedStyle reads (styles.xml, fillId indexed=55) -- not a
         // shortcut of the test. The query of the property above MUST find 1 violation here, not
         // 0: if it found 0, the property above would be indistinguishable from a dead field.
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.ShadedDatapointGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.ShadedDatapointGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
             new MinimalXlsxBuilder("T_SHADED_WITH_DATAPOINT")
                 .WithCell("A3", "Rows")
                 .WithCell("B10", "Some row label")
@@ -58,7 +58,7 @@ public sealed class LayoutCellShadedDatapointExclusionTests(LayoutRepositoryFixt
                 .WithShadedCell("D10", "199116_x000D_text") // shaded AND with a real datapoint: the fabricated violation
                 .Save(inputDir);
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
             using var connection = Open(outputPath);
@@ -83,10 +83,10 @@ public sealed class LayoutCellShadedDatapointExclusionTests(LayoutRepositoryFixt
         // Negative control (the positive one must be accompanied by one that stays quiet): a shaded
         // cell WITHOUT a datapoint (the normal case) must not be counted as a violation -- if this
         // test started to fail, the query would have become too sensitive.
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.ShadedDatapointGateNeg_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.ShadedDatapointGateNeg_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
             new MinimalXlsxBuilder("T_SHADED_NO_DATAPOINT")
                 .WithCell("D2", "0020") // code row (markerRow-1): seeds the column ordinate
                 .WithCell("A3", "Rows")
@@ -95,7 +95,7 @@ public sealed class LayoutCellShadedDatapointExclusionTests(LayoutRepositoryFixt
                 .WithShadedCell("D10") // shaded, no text -- the normal case of a disabled cell
                 .Save(inputDir);
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
             using var connection = Open(outputPath);

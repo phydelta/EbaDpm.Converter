@@ -22,13 +22,13 @@ public sealed class PlaneCValidateFlagTests : IDisposable
 
     public PlaneCValidateFlagTests()
     {
-        _tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.PlaneCFlagTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        _tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.PlaneCFlagTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDirectory);
 
-        _generatedPath = Path.Combine(_tempDirectory, "generated-schema-only.db");
+        _generatedPath = Path.Join(_tempDirectory, "generated-schema-only.db");
         SchemaCreator.Create(_generatedPath, overwrite: false);
 
-        _emptyLayoutsPath = Path.Combine(_tempDirectory, "layouts-empty.db");
+        _emptyLayoutsPath = Path.Join(_tempDirectory, "layouts-empty.db");
         CreateEmptyLayoutsRepository(_emptyLayoutsPath);
 
         // Microsoft.Data.Sqlite keeps the native handle in the connection POOL even though each
@@ -124,11 +124,11 @@ public sealed class PlaneCValidateFlagTests : IDisposable
     [Fact]
     public void Cli_WithANonExistentLayouts_FailsWithAnExplicitMessage()
     {
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(
-            ["--validate", _generatedPath, "--layouts", Path.Combine(_tempDirectory, "does-not-exist.db")],
+            ["--validate", _generatedPath, "--layouts", Path.Join(_tempDirectory, "does-not-exist.db")],
             stdout, stderr);
 
         Assert.Equal(CliRunner.ExitArgumentError, exitCode);
@@ -139,8 +139,8 @@ public sealed class PlaneCValidateFlagTests : IDisposable
     [Fact]
     public void Cli_WithValidLayouts_PrintsPlaneC()
     {
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         // Without requiring a specific exit code: the schema-only database may make some plane A
         // invariant fail that has nothing to do with --layouts. What is checked is the printed TEXT.
@@ -153,8 +153,8 @@ public sealed class PlaneCValidateFlagTests : IDisposable
     [Fact]
     public void Cli_WithoutLayouts_PrintsThatItWasNotEvaluated_AndDoesNotPrintThePlaneCHeader()
     {
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         CliRunner.Run(["--validate", _generatedPath], stdout, stderr);
 
@@ -170,11 +170,13 @@ public sealed class PlaneCValidateFlagTests : IDisposable
     [Fact]
     public void Cli_WithAndWithoutLayouts_ReturnsTheSameExitCode()
     {
-        var stdoutWithout = new StringWriter();
-        var exitCodeWithout = CliRunner.Run(["--validate", _generatedPath], stdoutWithout, new StringWriter());
+        using var stdoutWithout = new StringWriter();
+        using var stderrWithout = new StringWriter();
+        var exitCodeWithout = CliRunner.Run(["--validate", _generatedPath], stdoutWithout, stderrWithout);
 
-        var stdoutWith = new StringWriter();
-        var exitCodeWith = CliRunner.Run(["--validate", _generatedPath, "--layouts", _emptyLayoutsPath], stdoutWith, new StringWriter());
+        using var stdoutWith = new StringWriter();
+        using var stderrWith = new StringWriter();
+        var exitCodeWith = CliRunner.Run(["--validate", _generatedPath, "--layouts", _emptyLayoutsPath], stdoutWith, stderrWith);
 
         Assert.Equal(exitCodeWithout, exitCodeWith);
     }
@@ -182,8 +184,8 @@ public sealed class PlaneCValidateFlagTests : IDisposable
     [Fact]
     public void Help_MentionsTheLayoutsOption()
     {
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         CliRunner.Run(["--help"], stdout, stderr);
 

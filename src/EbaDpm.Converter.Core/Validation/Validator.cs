@@ -19,7 +19,7 @@ public static class Validator
 
         // The 8 auxiliary indexes are created on a TEMPORARY COPY, never on the product output
         // (the output is a schema contract).
-        var tempCopyPath = Path.Combine(Path.GetTempPath(), "EbaDpm.Validate_" + Guid.NewGuid().ToString("N") + ".db");
+        var tempCopyPath = Path.Join(Path.GetTempPath(), "EbaDpm.Validate_" + Guid.NewGuid().ToString("N") + ".db");
         File.Copy(generatedPath, tempCopyPath, overwrite: true);
 
         try

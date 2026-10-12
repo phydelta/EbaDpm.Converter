@@ -109,7 +109,7 @@ public sealed class SourceModelDetectorTests
     [AceFact]
     public void EmptyFile_ThrowsWithMessageNamingTheFile()
     {
-        var tempPath = Path.Combine(Path.GetTempPath(), $"empty-file_{Environment.ProcessId}_{Guid.NewGuid():N}.accdb");
+        var tempPath = Path.Join(Path.GetTempPath(), $"empty-file_{Environment.ProcessId}_{Guid.NewGuid():N}.accdb");
         File.WriteAllBytes(tempPath, []);
         try
         {

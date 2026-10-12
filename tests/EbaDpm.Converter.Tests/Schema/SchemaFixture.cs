@@ -32,9 +32,9 @@ public sealed class SchemaFixture : IDisposable
 
         RepoPaths.EnsureReferenceDatabaseExists();
 
-        TempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.SchemaTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        TempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.SchemaTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(TempDirectory);
-        GeneratedDatabasePath = Path.Combine(TempDirectory, "generated.db");
+        GeneratedDatabasePath = Path.Join(TempDirectory, "generated.db");
 
         CreatedTableStatementCount = SchemaCreator.Create(GeneratedDatabasePath, overwrite: false);
 
