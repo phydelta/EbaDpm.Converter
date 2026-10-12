@@ -29,9 +29,10 @@ dotnet test
 
 Requirements:
 
-- **Windows x64** with the **Microsoft Access Database Engine (ACE OLEDB 16.0), 64-bit**
-  installed — the same requirement as the converter itself. Without it, no `.accdb` can be
-  opened.
+- **Windows x64** with a **64-bit Access database engine** (`Microsoft.ACE.OLEDB.16.0` or
+  `12.0`): 64-bit Microsoft Office, or the Access Database Engine 2016 Redistributable (x64).
+  The test project runs as x64, so a 32-bit Office is not enough. Without it, no `.accdb` can
+  be opened.
 - About **2 GB** of free disk space: the Access databases are several hundred MB each, and the
   tests write full conversions to temporary files.
 - Time: the full data suite takes **several minutes**, because several fixtures convert entire

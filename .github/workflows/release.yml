@@ -99,16 +99,22 @@ jobs:
           dotnet build EbaDpm.Converter.sln --configuration Release
           dotnet test EbaDpm.Converter.sln --configuration Release --no-build
 
-      - name: Publish single-file executable
+      # One zip, two architectures: an OLEDB provider can only be loaded by a process of its own
+      # architecture, and the Office on the user's machine may be 32-bit or 64-bit. The x64
+      # executable at the root relaunches x86\EbaDpm.Converter.exe when only a 32-bit provider exists.
+      - name: Publish single-file executables (x64 and x86)
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
-          dotnet publish src/EbaDpm.Converter.Cli --configuration Release --runtime win-x64 `
-            --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
-            -p:DebugType=None -p:Version=$version -p:ContinuousIntegrationBuild=true -o publish
+          foreach ($target in @(@{ Rid = 'win-x64'; Out = 'publish' }, @{ Rid = 'win-x86'; Out = 'publish/x86' })) {
+            dotnet publish src/EbaDpm.Converter.Cli --configuration Release --runtime $target.Rid `
+              --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+              -p:DebugType=None -p:Version=$version -p:ContinuousIntegrationBuild=true -o $target.Out
+            if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($target.Rid)" }
+          }
           Copy-Item LICENSE, README.md, CHANGELOG.md publish/
           New-Item -ItemType Directory -Force dist | Out-Null
-          $zip = "dist/EbaDpm.Converter-$version-win-x64.zip"
+          $zip = "dist/EbaDpm.Converter-$version-win.zip"
           Compress-Archive -Path publish/* -DestinationPath $zip
           Push-Location dist
           Get-ChildItem -File | ForEach-Object {

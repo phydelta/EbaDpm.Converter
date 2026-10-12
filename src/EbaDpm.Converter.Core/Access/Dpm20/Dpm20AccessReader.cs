@@ -5,7 +5,7 @@ namespace EbaDpm.Converter.Core.Access.Dpm20;
 
 /// <summary>
 /// Reader of the DPM 2.0 Access database (<c>DPM2 Database_v 4_2_20251125.accdb</c> and later
-/// publications), read via ACE OLEDB. Windows-only x64.
+/// publications), read via ACE OLEDB (16.0 or 12.0). Windows-only, x64 or x86.
 ///
 /// NEW pipeline, PARALLEL to <see cref="Dpm10AccessReader"/>: it does NOT implement
 /// <see cref="IDpmSourceReader"/> — that interface exposes rows shaped like DPM 1.0
@@ -73,8 +73,7 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
             throw new ArgumentException("The cutoff release code cannot be empty.", nameof(cutoffReleaseCode));
         }
 
-        _connectionString =
-            $"Provider=Microsoft.ACE.OLEDB.16.0;Data Source={accdbPath};Persist Security Info=False;";
+        _connectionString = AceProvider.ConnectionString(accdbPath);
         _requestedCutoffReleaseId = cutoffReleaseId;
         _requestedCutoffReleaseCode = cutoffReleaseCode?.Trim();
     }

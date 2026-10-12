@@ -35,9 +35,10 @@ jobs:
         with:
           global-json-file: global.json
 
-      # The converter reads Access through Microsoft.ACE.OLEDB.16.0, which hosted runners do not
-      # ship. Installing it lets the ACE-dependent synthetic tests run; if the download fails,
-      # those tests are reported as skipped ([AceFact]) instead of failing the build.
+      # The converter reads Access through ACE OLEDB, which hosted runners do not ship (they have
+      # no Office). Installing the redistributable lets the ACE-dependent synthetic tests run; if
+      # the download fails, those tests are reported as skipped ([AceFact]) instead of failing the
+      # build.
       - name: Install Microsoft Access Database Engine 2016 (x64)
         continue-on-error: true
         shell: pwsh
@@ -59,6 +60,18 @@ jobs:
           dotnet test EbaDpm.Converter.sln --configuration Release --no-build
           --logger "trx;LogFileName=test-results.trx"
           --results-directory TestResults
+
+      # The release ships a 32-bit executable next to the 64-bit one (for 32-bit Office): make
+      # sure it still publishes and starts.
+      - name: Publish and smoke-test the x86 executable
+        shell: pwsh
+        run: |
+          dotnet publish src/EbaDpm.Converter.Cli --configuration Release --runtime win-x86 `
+            --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            -o publish-x86
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed for win-x86' }
+          ./publish-x86/EbaDpm.Converter.exe --help
+          if ($LASTEXITCODE -ne 0) { throw "x86 executable --help exited with $LASTEXITCODE" }
 
       - name: Upload test results
         if: always()

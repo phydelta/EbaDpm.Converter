@@ -160,10 +160,11 @@ function Install-Item([pscustomobject] $item, [string] $workDirectory) {
 
 Write-Host "Data directory: $DataDirectory"
 
-$aceInstalled = Test-Path 'Registry::HKEY_CLASSES_ROOT\Microsoft.ACE.OLEDB.16.0'
+$aceInstalled = (Test-Path 'Registry::HKEY_CLASSES_ROOT\Microsoft.ACE.OLEDB.16.0') -or
+    (Test-Path 'Registry::HKEY_CLASSES_ROOT\Microsoft.ACE.OLEDB.12.0')
 if (-not $aceInstalled) {
-    Write-Warning ('Microsoft.ACE.OLEDB.16.0 is not registered. The data tests need the 64-bit ' +
-        'Microsoft Access Database Engine to open the .accdb files.')
+    Write-Warning ('No ACE OLEDB provider (16.0 or 12.0) is registered. The data tests need a 64-bit ' +
+        'Access database engine (64-bit Office or the Access Database Engine 2016 Redistributable x64).')
 }
 
 New-Item -ItemType Directory -Force -Path $DataDirectory | Out-Null

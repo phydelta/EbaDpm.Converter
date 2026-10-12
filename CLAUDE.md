@@ -65,7 +65,8 @@ Data/                       EBA data files, NOT versioned, read-only (see docs/t
 
 ## Environment
 
-- Windows x64, .NET SDK 10 (`global.json`), `Microsoft.ACE.OLEDB.16.0` x64 installed.
+- Windows x64, .NET SDK 10 (`global.json`), ACE OLEDB 16.0 x64 and x86 installed (Office x64 and
+  the 2016 Redistributable). The tool resolves the provider itself (`AceProvider`).
 - No `sqlite3` CLI: use Python's `sqlite3` module for SQLite files.
 - GitHub repository `phydelta/EbaDpm.Converter`, with the `gh` CLI available.
 - .NET plugins for Claude Code, from the `dotnet/skills` marketplace, enabled in
