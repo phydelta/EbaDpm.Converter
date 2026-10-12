@@ -20,7 +20,7 @@ source metamodel.
 | **Version** | See the [latest release](https://github.com/phydelta/EbaDpm.Converter/releases/latest) |
 | **Sources** | DPM 1.0 (e.g. release 4.1) and DPM 2.0 (e.g. releases 4.2, 4.3), detected automatically |
 | **Output** | SQLite database with the 45 tables of the DPM distribution schema |
-| **Platform** | Windows x64 |
+| **Platform** | Windows, x64 or x86 (matching the installed Office) |
 | **License** | MIT |
 
 ## Why
@@ -56,16 +56,20 @@ on any other SQLite edition existing.
 
 | Requirement | Notes |
 |---|---|
-| Windows x64 | The tool is Windows-only because of the Access provider below |
-| Microsoft Access Database Engine 2016 Redistributable (x64) | Provides `Microsoft.ACE.OLEDB.16.0`, used to read the `.accdb`. It is a system component and cannot be bundled |
+| Windows | The tool is Windows-only because of the Access provider below |
+| Microsoft Office, 32-bit or 64-bit | Provides the Access database engine (`Microsoft.ACE.OLEDB.16.0` or `12.0`) used to read the `.accdb`. The tool picks the provider itself, 16.0 first, and runs with the architecture of the installed Office |
+| *or* Microsoft Access Database Engine 2016 Redistributable | Alternative on machines without Office. It registers the same providers. It is a system component and cannot be bundled |
 | .NET 10 SDK | Only to build from source. The self-contained executable needs no .NET installation |
 
 ## Download
 
 Ready-to-run executables are published on the
 [Releases](https://github.com/phydelta/EbaDpm.Converter/releases) page as
-`EbaDpm.Converter-X.Y.Z-win-x64.zip`, with a `SHA256SUMS.txt` file and a build provenance
-attestation (see [docs/releasing.md](docs/releasing.md#verifying-a-downloaded-release)).
+`EbaDpm.Converter-X.Y.Z-win.zip`, with a `SHA256SUMS.txt` file and a build provenance
+attestation (see [docs/releasing.md](docs/releasing.md#verifying-a-downloaded-release)). The zip
+contains the 64-bit executable, `EbaDpm.Converter.exe`, and the 32-bit one, `x86\EbaDpm.Converter.exe`.
+Always run the 64-bit one: when the only Access provider on the machine is 32-bit (32-bit Office),
+it relaunches the 32-bit executable with the same arguments.
 
 ## Build
 
@@ -86,8 +90,9 @@ dotnet publish src/EbaDpm.Converter.Cli -c Release -r win-x64 --self-contained t
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist
 ```
 
-This produces `dist\EbaDpm.Converter.exe` (one file, roughly 75 MB). It still requires
-`Microsoft.ACE.OLEDB.16.0` on the machine to read Access files.
+This produces `dist\EbaDpm.Converter.exe` (one file, roughly 75 MB). Use `-r win-x86` for a
+32-bit build. It still requires an Access database engine of the same architecture on the
+machine (see [Requirements](#requirements)).
 
 ## Quick start
 
@@ -131,7 +136,7 @@ difference against it is reported but never treated as a defect on its own. Deta
 
 - **DPM validation rules are not exported.** `vValidationRuleExpressions` and
   `vValidationRuleTables` are created empty. This is a deliberate scope decision.
-- **Windows-only**, because of the `Microsoft.ACE.OLEDB.16.0` dependency.
+- **Windows-only**, because of the ACE OLEDB (Access database engine) dependency.
 - **No in-process concurrency over Access.** The ACE OLEDB provider is not safe for concurrent
   use from several threads of the same process, even on different files (it can crash with
   `0xC0000005`). Run conversions in parallel as separate processes.

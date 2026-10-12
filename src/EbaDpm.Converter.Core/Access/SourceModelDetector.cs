@@ -69,8 +69,8 @@ public static class SourceModelDetector
             throw new ArgumentException("The .accdb file path cannot be empty.", nameof(accdbPath));
         }
 
-        var connectionString =
-            $"Provider=Microsoft.ACE.OLEDB.16.0;Data Source={accdbPath};Persist Security Info=False;";
+        // Outside the try/catch: AceProviderNotFoundException must propagate unchanged.
+        var connectionString = AceProvider.ConnectionString(accdbPath);
 
         HashSet<string> tableNames;
         try

@@ -30,8 +30,8 @@ Database from Microsoft Access to SQLite in the DPM distribution schema.
 ## Fixed technical context
 
 - **.NET 10**, C# with nullable reference types and `TreatWarningsAsErrors`.
-- **Source**: `.accdb` read with `System.Data.OleDb` and `Microsoft.ACE.OLEDB.16.0`. The tool is
-  **Windows-only x64** by design; do not try to make it cross-platform. ACE OLEDB is not safe for
+- **Source**: `.accdb` read with `System.Data.OleDb` and ACE OLEDB, resolved by `AceProvider`
+  (16.0, then 12.0). The tool is **Windows-only**, published for x64 and x86, by design; do not try to make it cross-platform. ACE OLEDB is not safe for
   concurrent use within one process: no multi-threaded access to Access.
 - **Target**: SQLite through `Microsoft.Data.Sqlite`; the DDL is the embedded resource
   `src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql` (a contract: do not change it
