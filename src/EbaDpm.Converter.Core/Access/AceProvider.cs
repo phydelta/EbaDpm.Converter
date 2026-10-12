@@ -132,9 +132,9 @@ public static class AceProvider
         {
             var view = Environment.Is64BitProcess ? RegistryView.Registry32 : RegistryView.Registry64;
             using var root = RegistryKey.OpenBaseKey(RegistryHive.ClassesRoot, view);
-            foreach (var clsidKeyPath in Candidates.Select(candidate => $@"{candidate}\CLSID"))
+            foreach (var candidate in Candidates)
             {
-                using var key = root.OpenSubKey(clsidKeyPath);
+                using var key = root.OpenSubKey($@"{candidate}\CLSID");
                 if (key is not null)
                 {
                     return true;
