@@ -37,7 +37,7 @@ internal static class Dpm2TestAccdbFactory
 
     public static string CreateEmptyAccdb()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"empty-neither-model_{Environment.ProcessId}_{Guid.NewGuid():N}.accdb");
+        var path = Path.Join(Path.GetTempPath(), $"empty-neither-model_{Environment.ProcessId}_{Guid.NewGuid():N}.accdb");
 
         var catalogType = Type.GetTypeFromProgID("ADOX.Catalog")
             ?? throw new InvalidOperationException(

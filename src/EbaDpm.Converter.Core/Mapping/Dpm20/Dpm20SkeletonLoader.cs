@@ -64,7 +64,7 @@ public static class Dpm20SkeletonLoader
                 // detection, B-DIC-01 publication guard) would misidentify the output. With the
                 // natural cutoff (the most recent release) the result equals the Access value.
                 release.ReleaseId == cutoffReleaseId,
-                (int?)null); // ConceptID: NULL until the concept loader runs
+                null); // ConceptID: NULL until the concept loader runs
         }
     }
 
@@ -266,6 +266,10 @@ public static class Dpm20SkeletonLoader
     // Orchestration
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// Loads the skeleton tables (owner, language, release, reporting framework and taxonomy)
+    /// into the destination.
+    /// </summary>
     /// <param name="releases">The 5 rows of <c>[Release]</c>, unfiltered (it is not versioned).</param>
     /// <param name="frameworks">The source <c>Framework</c> rows, unfiltered (20 rows).</param>
     /// <param name="selectedTaxonomies">

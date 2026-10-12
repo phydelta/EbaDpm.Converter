@@ -1,4 +1,5 @@
 using System.Data.OleDb;
+using System.Runtime.InteropServices;
 
 namespace EbaDpm.Converter.Tests;
 
@@ -45,8 +46,10 @@ internal static class AceRequirement
             // Fallback: the provider's own ProgID.
             return Type.GetTypeFromProgID(ProviderName) is not null;
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is ExternalException or InvalidOperationException or PlatformNotSupportedException
+            or DllNotFoundException or TypeLoadException or NotSupportedException)
         {
+            // Probing only: any failure to enumerate OLEDB providers means ACE is not usable here.
             return false;
         }
     }

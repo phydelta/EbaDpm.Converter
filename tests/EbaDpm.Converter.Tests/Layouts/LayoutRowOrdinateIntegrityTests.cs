@@ -91,10 +91,10 @@ public sealed class LayoutRowOrdinateIntegrityTests(LayoutRepositoryFixture fixt
         // (row of a Y, column of an X), and the header cell (row 2) is not the row of any Y
         // ordinate -- so it simply DOES NOT COME TO EXIST in LayoutCell, instead of existing with
         // a NULL RowOrdinateId.
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.RowOrdCounterExample_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.RowOrdCounterExample_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
             new MinimalXlsxBuilder("T_COUNTEREXAMPLE")
                 .WithCell("D2", "5551_x000D_text") // datapoint in the HEADER, outside any Y row
                 .WithCell("A3", "Rows")
@@ -103,7 +103,7 @@ public sealed class LayoutRowOrdinateIntegrityTests(LayoutRepositoryFixture fixt
                 .WithCell("D10", "199116_x000D_text")
                 .Save(inputDir);
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
             using var connection = Open(outputPath);

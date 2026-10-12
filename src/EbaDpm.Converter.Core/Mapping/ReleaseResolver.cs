@@ -45,6 +45,10 @@ public sealed class ReleaseResolver
     /// </summary>
     public IReadOnlyList<(string Code, DateTime Date)> ReleasesFromFloor { get; }
 
+    /// <summary>
+    /// Creates the resolver from the publication dates of all the taxonomies in Access and the
+    /// packages selected in this run, which determine the dynamic floor.
+    /// </summary>
     /// <param name="allTaxonomyPublications">
     /// (DpmPackageCode, ActualPublicationDate) pairs for <b>all</b> the taxonomies in Access
     /// (without applying the taxonomy filter), with a non-null date.

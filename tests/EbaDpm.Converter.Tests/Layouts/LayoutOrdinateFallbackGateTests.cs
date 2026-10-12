@@ -13,7 +13,7 @@ namespace EbaDpm.Converter.Tests.Layouts;
 /// </summary>
 public sealed class LayoutOrdinateFallbackGateTests : IDisposable
 {
-    private readonly string _tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.FallbackGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
+    private readonly string _tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.FallbackGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
 
     public void Dispose()
     {
@@ -37,7 +37,7 @@ public sealed class LayoutOrdinateFallbackGateTests : IDisposable
         // Row markerRow-1 (here, row 2) is EMPTY -- there is no cell shaped like a short code for
         // any column. BuildColumnCodeMap must return an empty map, and BuildXOrdinate must fall
         // back to the column letter AND mark it IsFallbackCode = 1.
-        var inputDir = Path.Combine(_tempDir, "input1");
+        var inputDir = Path.Join(_tempDir, "input1");
         new MinimalXlsxBuilder("T_NO_CODE_ROW")
             .WithCell("A3", "Rows")
             .WithCell("B10", "Some row label")
@@ -45,7 +45,7 @@ public sealed class LayoutOrdinateFallbackGateTests : IDisposable
             .WithCell("D10", "199116_x000D_text")
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out1.db");
+        var outputPath = Path.Join(_tempDir, "out1.db");
         LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
         using var connection = Open(outputPath);
@@ -59,7 +59,7 @@ public sealed class LayoutOrdinateFallbackGateTests : IDisposable
         // two rows above where BuildColumnCodeMap looks. It must still fall back to the letter,
         // marked -- the map does not "search" for the code, it only looks at the fixed position
         // measured over the real corpus (862/862 sheets).
-        var inputDir = Path.Combine(_tempDir, "input2");
+        var inputDir = Path.Join(_tempDir, "input2");
         new MinimalXlsxBuilder("T_CODE_ROW_WRONG_POS")
             .WithCell("D1", "0010")
             .WithCell("A3", "Rows")
@@ -68,7 +68,7 @@ public sealed class LayoutOrdinateFallbackGateTests : IDisposable
             .WithCell("D10", "199116_x000D_text")
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out2.db");
+        var outputPath = Path.Join(_tempDir, "out2.db");
         LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
         using var connection = Open(outputPath);
@@ -82,7 +82,7 @@ public sealed class LayoutOrdinateFallbackGateTests : IDisposable
         // markerRow=3) -- it must not fall back to the letter. Without this control, the two
         // previous tests could be "always in fallback" for a different reason (e.g. a plumbing
         // error) and look like a valid positive proof without being one.
-        var inputDir = Path.Combine(_tempDir, "input3");
+        var inputDir = Path.Join(_tempDir, "input3");
         new MinimalXlsxBuilder("T_CODE_ROW_RIGHT_POS")
             .WithCell("D2", "0010")
             .WithCell("A3", "Rows")
@@ -91,7 +91,7 @@ public sealed class LayoutOrdinateFallbackGateTests : IDisposable
             .WithCell("D10", "199116_x000D_text")
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out3.db");
+        var outputPath = Path.Join(_tempDir, "out3.db");
         LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
         using var connection = Open(outputPath);

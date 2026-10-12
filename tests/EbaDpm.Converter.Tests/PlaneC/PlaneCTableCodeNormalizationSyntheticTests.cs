@@ -35,13 +35,13 @@ public sealed class PlaneCTableCodeNormalizationSyntheticTests
     [Fact]
     public void Extraction_SheetNameWithSpace_IsCanonicalizedToUnderscore_AndKeepsTheRawLiteralInSheetName()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.TableCodeNorm_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.TableCodeNorm_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
             new MinimalXlsxBuilder("C 01.00").Save(inputDir, framework: "TEST", release: "3.2", module: "T1");
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
             using var connection = Open(outputPath);
@@ -64,13 +64,13 @@ public sealed class PlaneCTableCodeNormalizationSyntheticTests
     [Fact]
     public void Extraction_AlreadyCanonicalSheetName_DoesNotChange_VerifiedNoOp()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.TableCodeNormNoOp_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.TableCodeNormNoOp_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
             new MinimalXlsxBuilder("C_02.00").Save(inputDir, framework: "TEST", release: "4.2", module: "T1");
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
             using var connection = Open(outputPath);

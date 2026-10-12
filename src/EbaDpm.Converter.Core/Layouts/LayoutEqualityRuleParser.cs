@@ -50,9 +50,8 @@ internal static class LayoutEqualityRuleParser
     /// -- a "one-term rule" is not possible with this operator).</summary>
     public static IEnumerable<RawRuleLine> ExtractRawLines(string commentText)
     {
-        foreach (var rawLine in commentText.Split('\n'))
+        foreach (var line in commentText.Split('\n').Select(rawLine => rawLine.Trim()))
         {
-            var line = rawLine.Trim();
             if (line.Length == 0 || !line.Contains("==", StringComparison.Ordinal))
             {
                 continue;

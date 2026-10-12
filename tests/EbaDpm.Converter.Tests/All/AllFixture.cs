@@ -91,9 +91,9 @@ public sealed class AllFixture : IDisposable
 
         RepoPaths.EnsureAccessDatabaseExists();
 
-        TempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.AllTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        TempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.AllTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(TempDirectory);
-        GeneratedDatabasePath = Path.Combine(TempDirectory, "generated-all.db");
+        GeneratedDatabasePath = Path.Join(TempDirectory, "generated-all.db");
 
         SchemaCreator.Create(GeneratedDatabasePath, overwrite: false);
 
@@ -127,7 +127,7 @@ public sealed class AllFixture : IDisposable
         GeneratedConnection.Dispose();
         SqliteConnection.ClearAllPools();
 
-        ValidatedDatabasePath = Path.Combine(TempDirectory, "generated-all-validated.db");
+        ValidatedDatabasePath = Path.Join(TempDirectory, "generated-all-validated.db");
         File.Copy(GeneratedDatabasePath, ValidatedDatabasePath, overwrite: true);
 
         GeneratedConnection = new SqliteConnection(connectionString);

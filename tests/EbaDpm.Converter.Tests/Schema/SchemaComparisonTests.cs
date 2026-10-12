@@ -251,7 +251,7 @@ public sealed class SchemaComparisonTests : IClassFixture<SchemaFixture>
             error = null;
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or SqliteException)
         {
             names = new List<string>();
             error = ex.Message;

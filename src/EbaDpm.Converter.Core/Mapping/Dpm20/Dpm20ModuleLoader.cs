@@ -320,16 +320,17 @@ public static class Dpm20ModuleLoader
         using var writer = new SqliteBatchWriter(
             destination, "mModuleBusinessTemplate", ["ModuleID", "Order", "BusinessTemplateID"]);
 
-        foreach (var moduleGroup in groupsByModule.GroupBy(g => g.ModuleId).OrderBy(g => g.Key))
-        {
-            // Declared choice, NOT derived. 0-based rank by NATURAL order of the RAW group code —
-            // the SAME criterion as mTemplateOrTable.Order, reused for internal consistency, not
-            // because it matches more than the other candidates tried (all between 40/127 and
-            // 81/127; this very criterion matches 79/127).
-            var orderedGroups = moduleGroup
+        // Declared choice, NOT derived. 0-based rank by NATURAL order of the RAW group code —
+        // the SAME criterion as mTemplateOrTable.Order, reused for internal consistency, not
+        // because it matches more than the other candidates tried (all between 40/127 and
+        // 81/127; this very criterion matches 79/127).
+        foreach (var orderedGroups in groupsByModule
+            .GroupBy(g => g.ModuleId)
+            .OrderBy(g => g.Key)
+            .Select(moduleGroup => moduleGroup
                 .OrderBy(g => g.RawCode, Dpm20StructureLoader.NaturalStringComparer.Instance)
-                .ToList();
-
+                .ToList()))
+        {
             for (var order = 0; order < orderedGroups.Count; order++)
             {
                 var entry = orderedGroups[order];

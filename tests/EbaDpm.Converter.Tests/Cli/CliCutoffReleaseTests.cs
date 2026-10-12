@@ -18,8 +18,8 @@ public sealed class CliCutoffReleaseTests
         var args = mode == "convert"
             ? new[] { "--source", "does-not-exist.accdb", "--output", "out.db", "--all", "--cutoff-release" }
             : new[] { "--list-taxonomies", "--source", "does-not-exist.accdb", "--cutoff-release" };
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(args, stdout, stderr);
 
@@ -30,10 +30,11 @@ public sealed class CliCutoffReleaseTests
     [Fact]
     public void CutoffRelease_FollowedByAnotherOption_IsAnArgumentError()
     {
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(
-            ["--source", "does-not-exist.accdb", "--output", "out.db", "--cutoff-release", "--all"], new StringWriter(), stderr);
+            ["--source", "does-not-exist.accdb", "--output", "out.db", "--cutoff-release", "--all"], stdout, stderr);
 
         Assert.Equal(CliRunner.ExitArgumentError, exitCode);
         Assert.Contains("argument --cutoff-release requires a value.", stderr.ToString(), StringComparison.Ordinal);
@@ -43,8 +44,8 @@ public sealed class CliCutoffReleaseTests
     public void ListTaxonomies_WithUnknownCutoffCode_IsAnArgumentError_ListingTheAvailableCodes()
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(
             ["--list-taxonomies", "--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", "9.9"], stdout, stderr);
@@ -58,15 +59,15 @@ public sealed class CliCutoffReleaseTests
     public void Convert_WithUnknownCutoffCode_IsAnArgumentError_ListingTheAvailableCodes()
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
-        var tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.CliCutoffTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.CliCutoffTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDirectory);
         try
         {
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliRunner.Run(
-                ["--source", RepoPaths.AccessDpm20DatabasePath, "--output", Path.Combine(tempDirectory, "o.db"), "--all", "--cutoff-release", "9.9"],
+                ["--source", RepoPaths.AccessDpm20DatabasePath, "--output", Path.Join(tempDirectory, "o.db"), "--all", "--cutoff-release", "9.9"],
                 stdout, stderr);
 
             Assert.Equal(CliRunner.ExitArgumentError, exitCode);
@@ -75,7 +76,14 @@ public sealed class CliCutoffReleaseTests
         finally
         {
             SqliteConnection.ClearAllPools();
-            try { Directory.Delete(tempDirectory, recursive: true); } catch (IOException) { }
+            try
+            {
+                Directory.Delete(tempDirectory, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup of a temp directory: a file still locked must not mask the test verdict.
+            }
         }
     }
 
@@ -83,8 +91,8 @@ public sealed class CliCutoffReleaseTests
     public void ListTaxonomies_WithRequestedCutoff_ShowsItInTheLogLine()
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(
             ["--list-taxonomies", "--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", "4.2"], stdout, stderr);
@@ -97,8 +105,8 @@ public sealed class CliCutoffReleaseTests
     public void ListTaxonomies_WithoutCutoff_ShowsTheNaturalCutoffWithoutTheRequestedMarker()
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(
             ["--list-taxonomies", "--source", RepoPaths.AccessDpm20DatabasePath], stdout, stderr);
@@ -112,8 +120,8 @@ public sealed class CliCutoffReleaseTests
     public void ListTaxonomies_OnDpm10Source_WithCutoff_IsAnArgumentError()
     {
         RepoPaths.EnsureAccessDatabaseExists();
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(
             ["--list-taxonomies", "--source", RepoPaths.AccessDatabasePath, "--cutoff-release", "4.2"], stdout, stderr);
@@ -126,13 +134,13 @@ public sealed class CliCutoffReleaseTests
     public void Convert_OnDpm10Source_WithCutoff_IsAnArgumentError_AndCreatesNoOutput()
     {
         RepoPaths.EnsureAccessDatabaseExists();
-        var tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.CliCutoffTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.CliCutoffTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDirectory);
-        var outputPath = Path.Combine(tempDirectory, "o.db");
+        var outputPath = Path.Join(tempDirectory, "o.db");
         try
         {
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
 
             var exitCode = CliRunner.Run(
                 ["--source", RepoPaths.AccessDatabasePath, "--output", outputPath, "--taxonomies", "COREP 3.2", "--cutoff-release", "4.2"],
@@ -145,7 +153,14 @@ public sealed class CliCutoffReleaseTests
         finally
         {
             SqliteConnection.ClearAllPools();
-            try { Directory.Delete(tempDirectory, recursive: true); } catch (IOException) { }
+            try
+            {
+                Directory.Delete(tempDirectory, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup of a temp directory: a file still locked must not mask the test verdict.
+            }
         }
     }
 }

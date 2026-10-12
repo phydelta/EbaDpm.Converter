@@ -106,8 +106,8 @@ public static class AxisAndCellCensusChecks
 
         sw.Restart();
         var comparableHierarchy = Comparable(
-            generatedRestriction.ToDictionary(kv => kv.Key, kv => (string?)Normalization.HierarchyCode(kv.Value)),
-            referenceRestriction.ToDictionary(kv => kv.Key, kv => (string?)Normalization.HierarchyCode(kv.Value)));
+            generatedRestriction.ToDictionary<KeyValuePair<string, string>, string, string?>(kv => kv.Key, kv => Normalization.HierarchyCode(kv.Value)),
+            referenceRestriction.ToDictionary<KeyValuePair<string, string>, string, string?>(kv => kv.Key, kv => Normalization.HierarchyCode(kv.Value)));
         yield return PlaneBSupport.LiteralWithDeclaredDivergences(
             "B-OAR-01.2", ValidationLayer.Critical, "mOpenAxisValueRestriction", "HierarchyID of the restriction (normalised): literal against the reference",
             "B-OAR-01-HIERARCHY", referenceRole, comparableHierarchy, exceptionSink, sw.ElapsedMilliseconds);

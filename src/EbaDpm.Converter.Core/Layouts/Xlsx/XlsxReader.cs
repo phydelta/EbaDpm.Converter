@@ -186,14 +186,10 @@ internal static class XlsxReader
         }
 
         var merges = new List<(int R1, int C1, int R2, int C2)>();
-        foreach (var mergeEl in sheetXml.Descendants(Main + "mergeCells").Elements(Main + "mergeCell"))
+        foreach (var refValue in sheetXml.Descendants(Main + "mergeCells").Elements(Main + "mergeCell")
+            .Select(mergeEl => (string?)mergeEl.Attribute("ref"))
+            .OfType<string>())
         {
-            var refValue = (string?)mergeEl.Attribute("ref");
-            if (refValue is null)
-            {
-                continue;
-            }
-
             var parts = refValue.Split(':');
             var (r1, c1) = CellRefUtil.Parse(parts[0]);
             var (r2, c2) = parts.Length > 1 ? CellRefUtil.Parse(parts[1]) : (r1, c1);

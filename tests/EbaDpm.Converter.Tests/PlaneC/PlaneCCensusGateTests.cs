@@ -33,7 +33,7 @@ namespace EbaDpm.Converter.Tests.PlaneC;
 public sealed class PlaneCCensusGateTests(Dpm20SkeletonFixture fixture) : IDisposable
 {
     private readonly string _tempDirectory =
-        Path.Combine(Path.GetTempPath(), $"EbaDpm.KnownDivergenceGateTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        Path.Join(Path.GetTempPath(), $"EbaDpm.KnownDivergenceGateTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
 
     public void Dispose()
     {
@@ -67,8 +67,8 @@ public sealed class PlaneCCensusGateTests(Dpm20SkeletonFixture fixture) : IDispo
     public void CDps01_WithAnAlteredRealSignature_ProducesAnUnlistedViolation_AndFails()
     {
         Directory.CreateDirectory(_tempDirectory);
-        var generatedPath = Path.Combine(_tempDirectory, "generated.db");
-        var layoutsPath = Path.Combine(_tempDirectory, "layouts.db");
+        var generatedPath = Path.Join(_tempDirectory, "generated.db");
+        var layoutsPath = Path.Join(_tempDirectory, "layouts.db");
 
         SqliteConnection.ClearAllPools();
         File.Copy(fixture.ValidatedDatabasePath, generatedPath);

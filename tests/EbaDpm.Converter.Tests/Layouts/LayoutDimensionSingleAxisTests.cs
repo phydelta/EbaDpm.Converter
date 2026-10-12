@@ -61,10 +61,10 @@ public sealed class LayoutDimensionSingleAxisTests(LayoutRepositoryFixture fixtu
         // applied ONLY to this fabricated sheet, must find 1 pair on more than one axis -- not 0:
         // if it found 0, the real property (0 of 10,147) would be indistinguishable from a query
         // that never looks at anything.
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.SingleAxisGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.SingleAxisGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
             new MinimalXlsxBuilder("T_DIM_TWO_AXES")
                 // HEADER declaration (row 1, before "Rows"): it does not pair within the header
                 // (row 2 empty in that column), so it falls to the in-grid scan -- it ends up with
@@ -82,7 +82,7 @@ public sealed class LayoutDimensionSingleAxisTests(LayoutRepositoryFixture fixtu
                 .WithCell("D10", "(qTR:qx2003) Market risk, same value, paired further down the grid")
                 .Save(inputDir);
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, RepoPaths.ReferenceDatabasePath);
 
             using var connection = Open(outputPath);

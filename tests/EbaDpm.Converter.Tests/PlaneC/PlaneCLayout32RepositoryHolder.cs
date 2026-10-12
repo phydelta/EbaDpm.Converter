@@ -23,9 +23,9 @@ internal static class PlaneCLayout32RepositoryHolder
         RepoPaths.EnsureTableLayouts32DirectoryExists();
         RepoPaths.EnsureReferenceDatabaseExists();
 
-        var tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.PlaneCLayouts32_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.PlaneCLayouts32_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDirectory);
-        var path = Path.Combine(tempDirectory, "layouts32.db");
+        var path = Path.Join(tempDirectory, "layouts32.db");
 
         // Same dictionary (4.2 Hotfix) that PlaneCLayoutRepositoryHolder uses for 4.2: the
         // dictionary only resolves whether the code of a loose term is a MET member or a dimension

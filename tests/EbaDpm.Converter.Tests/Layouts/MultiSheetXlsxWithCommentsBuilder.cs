@@ -62,7 +62,7 @@ internal sealed class MultiSheetXlsxWithCommentsBuilder
     {
         Directory.CreateDirectory(directory);
         var fileName = $"20260101 Annotated Table Layout  {framework} {release} {module}{framework} {release}.xlsx";
-        var path = Path.Combine(directory, fileName);
+        var path = Path.Join(directory, fileName);
 
         using var stream = new FileStream(path, FileMode.Create, FileAccess.Write);
         using var zip = new ZipArchive(stream, ZipArchiveMode.Create);

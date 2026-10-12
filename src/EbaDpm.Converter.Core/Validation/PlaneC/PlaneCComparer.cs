@@ -266,12 +266,11 @@ public static class PlaneCComparer
                     }
 
                     ownRelease.Add(s);
-                    if (match == PlaneCReleaseMatch.PointRelease && toleratedSheetIds.Add(s.SheetId))
+                    if (match == PlaneCReleaseMatch.PointRelease
+                        && toleratedSheetIds.Add(s.SheetId)
+                        && toleratedSamples.Count < 50)
                     {
-                        if (toleratedSamples.Count < 50)
-                        {
-                            toleratedSamples.Add($"{tableCode} (sheet release='{s.ReleaseLabel}')");
-                        }
+                        toleratedSamples.Add($"{tableCode} (sheet release='{s.ReleaseLabel}')");
                     }
                 }
             }
@@ -379,12 +378,9 @@ public static class PlaneCComparer
                 violations.Add(new PlaneCViolation(tableCode, type, canonical, tableClass));
             }
 
-            foreach (var term in ourTermUniverse)
+            foreach (var term in ourTermUniverse.Where(t => !layoutTermUniverse.Contains(t)))
             {
-                if (!layoutTermUniverse.Contains(term))
-                {
-                    extraTerms.Add(new PlaneCExtraTerm(tableCode, term));
-                }
+                extraTerms.Add(new PlaneCExtraTerm(tableCode, term));
             }
         }
 

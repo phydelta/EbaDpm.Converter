@@ -261,15 +261,9 @@ public sealed class ConceptReleaseTests
             var releaseCode = row[3];
 
             string? xbrlCode;
-            bool found;
-            if (conceptType == "Dimension")
-            {
-                found = dimensionXbrlByConceptId.TryGetValue(conceptId, out xbrlCode);
-            }
-            else
-            {
-                found = memberXbrlByConceptId.TryGetValue(conceptId, out xbrlCode);
-            }
+            var found = conceptType == "Dimension"
+                ? dimensionXbrlByConceptId.TryGetValue(conceptId, out xbrlCode)
+                : memberXbrlByConceptId.TryGetValue(conceptId, out xbrlCode);
 
             if (!found)
             {

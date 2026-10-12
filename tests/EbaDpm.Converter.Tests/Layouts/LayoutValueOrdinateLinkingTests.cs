@@ -90,17 +90,17 @@ public sealed class LayoutValueOrdinateLinkingTests(LayoutRepositoryFixture fixt
         // "(ZZDIM:ZZDOM)" is fabricated in B3 with its value. It is used without a dictionary so
         // that the value is NOT rejected for "does not exist in the dictionary" before it even
         // reaches LayoutValueOrdinateLinker.
-        var tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.UnlinkGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.UnlinkGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
         {
-            var inputDir = Path.Combine(tempDir, "input");
+            var inputDir = Path.Join(tempDir, "input");
             new MinimalXlsxBuilder("T_UNLINK_GATE")
                 .WithCell("A3", "Rows")
                 .WithCell("B3", "(ZZDIM:ZZDOM) fake dimension declaration")
                 .WithCell("F3", "(ZZDOM:ZZMEM) fake value, column F never gets an X ordinate")
                 .Save(inputDir);
 
-            var outputPath = Path.Combine(tempDir, "out.db");
+            var outputPath = Path.Join(tempDir, "out.db");
             LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
             using var connection = Open(outputPath);

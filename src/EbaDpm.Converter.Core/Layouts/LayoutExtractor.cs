@@ -110,8 +110,11 @@ public static class LayoutExtractor
             connection, "LayoutEqualityRule",
             ["RuleId", "Position", "SourceFile", "SheetId", "CellRef", "Term", "TableCode", "RowCode", "ColumnCode", "ZCode"]);
 
-        var transaction = connection.BeginTransaction();
-        AssignTransaction(transaction, fileInsert, sheetInsert, declInsert, ordinateInsert, cellInsert, valueInsert, rawInsert, unparsedInsert, extractionInsert, equalityRuleInsert);
+        // Disposing the holder disposes whichever transaction is current, also when an exception
+        // escapes the loop (an uncommitted transaction is rolled back).
+        using var transaction = new RotatingTransaction(
+            connection,
+            fileInsert, sheetInsert, declInsert, ordinateInsert, cellInsert, valueInsert, rawInsert, unparsedInsert, extractionInsert, equalityRuleInsert);
 
         // Provenance: which dictionary resolved this extraction. One row, always — with a null
         // dictionaryPath if none was given, which is just as real a piece of information.
@@ -391,15 +394,11 @@ public static class LayoutExtractor
             // per sheet.
             if (fileId % 10 == 0)
             {
-                transaction.Commit();
-                transaction.Dispose();
-                transaction = connection.BeginTransaction();
-                AssignTransaction(transaction, fileInsert, sheetInsert, declInsert, ordinateInsert, cellInsert, valueInsert, rawInsert, unparsedInsert, extractionInsert, equalityRuleInsert);
+                transaction.CommitAndBegin();
             }
         }
 
         transaction.Commit();
-        transaction.Dispose();
 
         var reasonSample = unparsedReasonCounts
             .OrderByDescending(kv => kv.Value)
@@ -428,11 +427,43 @@ public static class LayoutExtractor
             equalityCommentsExamined, equalityRuleLinesFound, equalityRulesWritten, equalityRuleGrammarFailures);
     }
 
-    private static void AssignTransaction(SqliteTransaction transaction, params PreparedInsert[] inserts)
+    /// <summary>
+    /// The current transaction of the extraction: it is re-begun after each periodic commit and
+    /// assigned to every prepared insert. Disposing it disposes the current transaction.
+    /// </summary>
+    private sealed class RotatingTransaction : IDisposable
     {
-        foreach (var insert in inserts)
+        private readonly SqliteConnection _connection;
+        private readonly PreparedInsert[] _inserts;
+        private SqliteTransaction _current;
+
+        public RotatingTransaction(SqliteConnection connection, params PreparedInsert[] inserts)
         {
-            insert.Transaction = transaction;
+            _connection = connection;
+            _inserts = inserts;
+            _current = Begin();
+        }
+
+        public void Commit() => _current.Commit();
+
+        public void CommitAndBegin()
+        {
+            _current.Commit();
+            _current.Dispose();
+            _current = Begin();
+        }
+
+        public void Dispose() => _current.Dispose();
+
+        private SqliteTransaction Begin()
+        {
+            var transaction = _connection.BeginTransaction();
+            foreach (var insert in _inserts)
+            {
+                insert.Transaction = transaction;
+            }
+
+            return transaction;
         }
     }
 

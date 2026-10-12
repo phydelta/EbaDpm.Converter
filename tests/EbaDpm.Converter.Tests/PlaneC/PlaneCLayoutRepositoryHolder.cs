@@ -27,9 +27,9 @@ internal static class PlaneCLayoutRepositoryHolder
         RepoPaths.EnsureTableLayouts42DirectoryExists();
         RepoPaths.EnsureReferenceDatabaseExists();
 
-        var tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.PlaneCLayouts_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        var tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.PlaneCLayouts_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDirectory);
-        var path = Path.Combine(tempDirectory, "layouts42.db");
+        var path = Path.Join(tempDirectory, "layouts42.db");
 
         LayoutExtractor.Extract(RepoPaths.TableLayouts42Directory, path, overwrite: false, RepoPaths.ReferenceDatabasePath);
 

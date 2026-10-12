@@ -17,7 +17,7 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
 
     public LayoutEqualityRuleExtractionTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"EbaDpm.EquExtract_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        _tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.EquExtract_{Environment.ProcessId}_{Guid.NewGuid():N}");
     }
 
     public void Dispose()
@@ -39,7 +39,7 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
     [Fact]
     public void Extract_OneLineWithTwoTerms_WritesASingleRuleWithTwoPositions()
     {
-        var inputDir = Path.Combine(_tempDir, "input");
+        var inputDir = Path.Join(_tempDir, "input");
         new MultiSheetXlsxWithCommentsBuilder()
             .AddSheet("A_01.01", out var sheetA)
             .AddSheet("B_02.01", out var sheetB)
@@ -48,7 +48,7 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
             .WithComment(sheetA, "D10", "{A_01.01, r0010, c0020}=={B_02.01, r0030, c0040}", commentsFileNumber: 1)
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out.db");
+        var outputPath = Path.Join(_tempDir, "out.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
         Assert.Equal(0, summary.EqualityRuleGrammarFailures);
@@ -71,14 +71,14 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
     [Fact]
     public void Extract_ThreeChainedTerms_IsASingleRuleOfThreePositions_NotTwoOfTwo()
     {
-        var inputDir = Path.Combine(_tempDir, "input");
+        var inputDir = Path.Join(_tempDir, "input");
         new MultiSheetXlsxWithCommentsBuilder()
             .AddSheet("A_01.01", out var sheetA)
             .WithCell(sheetA, "A1", "A_01.01")
             .WithComment(sheetA, "D10", "{A_01.01, r1, c1}=={B_01.01, r2, c2}=={C_01.01, r3, c3}", commentsFileNumber: 1)
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out.db");
+        var outputPath = Path.Join(_tempDir, "out.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
         Assert.Equal(1, summary.EqualityRulesWritten);
@@ -98,7 +98,7 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
         // The EBA annotates the SAME rule, in full, in the comment of EACH participating cell --
         // sometimes with a different term order depending on which cell it is read from.
         // Deduplication has to be by SET, not by literal text.
-        var inputDir = Path.Combine(_tempDir, "input");
+        var inputDir = Path.Join(_tempDir, "input");
         new MultiSheetXlsxWithCommentsBuilder()
             .AddSheet("A_01.01", out var sheetA)
             .AddSheet("B_02.01", out var sheetB)
@@ -108,7 +108,7 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
             .WithComment(sheetB, "E20", "{B_02.01, r0030, c0040}=={A_01.01, r0010, c0020}", commentsFileNumber: 2)
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out.db");
+        var outputPath = Path.Join(_tempDir, "out.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
         // Two comments examined, two "==" lines found, but only ONE rule written.
@@ -124,7 +124,7 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
     [Fact]
     public void Extract_TermWithZCode_CapturesItTrimmed_AndToleratesTheFormWithoutSpaceAfterC()
     {
-        var inputDir = Path.Combine(_tempDir, "input");
+        var inputDir = Path.Join(_tempDir, "input");
         new MultiSheetXlsxWithCommentsBuilder()
             .AddSheet("A_01.01", out var sheetA)
             .WithCell(sheetA, "A1", "A_01.01")
@@ -133,7 +133,7 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
             .WithComment(sheetA, "D10", "{A_01.01, r0090, c 0200, s0020}=={B_01.01, r1, c1}", commentsFileNumber: 1)
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out.db");
+        var outputPath = Path.Join(_tempDir, "out.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
         Assert.Equal(0, summary.EqualityRuleGrammarFailures);
@@ -150,14 +150,14 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
     [Fact]
     public void Extract_ALineWithDoubleEqualsButTermsWithoutCommas_IsAGrammarFailure_NotSilentlyDiscarded()
     {
-        var inputDir = Path.Combine(_tempDir, "input");
+        var inputDir = Path.Join(_tempDir, "input");
         new MultiSheetXlsxWithCommentsBuilder()
             .AddSheet("A_01.01", out var sheetA)
             .WithCell(sheetA, "A1", "A_01.01")
             .WithComment(sheetA, "D10", "{no-commas-here}=={nor-here}", commentsFileNumber: 1)
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out.db");
+        var outputPath = Path.Join(_tempDir, "out.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
         Assert.Equal(1, summary.EqualityRuleLinesFound);
@@ -174,14 +174,14 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
     [Fact]
     public void Extract_ACommentWithoutDoubleEquals_GeneratesNoRule_ItIsProseOrAnOpenAxisRestriction()
     {
-        var inputDir = Path.Combine(_tempDir, "input");
+        var inputDir = Path.Join(_tempDir, "input");
         new MultiSheetXlsxWithCommentsBuilder()
             .AddSheet("A_01.01", out var sheetA)
             .WithCell(sheetA, "A1", "A_01.01")
             .WithComment(sheetA, "D10", "KeyVariableID: 12345\nValue chosen from: qEEA(*[qAE1])", commentsFileNumber: 1)
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out.db");
+        var outputPath = Path.Join(_tempDir, "out.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
         Assert.Equal(1, summary.EqualityCommentsExamined);
@@ -208,7 +208,7 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
     [Fact]
     public void Extract_SheetWithoutCommentsFollowedBySheetWithComments_ResolvesTheCommentThroughRels_NotByFileNumber()
     {
-        var inputDir = Path.Combine(_tempDir, "input");
+        var inputDir = Path.Join(_tempDir, "input");
         new MultiSheetXlsxWithCommentsBuilder()
             .AddSheet("A_01.01", out var sheetA) // sheet1.xml -- WITHOUT comments, no _rels.
             .AddSheet("B_02.01", out var sheetB) // sheet2.xml -- WITH a comment, but in comments1.xml.
@@ -217,7 +217,7 @@ public sealed class LayoutEqualityRuleExtractionTests : IDisposable
             .WithComment(sheetB, "D10", "{B_02.01, r0010, c0020}=={C_03.01, r0030, c0040}", commentsFileNumber: 1)
             .Save(inputDir);
 
-        var outputPath = Path.Combine(_tempDir, "out.db");
+        var outputPath = Path.Join(_tempDir, "out.db");
         var summary = LayoutExtractor.Extract(inputDir, outputPath, overwrite: false, dictionaryPath: null);
 
         // Control: sheet A (without comments) contributes no examined comment; the only comment in

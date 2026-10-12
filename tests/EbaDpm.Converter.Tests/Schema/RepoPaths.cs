@@ -64,7 +64,7 @@ internal static class RepoPaths
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             while (dir is not null)
             {
-                if (File.Exists(Path.Combine(dir.FullName, "EbaDpm.Converter.sln")))
+                if (File.Exists(Path.Join(dir.FullName, "EbaDpm.Converter.sln")))
                 {
                     return dir.FullName;
                 }
@@ -88,7 +88,7 @@ internal static class RepoPaths
         {
             var fromEnvironment = Environment.GetEnvironmentVariable(DataDirectoryEnvironmentVariable);
             return string.IsNullOrWhiteSpace(fromEnvironment)
-                ? Path.Combine(RepositoryRoot, "Data")
+                ? Path.Join(RepositoryRoot, "Data")
                 : fromEnvironment;
         }
     }
@@ -99,23 +99,23 @@ internal static class RepoPaths
     /// </summary>
     public static bool IsDataAvailable => Directory.Exists(DataDirectory);
 
-    public static string ReferenceDatabasePath => Path.Combine(DataDirectory, ReferenceDatabaseFileName);
+    public static string ReferenceDatabasePath => Path.Join(DataDirectory, ReferenceDatabaseFileName);
 
-    public static string Reference40Path => Path.Combine(DataDirectory, Reference40FileName);
+    public static string Reference40Path => Path.Join(DataDirectory, Reference40FileName);
 
-    public static string Reference32Path => Path.Combine(DataDirectory, Reference32FileName);
+    public static string Reference32Path => Path.Join(DataDirectory, Reference32FileName);
 
-    public static string AccessDatabasePath => Path.Combine(DataDirectory, AccessDatabaseFileName);
+    public static string AccessDatabasePath => Path.Join(DataDirectory, AccessDatabaseFileName);
 
-    public static string AccessDpm20DatabasePath => Path.Combine(DataDirectory, AccessDpm20DatabaseFileName);
+    public static string AccessDpm20DatabasePath => Path.Join(DataDirectory, AccessDpm20DatabaseFileName);
 
-    public static string AccessDpm20Release43DatabasePath => Path.Combine(DataDirectory, AccessDpm20Release43DatabaseFileName);
+    public static string AccessDpm20Release43DatabasePath => Path.Join(DataDirectory, AccessDpm20Release43DatabaseFileName);
 
     /// <summary>Directory with the 4.2 Annotated Table Layouts.</summary>
-    public static string TableLayouts42Directory => Path.Combine(DataDirectory, "4.2 table layouts");
+    public static string TableLayouts42Directory => Path.Join(DataDirectory, "4.2 table layouts");
 
     /// <summary>Directory with the 4.3 Annotated Table Layouts.</summary>
-    public static string TableLayouts43Directory => Path.Combine(DataDirectory, "4.3 table layouts");
+    public static string TableLayouts43Directory => Path.Join(DataDirectory, "4.3 table layouts");
 
     /// <summary>
     /// Directory with the 3.2 Annotated Table Layouts: the DPM 1.0 era, with no date or module in
@@ -123,7 +123,7 @@ internal static class RepoPaths
     /// the 4.2 corpus (51 files), and the corpus with which check C-DPS-01 started to monitor
     /// DPM 1.0.
     /// </summary>
-    public static string TableLayouts32Directory => Path.Combine(DataDirectory, "3.2 table layouts");
+    public static string TableLayouts32Directory => Path.Join(DataDirectory, "3.2 table layouts");
 
     /// <summary>Verifies that the 3.2 layouts directory exists.</summary>
     public static void EnsureTableLayouts32DirectoryExists()

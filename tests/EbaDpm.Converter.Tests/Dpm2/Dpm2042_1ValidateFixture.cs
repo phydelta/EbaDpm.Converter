@@ -46,12 +46,12 @@ public sealed class Dpm2042_1ValidateFixture : IDisposable
             DerivedCutoffRequested = reader.CutoffReleaseRequested;
         }
 
-        TempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.Dpm2042_1ValidateSuiteTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        TempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.Dpm2042_1ValidateSuiteTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(TempDirectory);
-        GeneratedDatabasePath = Path.Combine(TempDirectory, "generated-dpm2042_1-validate.db");
+        GeneratedDatabasePath = Path.Join(TempDirectory, "generated-dpm2042_1-validate.db");
 
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         ExitCode = CliRunner.Run(
             ["--source", RepoPaths.AccessDpm20DatabasePath, "--output", GeneratedDatabasePath, "--all"],

@@ -38,7 +38,7 @@ namespace EbaDpm.Converter.Tests.PlaneC;
 public sealed class CDps01Dpm10SentinelRealDataTests(AllFixture fixture) : IDisposable
 {
     private readonly string _tempDirectory =
-        Path.Combine(Path.GetTempPath(), $"EbaDpm.CDps01Dpm10Sentinel_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        Path.Join(Path.GetTempPath(), $"EbaDpm.CDps01Dpm10Sentinel_{Environment.ProcessId}_{Guid.NewGuid():N}");
 
     public void Dispose()
     {
@@ -91,7 +91,7 @@ public sealed class CDps01Dpm10SentinelRealDataTests(AllFixture fixture) : IDisp
     public void CDps01_RemovingMrwX93FromC10600_FailsWithTheViolationInC10600()
     {
         Directory.CreateDirectory(_tempDirectory);
-        var mutatedPath = Path.Combine(_tempDirectory, "generated-mutated.db");
+        var mutatedPath = Path.Join(_tempDirectory, "generated-mutated.db");
 
         SqliteConnection.ClearAllPools();
         File.Copy(fixture.ValidatedDatabasePath, mutatedPath);

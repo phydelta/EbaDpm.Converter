@@ -1453,8 +1453,8 @@ public static class AxisAndCellLoader
     private static void WriteConceptTranslations(SqliteConnection destination, Accumulator acc)
     {
         var seeds = acc.AxisRows
-            .Select(r => (r.ConceptId, r.AxisLabel, (string?)null))
-            .Concat(acc.OrdinateRows.Select(r => (r.ConceptId, (string?)r.OrdinateLabel, (string?)null)));
+            .Select<AxisWriteRow, (int ConceptId, string? Label, string? Description)>(r => (r.ConceptId, r.AxisLabel, null))
+            .Concat(acc.OrdinateRows.Select<OrdinateWriteRow, (int ConceptId, string? Label, string? Description)>(r => (r.ConceptId, r.OrdinateLabel, null)));
 
         ConceptTranslationWriter.Write(destination, seeds);
     }

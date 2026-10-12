@@ -34,7 +34,7 @@ public sealed class PlaneCEquTableIdReleaseIndexTests : IDisposable
 
     public PlaneCEquTableIdReleaseIndexTests()
     {
-        _tempDirectory = Path.Combine(Path.GetTempPath(), $"EbaDpm.EquTableIdReleaseIndexTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
+        _tempDirectory = Path.Join(Path.GetTempPath(), $"EbaDpm.EquTableIdReleaseIndexTests_{Environment.ProcessId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDirectory);
     }
 
@@ -65,11 +65,11 @@ public sealed class PlaneCEquTableIdReleaseIndexTests : IDisposable
     [Fact]
     public void CEqu01_WithTwoTableIdsOfTheSameCodeInDifferentReleases_ResolvesOnlyTheMatchingTableId()
     {
-        var generatedPath = Path.Combine(_tempDirectory, "generated.db");
+        var generatedPath = Path.Join(_tempDirectory, "generated.db");
         SchemaCreator.Create(generatedPath, overwrite: false);
         InsertFixture(generatedPath);
 
-        var layoutsPath = Path.Combine(_tempDirectory, "layouts.db");
+        var layoutsPath = Path.Join(_tempDirectory, "layouts.db");
         CreateLayoutsWithEqualityRule(layoutsPath, ruleRelease: MatchingRelease);
 
         SqliteConnection.ClearAllPools();
@@ -96,11 +96,11 @@ public sealed class PlaneCEquTableIdReleaseIndexTests : IDisposable
     [Fact]
     public void CEqu01_WithTwoTableIdsOfTheSameCode_IfTheSheetMatchesNeither_IsStillDifferentRelease()
     {
-        var generatedPath = Path.Combine(_tempDirectory, "generated.db");
+        var generatedPath = Path.Join(_tempDirectory, "generated.db");
         SchemaCreator.Create(generatedPath, overwrite: false);
         InsertFixture(generatedPath);
 
-        var layoutsPath = Path.Combine(_tempDirectory, "layouts.db");
+        var layoutsPath = Path.Join(_tempDirectory, "layouts.db");
         CreateLayoutsWithEqualityRule(layoutsPath, ruleRelease: UnmatchedRuleRelease);
 
         SqliteConnection.ClearAllPools();
