@@ -440,7 +440,7 @@ public static class LayoutExtractor
         public RotatingTransaction(SqliteConnection connection, params PreparedInsert[] inserts)
         {
             _connection = connection;
-            _inserts = inserts;
+            _inserts = (PreparedInsert[])inserts.Clone();
             _current = Begin();
         }
 
