@@ -126,7 +126,62 @@ public static class Dpm20DictionaryLoader
         int IntNaDomainId,
         int StrNaDomainId);
 
-    private static DomainLoadResult LoadDomains(SqliteConnection destination, IReadOnlyList<Dpm20CategoryRow> categories)
+    /// <summary>
+    /// Translates the raw <c>DataType.Code</c> of a TYPED domain to <c>mDomain.DataType</c>. Domain
+    /// specific: the declared type of the source is taken as is: <c>s</c> ("string (non empty)")
+    /// is <c>NotEmptyString</c> and <c>es</c> ("string (including empty string)") is
+    /// <c>String</c>; the rest comes out of <see cref="DataTypeTranslation"/>. The metric naming
+    /// law (<see cref="ResolveDataType"/>) does NOT apply to domains. Returns <c>null</c> when
+    /// there is no known translation (<c>dt</c>, <c>u</c>, <c>o</c>...).
+    /// </summary>
+    private static string? ResolveDomainDataType(string rawCode) => rawCode switch
+    {
+        "s" => "NotEmptyString",
+        "es" => "String",
+        _ => DataTypeTranslation.GetValueOrDefault(rawCode),
+    };
+
+    /// <summary>
+    /// <c>mDomain.DataType</c> of a typed domain built from <c>Category</c>. <c>Category</c> has no
+    /// data-type column: the type is declared on each property (<c>Property.DataTypeID</c>), and the
+    /// property is linked to its domain by <c>PropertyCategory</c> (all rows, any release window).
+    /// Exactly one distinct code with a translation gives the type; zero codes, more than one or a
+    /// code without translation leave <c>NULL</c> and are named in <paramref name="unresolvedCases"/>:
+    /// a type is never picked.
+    /// </summary>
+    private static string? ResolveTypedDomainDataType(
+        Dpm20CategoryRow category,
+        IReadOnlyDictionary<int, SortedSet<string>> dataTypeCodesByCategoryId,
+        List<string> unresolvedCases)
+    {
+        if (!dataTypeCodesByCategoryId.TryGetValue(category.CategoryId, out var codes) || codes.Count == 0)
+        {
+            unresolvedCases.Add($"{category.Code} (CategoryID={category.CategoryId}): no property with a known data type");
+            return null;
+        }
+
+        var listed = string.Join(",", codes.Select(c => $"'{c}'"));
+        if (codes.Count > 1)
+        {
+            unresolvedCases.Add($"{category.Code} (CategoryID={category.CategoryId}): property data types {listed}");
+            return null;
+        }
+
+        var dataType = ResolveDomainDataType(codes.Min!);
+        if (dataType is null)
+        {
+            unresolvedCases.Add(
+                $"{category.Code} (CategoryID={category.CategoryId}): property data type {listed} has no known translation");
+        }
+
+        return dataType;
+    }
+
+    private static DomainLoadResult LoadDomains(
+        SqliteConnection destination,
+        IReadOnlyList<Dpm20CategoryRow> categories,
+        IReadOnlyDictionary<int, SortedSet<string>> dataTypeCodesByCategoryId,
+        List<string> unresolvedDomainDataTypeCases)
     {
         using var writer = new SqliteBatchWriter(
             destination,
@@ -185,7 +240,12 @@ public static class Dpm20DictionaryLoader
                 category.Name,
                 string.Empty, // DomainDescription: constant ''
                 xbrlCode,
-                null, // DataType: NULL even for the 17 typed ones
+                // DataType: Category has no data-type column; a typed domain takes the single type
+                // declared by its properties (PropertyCategory -> Property.DataTypeID). Enumerated
+                // domains have none.
+                isTypedDomain
+                    ? ResolveTypedDomainDataType(category, dataTypeCodesByCategoryId, unresolvedDomainDataTypeCases)
+                    : null,
                 isTypedDomain,
                 false, // IsNillable: constant 0
                 null); // ConceptID: NULL until the concept loader runs
@@ -706,7 +766,8 @@ public static class Dpm20DictionaryLoader
         IReadOnlyList<string> UnresolvedMetricDataTypeCases,
         IReadOnlyList<string> DimensionsWithoutCode,
         IReadOnlyList<string> DimensionsWithoutPropertyCategory,
-        IReadOnlyList<string> UnresolvedDimensionDomainCases);
+        IReadOnlyList<string> UnresolvedDimensionDomainCases,
+        IReadOnlyList<string> UnresolvedDomainDataTypeCases);
 
     /// <summary>
     /// Loads the dictionary tables (domains, domain unions, members, hierarchies, metrics and
@@ -731,8 +792,45 @@ public static class Dpm20DictionaryLoader
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(destination);
 
+        // Read first: mDomain.DataType of the typed domains comes from Property.DataTypeID through
+        // PropertyCategory, and mMetric/mDimension need the same reads later.
+        var dataTypeCodeById = reader.ReadDataTypes().ToDictionary(dt => dt.DataTypeId, dt => dt.Code);
+        var dataTypeCodeByPropertyId = new Dictionary<int, string>();
+        foreach (var property in reader.ReadProperties())
+        {
+            if (property.DataTypeId is { } dataTypeId && dataTypeCodeById.TryGetValue(dataTypeId, out var code))
+            {
+                dataTypeCodeByPropertyId[property.PropertyId] = code;
+            }
+        }
+
+        var propertyCategoriesByPropertyId = new Dictionary<int, List<Dpm20PropertyCategoryRow>>();
+        var dataTypeCodesByCategoryId = new Dictionary<int, SortedSet<string>>();
+        foreach (var row in reader.ReadPropertyCategories())
+        {
+            if (!propertyCategoriesByPropertyId.TryGetValue(row.PropertyId, out var list))
+            {
+                list = [];
+                propertyCategoriesByPropertyId[row.PropertyId] = list;
+            }
+
+            list.Add(row);
+
+            if (dataTypeCodeByPropertyId.TryGetValue(row.PropertyId, out var propertyTypeCode))
+            {
+                if (!dataTypeCodesByCategoryId.TryGetValue(row.CategoryId, out var categoryCodes))
+                {
+                    categoryCodes = new SortedSet<string>(StringComparer.Ordinal);
+                    dataTypeCodesByCategoryId[row.CategoryId] = categoryCodes;
+                }
+
+                categoryCodes.Add(propertyTypeCode);
+            }
+        }
+
         var categories = reader.ReadCategories().ToList();
-        var domainResult = LoadDomains(destination, categories);
+        var unresolvedDomainDataTypeCases = new List<string>();
+        var domainResult = LoadDomains(destination, categories, dataTypeCodesByCategoryId, unresolvedDomainDataTypeCases);
 
         var compositions = reader.ReadSuperCategoryCompositions().ToList();
         var domainUnionRows = LoadDomainUnions(destination, compositions, domainResult.DomainIdByCategoryId);
@@ -760,16 +858,6 @@ public static class Dpm20DictionaryLoader
             destination, subCategories, domainResult.DomainIdByCategoryId, domainResult.MetDomainId, domainResult.PrCategoryId);
 
         // ---- What mMetric and mDimension need in addition, on the SAME connection ----
-
-        var dataTypeCodeById = reader.ReadDataTypes().ToDictionary(dt => dt.DataTypeId, dt => dt.Code);
-        var dataTypeCodeByPropertyId = new Dictionary<int, string>();
-        foreach (var property in reader.ReadProperties())
-        {
-            if (property.DataTypeId is { } dataTypeId && dataTypeCodeById.TryGetValue(dataTypeId, out var code))
-            {
-                dataTypeCodeByPropertyId[property.PropertyId] = code;
-            }
-        }
 
         // mMetric.ReferencedHierarchyID: PropertyID -> SubCategoryID, first row per HeaderVID
         // (36 of 537 properties have more than one distinct candidate — documented in
@@ -819,18 +907,6 @@ public static class Dpm20DictionaryLoader
         var propertyCodeWindowsByIdReadOnly = propertyCodeWindowsById
             .ToDictionary(kv => kv.Key, IReadOnlyList<(string Code, int StartReleaseId, int? EndReleaseId)> (kv) => kv.Value);
 
-        var propertyCategoriesByPropertyId = new Dictionary<int, List<Dpm20PropertyCategoryRow>>();
-        foreach (var row in reader.ReadPropertyCategories())
-        {
-            if (!propertyCategoriesByPropertyId.TryGetValue(row.PropertyId, out var list))
-            {
-                list = [];
-                propertyCategoriesByPropertyId[row.PropertyId] = list;
-            }
-
-            list.Add(row);
-        }
-
         var propertyCategoriesByPropertyIdReadOnly = propertyCategoriesByPropertyId
             .ToDictionary(kv => kv.Key, IReadOnlyList<Dpm20PropertyCategoryRow> (kv) => kv.Value);
 
@@ -868,7 +944,8 @@ public static class Dpm20DictionaryLoader
             unresolvedMetricDataTypeCases,
             dimensionsWithoutCode,
             dimensionsWithoutPropertyCategory,
-            unresolvedDimensionDomainCases);
+            unresolvedDimensionDomainCases,
+            unresolvedDomainDataTypeCases);
 
         return new Result(
             domainResult.RowsWritten,

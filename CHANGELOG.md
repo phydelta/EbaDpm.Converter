@@ -6,6 +6,14 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Fixed
+
+- DPM 2.0: `mDomain.DataType` is now filled for typed domains (for example `DT` → `Date`,
+  `ID` → `Integer`, `LE` → `NotEmptyString`) instead of being `NULL`. `Category` has no data
+  type; it is derived from the data type of the properties linked to the domain through
+  `PropertyCategory`. A typed domain whose properties have no type, several types or a type
+  without translation keeps `NULL` and is reported. Enumerated domains keep `NULL`.
+
 ## 1.2.0 - 2026-10-08
 
 ### Added

@@ -588,6 +588,7 @@ public static class CliRunner
         TextWriter stdout, EbaDpm.Converter.Core.Mapping.Dpm20.Dpm20DictionaryLoader.Diagnostics diagnostics)
     {
         WriteDiagnosticList(stdout, "mMetric.DataType without a known translation", diagnostics.UnresolvedMetricDataTypeCases);
+        WriteDiagnosticList(stdout, "mDomain.DataType unresolved", diagnostics.UnresolvedDomainDataTypeCases);
         WriteDiagnosticList(stdout, "mDimension without its own code in ItemCategory/_PR", diagnostics.DimensionsWithoutCode);
         WriteDiagnosticList(stdout, "mDimension without a row in PropertyCategory", diagnostics.DimensionsWithoutPropertyCategory);
         WriteDiagnosticList(stdout, "mDimension.DomainID unresolved", diagnostics.UnresolvedDimensionDomainCases);
