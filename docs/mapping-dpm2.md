@@ -168,8 +168,20 @@ evaluated independently.
 | `9999` | the `Open` sentinel, empty code |
 
 `IsTypedDomain = NOT Category.IsEnumerated`; `DomainXBRLCode` = `eba_typ:` or `eba_exp:` + code;
-`DomainDescription` = empty string; `IsNillable = 0`; `DataType` `NULL` (except the two synthetic
-typed domains).
+`DomainDescription` = empty string; `IsNillable = 0`.
+
+`DataType`: `Category` has no data-type column; the Access declares the type on each property
+(`Property.DataTypeID`), and `PropertyCategory` links the property to its domain.
+
+| Domain | `DataType` |
+|---|---|
+| Enumerated (`IsTypedDomain = 0`), `MET`, `Open` | `NULL`: the valid values are the members of the domain. The code `e` (enumeration) belongs to the properties that use the domain, i.e. to `mMetric`, not to the domain. |
+| Typed, from `Category` | the single data type of all the properties that have a `PropertyCategory` row for the category (any release window): `s` `NotEmptyString` (source label "string (non empty)"), `es` `String` ("string (including empty string)"), other codes as in `mMetric` (`i` Integer, `d` Date...). The metric naming law for `s`/`es` does **not** apply to domains. |
+| Typed, with no typed property, several distinct types, or a code without translation | `NULL`, and the domain is reported as unresolved (`mDomain.DataType unresolved`). No type is chosen. |
+| `INT_NA`, `STR_NA` | `Integer`, `NotEmptyString` (synthetic) |
+
+Measured on 4.2.1 and 4.3: every typed category has properties of exactly one type, and the
+result matches the 4.2 reference export for all its typed domains.
 
 ### mDomainUnion
 
