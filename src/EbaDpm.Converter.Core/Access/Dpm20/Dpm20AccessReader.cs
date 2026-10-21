@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.OleDb;
+using static EbaDpm.Converter.Core.Access.AccessRecordExtensions;
 
 namespace EbaDpm.Converter.Core.Access.Dpm20;
 
@@ -1068,14 +1069,4 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
             yield return new Dpm20OperatorRow(operatorId, symbol);
         }
     }
-
-    // ------------------------------------------------------------------
-    // NULL-tolerant read helpers (same pattern as Dpm10AccessReader)
-    // ------------------------------------------------------------------
-
-    private static string? GetNullableString(IDataRecord record, int ordinal)
-        => record.IsDBNull(ordinal) ? null : Convert.ToString(record.GetValue(ordinal));
-
-    private static int? GetNullableInt32(IDataRecord record, int ordinal)
-        => record.IsDBNull(ordinal) ? null : Convert.ToInt32(record.GetValue(ordinal));
 }
