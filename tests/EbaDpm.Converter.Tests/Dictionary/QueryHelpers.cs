@@ -14,7 +14,11 @@ internal static class QueryHelpers
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         var result = command.ExecuteScalar();
-        return result is null or DBNull ? 0 : Convert.ToInt64(result);
+
+        // A NULL or an absent row is never silently read as 0: an empty set must not look like a
+        // clean zero. (No caller needs NULL -> 0: they all COUNT(*) or read a flag of an existing row.)
+        Assert.False(result is null or DBNull, $"The scalar query returned NULL or no row, which is not a count: {sql}");
+        return Convert.ToInt64(result);
     }
 
     public static List<string?[]> Rows(SqliteConnection connection, string sql, int columnCount)
