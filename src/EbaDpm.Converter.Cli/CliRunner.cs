@@ -364,14 +364,7 @@ public static class CliRunner
             var request = new TaxonomySelectionRequest(taxonomyCodes, taxonomyKeys, releaseCodes, all);
             var selectedTaxonomies = TaxonomySelector.Resolve(allTaxonomies, request, taxonomyKeyByTaxonomyId);
 
-            var connectionString = new SqliteConnectionStringBuilder
-            {
-                DataSource = output,
-                Mode = SqliteOpenMode.ReadWrite,
-            }.ToString();
-
-            using var destination = new SqliteConnection(connectionString);
-            destination.Open();
+            using var destination = OpenDestination(output);
 
             var skeleton = SkeletonLoader.Load(accessReader, destination, allTaxonomies, selectedTaxonomies);
             var dictionary = DictionaryLoader.Load(accessReader, destination, allTaxonomies, selectedTaxonomies);
@@ -379,18 +372,7 @@ public static class CliRunner
             var axesAndCells = AxisAndCellLoader.Load(accessReader, destination, templates.TableIdByTableVId);
             var modules = ModuleLoader.Load(accessReader, destination, selectedTaxonomies);
 
-            // Final VACUUM: the reproducibility requirement is on CONTENT, not on the file, and
-            // without VACUUM the size of the .db varies between identical runs because of the
-            // batched write pattern and the SQLite page cache. VACUUM cannot run inside a
-            // transaction: none is left open here, each SqliteBatchWriter commits and closes its
-            // own when it completes.
-            var vacuumStopwatch = System.Diagnostics.Stopwatch.StartNew();
-            using (var vacuumCommand = destination.CreateCommand())
-            {
-                vacuumCommand.CommandText = "VACUUM;";
-                vacuumCommand.ExecuteNonQuery();
-            }
-            vacuumStopwatch.Stop();
+            var vacuumElapsedMilliseconds = VacuumWithTiming(destination);
 
             stdout.WriteLine(
                 $"Skeleton loaded into '{output}': {selectedTaxonomies.Count} taxonomies, "
@@ -423,7 +405,7 @@ public static class CliRunner
             stdout.WriteLine(
                 $"Modules loaded: {modules.ModuleRows} modules, {modules.ConceptualModuleRows} conceptual modules, "
                 + $"{modules.ModuleBusinessTemplateRows} module-template links.");
-            stdout.WriteLine($"Final VACUUM: {vacuumStopwatch.ElapsedMilliseconds} ms.");
+            stdout.WriteLine($"Final VACUUM: {vacuumElapsedMilliseconds} ms.");
             return ExitOk;
         }
         catch (SourceModelDetectionException ex)
@@ -500,14 +482,7 @@ public static class CliRunner
 
         SchemaCreator.Create(output, overwrite);
 
-        var connectionString = new SqliteConnectionStringBuilder
-        {
-            DataSource = output,
-            Mode = SqliteOpenMode.ReadWrite,
-        }.ToString();
-
-        using var destination = new SqliteConnection(connectionString);
-        destination.Open();
+        using var destination = OpenDestination(output);
 
         var skeleton = Dpm20SkeletonLoader.Load(releases, frameworks, selectedTaxonomies, accessReader.CutoffReleaseCode, accessReader.CutoffReleaseId, destination, moduleVersionHistory);
         WriteDiagnosticList(stdout, "mTaxonomy: unresolved label/version/date columns", skeleton.UnresolvedTaxonomyColumns ?? []);
@@ -529,13 +504,7 @@ public static class CliRunner
         // reading what has already been written; it does not touch any of the six loaders above.
         var concepts = Dpm20ConceptLoader.Load(destination);
 
-        var vacuumStopwatch = System.Diagnostics.Stopwatch.StartNew();
-        using (var vacuumCommand = destination.CreateCommand())
-        {
-            vacuumCommand.CommandText = "VACUUM;";
-            vacuumCommand.ExecuteNonQuery();
-        }
-        vacuumStopwatch.Stop();
+        var vacuumElapsedMilliseconds = VacuumWithTiming(destination);
 
         stdout.WriteLine(
             $"DPM 2.0 skeleton loaded into '{output}': {skeleton.ReleaseRows} releases, "
@@ -589,8 +558,43 @@ public static class CliRunner
             stdout.WriteLine($"  {type.Key,-18} {type.Value,7}");
         }
 
-        stdout.WriteLine($"Final VACUUM: {vacuumStopwatch.ElapsedMilliseconds} ms.");
+        stdout.WriteLine($"Final VACUUM: {vacuumElapsedMilliseconds} ms.");
         return ExitOk;
+    }
+
+    /// <summary>
+    /// Opens the destination SQLite database that <see cref="SchemaCreator.Create"/> has just
+    /// created. The schema is created by the caller, before it reads the source.
+    /// </summary>
+    private static SqliteConnection OpenDestination(string output)
+    {
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = output,
+            Mode = SqliteOpenMode.ReadWrite,
+        }.ToString();
+
+        var destination = new SqliteConnection(connectionString);
+        destination.Open();
+        return destination;
+    }
+
+    /// <summary>Runs the final VACUUM and returns the elapsed milliseconds.</summary>
+    private static long VacuumWithTiming(SqliteConnection destination)
+    {
+        // Final VACUUM: the reproducibility requirement is on CONTENT, not on the file, and
+        // without VACUUM the size of the .db varies between identical runs because of the
+        // batched write pattern and the SQLite page cache. VACUUM cannot run inside a
+        // transaction: none is left open here, each SqliteBatchWriter commits and closes its
+        // own when it completes.
+        var vacuumStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        using (var vacuumCommand = destination.CreateCommand())
+        {
+            vacuumCommand.CommandText = "VACUUM;";
+            vacuumCommand.ExecuteNonQuery();
+        }
+        vacuumStopwatch.Stop();
+        return vacuumStopwatch.ElapsedMilliseconds;
     }
 
     /// <summary>

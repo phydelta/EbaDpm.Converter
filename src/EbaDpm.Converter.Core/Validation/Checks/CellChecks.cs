@@ -15,7 +15,7 @@ public static class CellChecks
         // A-CEL-01/A-CEL-02 encoded a property of DPM 1.0 (the BusinessCode only counts CLOSED
         // axes), not of the format: the 4.2 reference itself violates them 45,290 times out of
         // 163,206. In DPM 2.0 an OPEN Z (or Y) axis contributes a LITERAL segment to the
-        // BusinessCode (ComposeBusinessCode already includes it, Dpm20AxisAndCellLoader), so on that
+        // BusinessCode (ComposeBusinessCode already includes it, Dpm20CellSignatureComposer), so on that
         // branch the segment count covers ALL positions, not only closed-axis ones.
         // Restated per scope: the DPM 1.0 form does not change.
         var cel02PositionFilter = model == ValidationSourceModel.Dpm2 ? "" : "AND a.\"IsOpenAxis\"=0";
@@ -233,7 +233,7 @@ public static class CellChecks
         var cells = SqlHelpers.Rows(
             c, "SELECT c.\"CellID\", c.\"BusinessCode\", tab.\"TableCode\" FROM \"mTableCell\" c JOIN \"mTable\" tab ON tab.\"TableID\" = c.\"TableID\"", 3);
 
-        // In DPM 2.0 ComposeBusinessCode (Dpm20AxisAndCellLoader) ALSO includes the OPEN axes, and
+        // In DPM 2.0 ComposeBusinessCode (Dpm20CellSignatureComposer) ALSO includes the OPEN axes, and
         // so does the 4.2 reference (the DPM 1.0 form yields 45,290/163,206 "violations" on both).
         // Reconstruction faithful to the production algorithm: PRIMARY order by orientation
         // (Y,X,Z), SECONDARY by AxisID DESCENDING within the same orientation (several open axes

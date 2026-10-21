@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.OleDb;
+using static EbaDpm.Converter.Core.Access.AccessRecordExtensions;
 
 namespace EbaDpm.Converter.Core.Access;
 
@@ -936,17 +937,4 @@ public sealed class Dpm10AccessReader : IDpmSourceReader
                 RestrictionId: Convert.ToInt32(row.GetValue(1)));
         }
     }
-
-    // ------------------------------------------------------------------
-    // NULL-tolerant read helpers
-    // ------------------------------------------------------------------
-
-    private static string? GetNullableString(IDataRecord record, int ordinal)
-        => record.IsDBNull(ordinal) ? null : Convert.ToString(record.GetValue(ordinal));
-
-    private static int? GetNullableInt32(IDataRecord record, int ordinal)
-        => record.IsDBNull(ordinal) ? null : Convert.ToInt32(record.GetValue(ordinal));
-
-    private static DateTime? GetNullableDateTime(IDataRecord record, int ordinal)
-        => record.IsDBNull(ordinal) ? null : Convert.ToDateTime(record.GetValue(ordinal));
 }
