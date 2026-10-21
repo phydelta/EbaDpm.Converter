@@ -24,9 +24,17 @@ internal sealed class InMemoryAxisAndCellSource : IDpm20AxisAndCellSource
     public List<Dpm20DataTypeRow> DataTypes { get; } = [];
     public List<Dpm20PropertyRow> Properties { get; } = [];
 
+    /// <summary>
+    /// Versions that are NOT current at the cutoff (only <see cref="ReadAllSubCategoryVersions"/>
+    /// returns them, like the Access reader, whose "all" read has no release filter).
+    /// </summary>
+    public List<Dpm20SubCategoryVersionRow> NonCurrentSubCategoryVersions { get; } = [];
+
     public IEnumerable<Dpm20SubCategoryVersionRow> ReadSubCategoryVersions() => SubCategoryVersions;
 
-    public IEnumerable<Dpm20SubCategoryVersionRow> ReadAllSubCategoryVersions() => SubCategoryVersions;
+    /// <summary>The unfiltered read: the current versions plus <see cref="NonCurrentSubCategoryVersions"/>.</summary>
+    public IEnumerable<Dpm20SubCategoryVersionRow> ReadAllSubCategoryVersions()
+        => SubCategoryVersions.Concat(NonCurrentSubCategoryVersions).DistinctBy(r => r.SubCategoryVId).ToList();
 
     public IEnumerable<Dpm20TableVersionHeaderRow> ReadTableVersionHeaders(IEnumerable<int> tableVIds)
     {
