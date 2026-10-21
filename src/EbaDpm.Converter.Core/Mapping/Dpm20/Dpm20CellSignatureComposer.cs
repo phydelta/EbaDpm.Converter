@@ -103,12 +103,9 @@ internal static class Dpm20CellSignatureComposer
 
                 if (ownCategorisationsByOrdinateId.TryGetValue(currentId, out var pairs))
                 {
-                    foreach (var pair in pairs)
+                    foreach (var pair in pairs.Where(pair => !chosen.TryGetValue(pair.DimensionId, out var existing) || depth < existing.Depth))
                     {
-                        if (!chosen.TryGetValue(pair.DimensionId, out var existing) || depth < existing.Depth)
-                        {
-                            chosen[pair.DimensionId] = (depth, pair);
-                        }
+                        chosen[pair.DimensionId] = (depth, pair);
                     }
                 }
 
