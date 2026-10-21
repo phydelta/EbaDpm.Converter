@@ -15,6 +15,10 @@ All notable changes to this project are documented in this file. The format is b
 - 32-bit Office is supported. The release zip, now `EbaDpm.Converter-X.Y.Z-win.zip`, contains
   the 64-bit executable and a 32-bit one in `x86\`; the 64-bit executable relaunches the 32-bit
   one when the only provider on the machine is 32-bit.
+- DPM 2.0 conversions are about 2.5 times faster (database 4.2.1: 39 s → 16 s). Most of the
+  time went into binding the parameters of the chunked `IN` queries against Access; the
+  parameters of a chunk are now bound once and reused. The output is unchanged.
+
 ### Fixed
 
 - DPM 2.0: `mDomain.DataType` is now filled for typed domains (for example `DT` → `Date`,

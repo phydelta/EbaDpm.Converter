@@ -91,7 +91,7 @@ public static class PlaneCSignature
     /// The canonical form of a signature (a set of already normalized terms): ALL terms,
     /// including the metric, sorted ORDINALLY by the whole term, joined by <c>|</c>.
     /// It does NOT pin <c>MET(...)</c> first: although
-    /// <c>Dpm20AxisAndCellLoader.ComposeCellSignature</c> does put the metric first when composing
+    /// <c>Dpm20CellSignatureComposer.ComposeCellSignature</c> does put the metric first when composing
     /// <c>mTableCell.DatapointSignature</c>, this is the canonical form of PLANE C, measured against
     /// <c>src/EbaDpm.Converter.Core/Resources/plane-c-known-divergences-4.2.tsv</c> (e.g.
     /// <c>L_06.00</c>: <c>FIH(*)|MET(ei1404)|ei1404(*)|...</c>, <c>F</c> before <c>M</c>, pure

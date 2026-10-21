@@ -69,9 +69,9 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 /// <see cref="MetDimensionId"/> when composing <c>DPS</c>.
 ///
 /// <b><c>mTableCell.BusinessCode</c>/<c>DatapointSignature</c>/<c>DPS</c></b>. The algorithm is
-/// the same as DPM 1.0 (it is not re-derived): <see cref="ComposeBusinessCode"/> composes
+/// the same as DPM 1.0 (it is not re-derived): <see cref="Dpm20CellSignatureComposer.ComposeBusinessCode"/> composes
 /// <c>{table,Y,X,Z}</c> by ORIENTATION (not by <c>mTableAxis.Order</c> — 100% against 96.54%) and
-/// <see cref="ComposeCellSignature"/> composes the closure by <c>ParentOrdinateID</c> with
+/// <see cref="Dpm20CellSignatureComposer.ComposeCellSignature"/> composes the closure by <c>ParentOrdinateID</c> with
 /// nearest-ancestor inheritance, discarding default members except the metric.
 /// <c>BusinessCode</c> is emitted for ALL cells; <c>DPS</c>/<c>DatapointSignature</c> (identical)
 /// only for the NON-shaded ones — a shaded one carries <see langword="null"/>, not an empty string.
@@ -85,7 +85,7 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 /// restriction resolved, <c>AxisID</c> = the emitted open axis, <c>HierarchyID</c> = the hierarchy
 /// found, <c>HierarchyStartingMemberID</c> = NULL and <c>IsStartingMemberIncluded</c> = 0 (the
 /// DPM 2.0 source does not model a starting member). The SAME restriction feeds the bracket of
-/// <see cref="ComposeDps"/>/<see cref="ComposeDms"/> — <c>DIM(*[HierarchyCode])</c> in
+/// <see cref="Dpm20CellSignatureComposer.ComposeDps"/>/<see cref="Dpm20CellSignatureComposer.ComposeDms"/> — <c>DIM(*[HierarchyCode])</c> in
 /// <c>DPS</c>, <c>DIM(*[HierarchyID])</c> in <c>DimensionMemberSignature</c>/
 /// <c>DatapointSignature</c> — exactly as the DPM 1.0 <c>AxisAndCellLoader</c> does with
 /// <c>OpenMemberRestriction</c>: the signature algorithm does NOT change, it is only fed.
@@ -93,13 +93,13 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 public static class Dpm20AxisAndCellLoader
 {
     /// <summary>As in DPM 1.0: the sentinel for the "open value" in <c>MemberID</c>.</summary>
-    private const int OpenAxisMemberSentinel = 9999;
+    internal const int OpenAxisMemberSentinel = 9999;
 
     /// <summary>
     /// The <c>DimensionID</c> synthesized for the metric dimension (see the XML doc of the class):
     /// a measured value, not minted by a counter.
     /// </summary>
-    private const int MetDimensionId = 9999;
+    internal const int MetDimensionId = 9999;
 
     private const int ChunkSize = 2_000;
 
@@ -185,7 +185,7 @@ public static class Dpm20AxisAndCellLoader
 
         /// <summary>
         /// OWN categorisation (WITHOUT closure) of each CLOSED survivor, by source <c>HeaderID</c>
-        /// — it is step 1 of the signature algorithm and feeds <see cref="ComposeCellSignature"/>,
+        /// — it is step 1 of the signature algorithm and feeds <see cref="Dpm20CellSignatureComposer.ComposeCellSignature"/>,
         /// which does its OWN closure by <c>ParentOrdinateID</c> at CELL level (not at ordinate
         /// level: two ordinates of the same cell, from different axes, can compete for the SAME
         /// dimension, and there the GLOBALLY nearest one wins, not the nearest within each axis
@@ -1634,7 +1634,7 @@ public static class Dpm20AxisAndCellLoader
                 // Code for BusinessCode, orientation+AxisID for its order (Y,X,Z), and OWN
                 // categorisation (without closure) + parent for ComposeCellSignature.
                 ordinateCodeByOrdinateId[ordinateId] = survivor.Code;
-                orientationRankAndAxisIdByOrdinateId[ordinateId] = (OrientationRank(axis.Orientation), axisId);
+                orientationRankAndAxisIdByOrdinateId[ordinateId] = (Dpm20CellSignatureComposer.OrientationRank(axis.Orientation), axisId);
                 parentOrdinateIdByOrdinateId[ordinateId] = parentOrdinateId;
                 ownCategorisationsByOrdinateId[ordinateId] = plan.OwnCategorisationByHeaderId.TryGetValue(survivor.HeaderId, out var ownDict)
                     ? ownDict.Select(kv => (kv.Key, kv.Value.DimensionXbrlCode, kv.Value.MemberId, kv.Value.MemberXbrlCode, kv.Value.IsDefaultMember, default((int HierarchyId, string HierarchyCode)?))).ToList()
@@ -1696,7 +1696,7 @@ public static class Dpm20AxisAndCellLoader
             // (sentinel MemberID, not a real member of mMember; see the XML doc of
             // DimensionMemberResolver.IsDefaultMemberByMemberId, same criterion as DPM 1.0).
             ordinateCodeByOrdinateId[ordinateId] = openAxis.Code;
-            orientationRankAndAxisIdByOrdinateId[ordinateId] = (OrientationRank(openAxis.DestOrientation), axisId);
+            orientationRankAndAxisIdByOrdinateId[ordinateId] = (Dpm20CellSignatureComposer.OrientationRank(openAxis.DestOrientation), axisId);
             parentOrdinateIdByOrdinateId[ordinateId] = null;
             // The open pair (if it resolved) PLUS the fixed pairs of the key header's own ContextID
             // (normally none, see the XML doc of OpenAxisPlan.FixedPairs) — both feed
@@ -1791,12 +1791,12 @@ public static class Dpm20AxisAndCellLoader
             // BusinessCode for ALL cells, order Y,X,Z (by orientation, NOT by mTableAxis.Order —
             // 100% against 96.54%, measured). DPS/DatapointSignature only if NOT shaded; shaded ->
             // NULL, not an empty string.
-            var businessCode = ComposeBusinessCode(tableCode, positionsForThisCell, orientationRankAndAxisIdByOrdinateId, ordinateCodeByOrdinateId);
+            var businessCode = Dpm20CellSignatureComposer.ComposeBusinessCode(tableCode, positionsForThisCell, orientationRankAndAxisIdByOrdinateId, ordinateCodeByOrdinateId);
             string? dps = null;
             string? dms = null;
             if (!isShaded)
             {
-                (dps, dms) = ComposeCellSignature(positionsForThisCell, ownCategorisationsByOrdinateId, parentOrdinateIdByOrdinateId);
+                (dps, dms) = Dpm20CellSignatureComposer.ComposeCellSignature(positionsForThisCell, ownCategorisationsByOrdinateId, parentOrdinateIdByOrdinateId);
             }
 
             cellRows.Add(new CellRowData(cellId, tableId, isShaded, businessCode, dps, dms));
@@ -1806,144 +1806,6 @@ public static class Dpm20AxisAndCellLoader
                 cellPositionRows.Add(new CellPositionRowData(cellId, ordinateId));
             }
         }
-    }
-
-    /// <summary>Y=0, X=1, Z=2 (the usual row, column, sheet convention).</summary>
-    private static int OrientationRank(string orientation) => orientation switch { "Y" => 0, "X" => 1, "Z" => 2, _ => 3 };
-
-    /// <summary>
-    /// <c>mTableCell.BusinessCode</c>: <c>{table,ordinates in order Y,X,Z}</c>. The PRIMARY order
-    /// is the orientation (100% measured): there are no two ordinates of the same cell with
-    /// different orientations to break a tie.
-    ///
-    /// The SECONDARY order — between several ordinates of the SAME orientation in the SAME cell,
-    /// which only occurs with several OPEN axes of that orientation (several key X headers of the
-    /// same TableVID, transposed to Y; it never coexists with a CLOSED axis of that same
-    /// orientation, 0 measured cases) — has NO rule derivable from a single source column:
-    /// <list type="bullet">
-    /// <item><description>
-    /// It is NOT <c>mTableAxis.Order</c> (measured: it gives the OPPOSITE order to the reference in
-    /// <c>K_50.00</c>).
-    /// </description></item>
-    /// <item><description>
-    /// It is NOT the <c>HeaderID</c>/<c>TableVersionHeader.Order</c> of the source key header, in
-    /// either direction: in <c>K_50.00</c> (2 axes) descending DOES reproduce the reference, but in
-    /// <c>K_43.00.a</c> (3 axes, codes <c>0010</c>/<c>0020</c>/<c>0040</c> with source
-    /// <c>Order</c> 1020/1030/1040) the reference gives <c>0040,0010,0020</c> — neither ascending
-    /// nor descending by either field.
-    /// </description></item>
-    /// </list>
-    /// Measured over the 144,463 (table, BusinessCode) keys of the 4.2 reference: ascending by own
-    /// <c>AxisID</c> matches 142,488 (98.63%); descending, 143,280 (99.18%). NEITHER closes at
-    /// 100%, and — the proof that there is no rule slipping away — they are NOT a subset of each
-    /// other: 927 keys that ascending gets right are lost by descending, and descending wins 1,719
-    /// different ones that ascending did not have. That is the sign that the secondary order is NOT
-    /// by <c>AxisID</c> in any direction: the reference uses a convention of its own, not derivable
-    /// from the source with the available fields.
-    ///
-    /// That is why DESCENDING is a DECLARED CHOICE, not a derived rule — it is documented as a
-    /// divergence from the reference, with the two measured figures, not as "the variant that
-    /// matches most". The residue (~1,183 of 144,463 BusinessCode, 0.8%) stays named, not forced.
-    /// </summary>
-    private static string ComposeBusinessCode(
-        string tableCode,
-        List<int> ordinateIdsOfCell,
-        IReadOnlyDictionary<int, (int Rank, int AxisId)> orientationRankAndAxisIdByOrdinateId,
-        IReadOnlyDictionary<int, string> ordinateCodeByOrdinateId)
-    {
-        var codes = ordinateIdsOfCell
-            .OrderBy(id => orientationRankAndAxisIdByOrdinateId[id].Rank)
-            .ThenByDescending(id => orientationRankAndAxisIdByOrdinateId[id].AxisId)
-            .Select(id => ordinateCodeByOrdinateId[id]);
-
-        return "{" + tableCode + "," + string.Join(",", codes) + "}";
-    }
-
-    /// <summary>Maximum depth when climbing through <c>ParentOrdinateID</c> composing a signature — the same defensive guard as DPM 1.0 (possible cycle: aborts with a clear message, not silently).</summary>
-    private const int MaxOrdinateTreeDepth = 64;
-
-    /// <summary>
-    /// <c>mTableCell.DPS</c>/<c>DatapointSignature</c> (the same algorithm as DPM 1.0, not
-    /// re-derived): for each ordinate of the cell, it climbs through
-    /// <paramref name="parentOrdinateIdByOrdinateId"/> accumulating depth; for each
-    /// <c>DimensionID</c>, across ALL the ordinates of the cell at once (not axis by axis), the
-    /// pair seen at the LOWEST depth wins. Default members are discarded except the metric (which
-    /// always survives, whether or not it is marked default — in 4.0/4.2 ALL its members are).
-    /// It composes <c>MET(...)</c> first and the rest ORDINALLY ordered by the dimension's XBRL
-    /// code, joined by <c>|</c>, reusing <see cref="ComposeDps"/>/<see cref="ComposeDms"/> — the
-    /// same pair-composition rule already used to write <c>mOrdinateCategorisation</c>.
-    /// Each winning pair carries its own <c>Restriction</c> (inherited from the ordinate that
-    /// contributed it), so <c>Dps</c> and <c>Dms</c> can differ in the bracket of an open axis
-    /// WITH a restriction — both are returned, never one derived from the other.
-    /// </summary>
-    private static (string? Dps, string? Dms) ComposeCellSignature(
-        List<int> ordinateIdsOfCell,
-        IReadOnlyDictionary<int, List<(int DimensionId, string DimensionXbrlCode, int MemberId, string? MemberXbrlCode, bool IsDefaultMember, (int HierarchyId, string HierarchyCode)? Restriction)>> ownCategorisationsByOrdinateId,
-        IReadOnlyDictionary<int, int?> parentOrdinateIdByOrdinateId)
-    {
-        var chosen = new Dictionary<int, (int Depth, (int DimensionId, string DimensionXbrlCode, int MemberId, string? MemberXbrlCode, bool IsDefaultMember, (int HierarchyId, string HierarchyCode)? Restriction) Pair)>();
-
-        foreach (var start in ordinateIdsOfCell)
-        {
-            var depth = 0;
-            int? current = start;
-            var steps = 0;
-
-            while (current is { } currentId)
-            {
-                if (++steps > MaxOrdinateTreeDepth)
-                {
-                    throw new InvalidOperationException(
-                        $"The ordinate tree starting at OrdinateID={start} exceeds the maximum " +
-                        $"expected depth ({MaxOrdinateTreeDepth}): possible cycle, unforeseen anomaly.");
-                }
-
-                if (ownCategorisationsByOrdinateId.TryGetValue(currentId, out var pairs))
-                {
-                    foreach (var pair in pairs)
-                    {
-                        if (!chosen.TryGetValue(pair.DimensionId, out var existing) || depth < existing.Depth)
-                        {
-                            chosen[pair.DimensionId] = (depth, pair);
-                        }
-                    }
-                }
-
-                current = parentOrdinateIdByOrdinateId.TryGetValue(currentId, out var parent) ? parent : null;
-                depth++;
-            }
-        }
-
-        // Pairs whose member is the default of its domain are discarded, except the metric, which
-        // is never discarded.
-        var alive = chosen.Values
-            .Where(v => v.Pair.DimensionId == MetDimensionId || !v.Pair.IsDefaultMember)
-            .ToList();
-
-        var orderedDps = new List<string>();
-        var orderedDms = new List<string>();
-        var metricPair = alive.Where(v => v.Pair.DimensionId == MetDimensionId).Select(v => v.Pair).ToList();
-        if (metricPair.Count > 0)
-        {
-            var m = metricPair[0];
-            // The metric never carries a bracket (the open-axis sentinel is NEVER the metric
-            // dimension, and ComposeDps/ComposeDms resolve it the same way without looking at
-            // Restriction), so Dps and Dms of the metric pair are literally the same text.
-            orderedDps.Add(ComposeDps(m.DimensionId, m.DimensionXbrlCode, m.MemberId, m.MemberXbrlCode, m.Restriction));
-            orderedDms.Add(ComposeDms(m.DimensionId, m.DimensionXbrlCode, m.MemberId, m.MemberXbrlCode, m.Restriction));
-        }
-
-        foreach (var v in alive
-            .Where(v => v.Pair.DimensionId != MetDimensionId)
-            .OrderBy(v => v.Pair.DimensionXbrlCode, StringComparer.Ordinal))
-        {
-            orderedDps.Add(ComposeDps(v.Pair.DimensionId, v.Pair.DimensionXbrlCode, v.Pair.MemberId, v.Pair.MemberXbrlCode, v.Pair.Restriction));
-            orderedDms.Add(ComposeDms(v.Pair.DimensionId, v.Pair.DimensionXbrlCode, v.Pair.MemberId, v.Pair.MemberXbrlCode, v.Pair.Restriction));
-        }
-
-        var dps = orderedDps.Count > 0 ? string.Join("|", orderedDps) : null;
-        var dms = orderedDms.Count > 0 ? string.Join("|", orderedDms) : null;
-        return (dps, dms);
     }
 
     private static void EmitCategorisation(
@@ -1959,59 +1821,9 @@ public static class Dpm20AxisAndCellLoader
 
         foreach (var (dimensionId, dimensionXbrlCode, memberId, memberXbrlCode) in pairs)
         {
-            var dps = ComposeDps(dimensionId, dimensionXbrlCode, memberId, memberXbrlCode, restriction);
-            var dms = ComposeDms(dimensionId, dimensionXbrlCode, memberId, memberXbrlCode, restriction);
+            var dps = Dpm20CellSignatureComposer.ComposeDps(dimensionId, dimensionXbrlCode, memberId, memberXbrlCode, restriction);
+            var dms = Dpm20CellSignatureComposer.ComposeDms(dimensionId, dimensionXbrlCode, memberId, memberXbrlCode, restriction);
             categorisationRows.Add(new CategorisationRowData(ordinateId, dimensionId, memberId, dps, dms));
         }
-    }
-
-    /// <summary>
-    /// The <b>DPS</b> signature (XBRL codes) of ONE PAIR — applied here only at PAIR level; the
-    /// composition of a full cell, with inheritance and Y/X/Z order, is done by
-    /// <see cref="ComposeCellSignature"/>: metric first (<c>MET(memberXbrl)</c>), open-axis
-    /// sentinel — without restriction, <c>dimXbrl(*)</c>; WITH restriction,
-    /// <c>dimXbrl(*[HierarchyCode])</c> — or the normal closed pair (<c>dimXbrl(memberXbrl)</c>).
-    /// <paramref name="restriction"/> is only looked at when <paramref name="memberId"/> is the
-    /// open-axis sentinel (the metric never produces a bracket even if a metric categorisation came
-    /// with a restriction).
-    /// </summary>
-    private static string ComposeDps(
-        int dimensionId, string dimensionXbrlCode, int memberId, string? memberXbrlCode,
-        (int HierarchyId, string HierarchyCode)? restriction = null)
-    {
-        if (dimensionId == MetDimensionId)
-        {
-            return $"MET({memberXbrlCode})";
-        }
-
-        if (memberId == OpenAxisMemberSentinel)
-        {
-            return restriction is { } r ? $"{dimensionXbrlCode}(*[{r.HierarchyCode}])" : $"{dimensionXbrlCode}(*)";
-        }
-
-        return $"{dimensionXbrlCode}({memberXbrlCode})";
-    }
-
-    /// <summary>
-    /// The <b>DMS</b> signature (database IDs) of ONE PAIR — same case as
-    /// <see cref="ComposeDps"/> and DIFFERENT only in the bracket of the open-axis sentinel WITH a
-    /// restriction: <c>dimXbrl(*[HierarchyID])</c> instead of <c>dimXbrl(*[HierarchyCode])</c>.
-    /// Outside that case, <c>Dps</c> and <c>Dms</c> are the same text (same invariant as DPM 1.0).
-    /// </summary>
-    private static string ComposeDms(
-        int dimensionId, string dimensionXbrlCode, int memberId, string? memberXbrlCode,
-        (int HierarchyId, string HierarchyCode)? restriction = null)
-    {
-        if (dimensionId == MetDimensionId)
-        {
-            return $"MET({memberXbrlCode})";
-        }
-
-        if (memberId == OpenAxisMemberSentinel)
-        {
-            return restriction is { } r ? $"{dimensionXbrlCode}(*[{r.HierarchyId}])" : $"{dimensionXbrlCode}(*)";
-        }
-
-        return $"{dimensionXbrlCode}({memberXbrlCode})";
     }
 }
