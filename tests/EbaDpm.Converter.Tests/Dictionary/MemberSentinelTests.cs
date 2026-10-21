@@ -123,10 +123,13 @@ public sealed class MemberSentinelTests
         var renumbering = _fixture.DictionaryResult.MemberIdRenumbering;
         var renumberedId = renumbering.Translate(AccessOccupantId);
 
-        if (renumberedId == AccessOccupantId)
-        {
-            return; // Access without an occupant at 9999: there was nothing to renumber or to check here.
-        }
+        // Precondition, asserted instead of skipped: the Access occupant of 9999 must have been
+        // renumbered, otherwise the check below would be vacuous. (The sibling test
+        // AccessOccupant_C27_12_IsStillEmitted... also asserts the occupant and its move.)
+        Assert.True(
+            renumberedId != AccessOccupantId,
+            $"Precondition: the Access occupant of MemberID {AccessOccupantId} should have been renumbered, "
+            + $"but Translate({AccessOccupantId}) returned {renumberedId}; the Path residue check would be vacuous.");
 
         // The sentinel has no HierarchyNode of its own (it takes part in no tree), so no Path
         // should contain the "9999" segment after renumbering -- neither at the start, in the
