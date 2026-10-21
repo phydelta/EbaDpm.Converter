@@ -192,6 +192,74 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
         }
     }
 
+    /// <summary>
+    /// Streams a query of the form <c>sqlPrefix ?, ?, ... )</c> over the distinct ids, in chunks of
+    /// <see cref="IdListChunkSize"/> (first-occurrence order). <paramref name="sqlPrefix"/> must end
+    /// with the opening parenthesis of the <c>IN</c> list. The command and its parameters are
+    /// created once for the full-size chunks and only <c>.Value</c> is reset per chunk:
+    /// <c>OleDbParameterCollection.Add</c> validates in O(n), so rebuilding 500 parameters per
+    /// chunk is quadratic. The last partial chunk gets its own command with fewer placeholders.
+    /// </summary>
+    private IEnumerable<IDataRecord> QueryByIdChunks(string sqlPrefix, IEnumerable<int> ids)
+    {
+        EnsureOpen();
+
+        var distinctIds = ids.Distinct().ToList();
+        OleDbCommand? fullCommand = null;
+        try
+        {
+            for (var offset = 0; offset < distinctIds.Count; offset += IdListChunkSize)
+            {
+                var size = Math.Min(IdListChunkSize, distinctIds.Count - offset);
+                OleDbCommand command;
+                var isFull = size == IdListChunkSize;
+                if (isFull && fullCommand is not null)
+                {
+                    command = fullCommand;
+                }
+                else
+                {
+                    var sql = sqlPrefix + string.Join(", ", Enumerable.Repeat("?", size)) + ")";
+                    command = new OleDbCommand(sql, _connection);
+                    for (var i = 0; i < size; i++)
+                    {
+                        command.Parameters.Add(new OleDbParameter());
+                    }
+
+                    if (isFull)
+                    {
+                        fullCommand = command;
+                    }
+                }
+
+                try
+                {
+                    for (var i = 0; i < size; i++)
+                    {
+                        command.Parameters[i].Value = distinctIds[offset + i];
+                    }
+
+                    using var reader = command.ExecuteReader(CommandBehavior.SequentialAccess);
+                    while (reader.Read())
+                    {
+                        yield return reader;
+                    }
+                }
+                finally
+                {
+                    if (!ReferenceEquals(command, fullCommand))
+                    {
+                        command.Dispose();
+                    }
+                }
+            }
+        }
+        finally
+        {
+            fullCommand?.Dispose();
+        }
+    }
+
     private void EnsureOpen()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -737,28 +805,22 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
     {
         ArgumentNullException.ThrowIfNull(tableVIds);
 
-        var distinctIds = tableVIds.Distinct().ToList();
-        for (var offset = 0; offset < distinctIds.Count; offset += IdListChunkSize)
-        {
-            var chunk = distinctIds.Skip(offset).Take(IdListChunkSize).ToList();
-            var placeholders = string.Join(", ", chunk.Select(_ => "?"));
-            var sql =
-                $"""
-                SELECT [TableVID], [HeaderID], [HeaderVID], [ParentHeaderID], [Order], [IsAbstract]
-                FROM [TableVersionHeader]
-                WHERE [TableVID] IN ({placeholders})
-                """;
+        const string sqlPrefix =
+            """
+            SELECT [TableVID], [HeaderID], [HeaderVID], [ParentHeaderID], [Order], [IsAbstract]
+            FROM [TableVersionHeader]
+            WHERE [TableVID] IN (
+            """;
 
-            foreach (var row in Query(sql, chunk.Cast<object>().ToList()))
-            {
-                yield return new Dpm20TableVersionHeaderRow(
-                    TableVId: Convert.ToInt32(row.GetValue(0)),
-                    HeaderId: Convert.ToInt32(row.GetValue(1)),
-                    HeaderVId: Convert.ToInt32(row.GetValue(2)),
-                    ParentHeaderId: GetNullableInt32(row, 3),
-                    Order: Convert.ToInt32(row.GetValue(4)),
-                    IsAbstract: Convert.ToBoolean(row.GetValue(5)));
-            }
+        foreach (var row in QueryByIdChunks(sqlPrefix, tableVIds))
+        {
+            yield return new Dpm20TableVersionHeaderRow(
+                TableVId: Convert.ToInt32(row.GetValue(0)),
+                HeaderId: Convert.ToInt32(row.GetValue(1)),
+                HeaderVId: Convert.ToInt32(row.GetValue(2)),
+                ParentHeaderId: GetNullableInt32(row, 3),
+                Order: Convert.ToInt32(row.GetValue(4)),
+                IsAbstract: Convert.ToBoolean(row.GetValue(5)));
         }
     }
 
@@ -769,27 +831,21 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
     {
         ArgumentNullException.ThrowIfNull(tableIds);
 
-        var distinctIds = tableIds.Distinct().ToList();
-        for (var offset = 0; offset < distinctIds.Count; offset += IdListChunkSize)
+        const string sqlPrefix =
+            """
+            SELECT [HeaderID], [TableID], [Direction], [IsKey]
+            FROM [Header]
+            WHERE [TableID] IN (
+            """;
+
+        foreach (var row in QueryByIdChunks(sqlPrefix, tableIds))
         {
-            var chunk = distinctIds.Skip(offset).Take(IdListChunkSize).ToList();
-            var placeholders = string.Join(", ", chunk.Select(_ => "?"));
-            var sql =
-                $"""
-                SELECT [HeaderID], [TableID], [Direction], [IsKey]
-                FROM [Header]
-                WHERE [TableID] IN ({placeholders})
-                """;
+            var headerId = Convert.ToInt32(row.GetValue(0));
+            var tableId = Convert.ToInt32(row.GetValue(1));
+            var direction = GetNullableString(row, 2)
+                ?? throw new InvalidOperationException($"Header has no Direction (HeaderID={headerId}).");
 
-            foreach (var row in Query(sql, chunk.Cast<object>().ToList()))
-            {
-                var headerId = Convert.ToInt32(row.GetValue(0));
-                var tableId = Convert.ToInt32(row.GetValue(1));
-                var direction = GetNullableString(row, 2)
-                    ?? throw new InvalidOperationException($"Header has no Direction (HeaderID={headerId}).");
-
-                yield return new Dpm20HeaderRow(headerId, tableId, direction, Convert.ToBoolean(row.GetValue(3)));
-            }
+            yield return new Dpm20HeaderRow(headerId, tableId, direction, Convert.ToBoolean(row.GetValue(3)));
         }
     }
 
@@ -801,29 +857,23 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
     {
         ArgumentNullException.ThrowIfNull(headerVIds);
 
-        var distinctIds = headerVIds.Distinct().ToList();
-        for (var offset = 0; offset < distinctIds.Count; offset += IdListChunkSize)
-        {
-            var chunk = distinctIds.Skip(offset).Take(IdListChunkSize).ToList();
-            var placeholders = string.Join(", ", chunk.Select(_ => "?"));
-            var sql =
-                $"""
-                SELECT [HeaderVID], [HeaderID], [Code], [Label], [PropertyID], [ContextID], [SubCategoryVID]
-                FROM [HeaderVersion]
-                WHERE [HeaderVID] IN ({placeholders})
-                """;
+        const string sqlPrefix =
+            """
+            SELECT [HeaderVID], [HeaderID], [Code], [Label], [PropertyID], [ContextID], [SubCategoryVID]
+            FROM [HeaderVersion]
+            WHERE [HeaderVID] IN (
+            """;
 
-            foreach (var row in Query(sql, chunk.Cast<object>().ToList()))
-            {
-                yield return new Dpm20HeaderVersionRow(
-                    HeaderVId: Convert.ToInt32(row.GetValue(0)),
-                    HeaderId: Convert.ToInt32(row.GetValue(1)),
-                    Code: GetNullableString(row, 2),
-                    Label: GetNullableString(row, 3),
-                    PropertyId: GetNullableInt32(row, 4),
-                    ContextId: GetNullableInt32(row, 5),
-                    SubCategoryVId: GetNullableInt32(row, 6));
-            }
+        foreach (var row in QueryByIdChunks(sqlPrefix, headerVIds))
+        {
+            yield return new Dpm20HeaderVersionRow(
+                HeaderVId: Convert.ToInt32(row.GetValue(0)),
+                HeaderId: Convert.ToInt32(row.GetValue(1)),
+                Code: GetNullableString(row, 2),
+                Label: GetNullableString(row, 3),
+                PropertyId: GetNullableInt32(row, 4),
+                ContextId: GetNullableInt32(row, 5),
+                SubCategoryVId: GetNullableInt32(row, 6));
         }
     }
 
@@ -836,23 +886,17 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
     {
         ArgumentNullException.ThrowIfNull(contextIds);
 
-        var distinctIds = contextIds.Distinct().ToList();
-        for (var offset = 0; offset < distinctIds.Count; offset += IdListChunkSize)
-        {
-            var chunk = distinctIds.Skip(offset).Take(IdListChunkSize).ToList();
-            var placeholders = string.Join(", ", chunk.Select(_ => "?"));
-            var sql =
-                $"""
-                SELECT [ContextID], [PropertyID], [ItemID]
-                FROM [ContextComposition]
-                WHERE [ContextID] IN ({placeholders})
-                """;
+        const string sqlPrefix =
+            """
+            SELECT [ContextID], [PropertyID], [ItemID]
+            FROM [ContextComposition]
+            WHERE [ContextID] IN (
+            """;
 
-            foreach (var row in Query(sql, chunk.Cast<object>().ToList()))
-            {
-                yield return new Dpm20ContextCompositionRow(
-                    Convert.ToInt32(row.GetValue(0)), Convert.ToInt32(row.GetValue(1)), Convert.ToInt32(row.GetValue(2)));
-            }
+        foreach (var row in QueryByIdChunks(sqlPrefix, contextIds))
+        {
+            yield return new Dpm20ContextCompositionRow(
+                Convert.ToInt32(row.GetValue(0)), Convert.ToInt32(row.GetValue(1)), Convert.ToInt32(row.GetValue(2)));
         }
     }
 
@@ -864,27 +908,21 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
     {
         ArgumentNullException.ThrowIfNull(tableIds);
 
-        var distinctIds = tableIds.Distinct().ToList();
-        for (var offset = 0; offset < distinctIds.Count; offset += IdListChunkSize)
-        {
-            var chunk = distinctIds.Skip(offset).Take(IdListChunkSize).ToList();
-            var placeholders = string.Join(", ", chunk.Select(_ => "?"));
-            var sql =
-                $"""
-                SELECT [CellID], [TableID], [ColumnID], [RowID], [SheetID]
-                FROM [Cell]
-                WHERE [TableID] IN ({placeholders})
-                """;
+        const string sqlPrefix =
+            """
+            SELECT [CellID], [TableID], [ColumnID], [RowID], [SheetID]
+            FROM [Cell]
+            WHERE [TableID] IN (
+            """;
 
-            foreach (var row in Query(sql, chunk.Cast<object>().ToList()))
-            {
-                yield return new Dpm20CellRow(
-                    Convert.ToInt32(row.GetValue(0)),
-                    Convert.ToInt32(row.GetValue(1)),
-                    GetNullableInt32(row, 2),
-                    GetNullableInt32(row, 3),
-                    GetNullableInt32(row, 4));
-            }
+        foreach (var row in QueryByIdChunks(sqlPrefix, tableIds))
+        {
+            yield return new Dpm20CellRow(
+                Convert.ToInt32(row.GetValue(0)),
+                Convert.ToInt32(row.GetValue(1)),
+                GetNullableInt32(row, 2),
+                GetNullableInt32(row, 3),
+                GetNullableInt32(row, 4));
         }
     }
 
@@ -898,27 +936,21 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
     {
         ArgumentNullException.ThrowIfNull(tableVIds);
 
-        var distinctIds = tableVIds.Distinct().ToList();
-        for (var offset = 0; offset < distinctIds.Count; offset += IdListChunkSize)
-        {
-            var chunk = distinctIds.Skip(offset).Take(IdListChunkSize).ToList();
-            var placeholders = string.Join(", ", chunk.Select(_ => "?"));
-            var sql =
-                $"""
-                SELECT [TableVID], [CellID], [IsExcluded], [IsVoid], [VariableVID]
-                FROM [TableVersionCell]
-                WHERE [TableVID] IN ({placeholders})
-                """;
+        const string sqlPrefix =
+            """
+            SELECT [TableVID], [CellID], [IsExcluded], [IsVoid], [VariableVID]
+            FROM [TableVersionCell]
+            WHERE [TableVID] IN (
+            """;
 
-            foreach (var row in Query(sql, chunk.Cast<object>().ToList()))
-            {
-                yield return new Dpm20TableVersionCellRow(
-                    Convert.ToInt32(row.GetValue(0)),
-                    Convert.ToInt32(row.GetValue(1)),
-                    Convert.ToBoolean(row.GetValue(2)),
-                    Convert.ToBoolean(row.GetValue(3)),
-                    GetNullableInt32(row, 4));
-            }
+        foreach (var row in QueryByIdChunks(sqlPrefix, tableVIds))
+        {
+            yield return new Dpm20TableVersionCellRow(
+                Convert.ToInt32(row.GetValue(0)),
+                Convert.ToInt32(row.GetValue(1)),
+                Convert.ToBoolean(row.GetValue(2)),
+                Convert.ToBoolean(row.GetValue(3)),
+                GetNullableInt32(row, 4));
         }
     }
 
@@ -932,24 +964,18 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
     {
         ArgumentNullException.ThrowIfNull(variableVIds);
 
-        var distinctIds = variableVIds.Distinct().ToList();
-        for (var offset = 0; offset < distinctIds.Count; offset += IdListChunkSize)
-        {
-            var chunk = distinctIds.Skip(offset).Take(IdListChunkSize).ToList();
-            var placeholders = string.Join(", ", chunk.Select(_ => "?"));
-            var sql =
-                $"""
-                SELECT [VariableVID], [ContextID]
-                FROM [VariableVersion]
-                WHERE [VariableVID] IN ({placeholders})
-                """;
+        const string sqlPrefix =
+            """
+            SELECT [VariableVID], [ContextID]
+            FROM [VariableVersion]
+            WHERE [VariableVID] IN (
+            """;
 
-            foreach (var row in Query(sql, chunk.Cast<object>().ToList()))
-            {
-                yield return new Dpm20VariableVersionRow(
-                    Convert.ToInt32(row.GetValue(0)),
-                    GetNullableInt32(row, 1));
-            }
+        foreach (var row in QueryByIdChunks(sqlPrefix, variableVIds))
+        {
+            yield return new Dpm20VariableVersionRow(
+                Convert.ToInt32(row.GetValue(0)),
+                GetNullableInt32(row, 1));
         }
     }
 

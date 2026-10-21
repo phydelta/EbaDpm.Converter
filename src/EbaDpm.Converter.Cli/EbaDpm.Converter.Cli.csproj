@@ -1,20 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <ItemGroup>
-    <ProjectReference Include="..\EbaDpm.Converter.Core\EbaDpm.Converter.Core.csproj" />
-  </ItemGroup>
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <RootNamespace>EbaDpm.Converter.Cli</RootNamespace>
     <AssemblyName>EbaDpm.Converter</AssemblyName>
     <!-- Windows-only, x64 or x86 (depends on ACE OLEDB 16.0 or 12.0). No PlatformTarget: plain
          build is a 64-bit process on x64 Windows; "publish -r win-x86" yields a 32-bit one. -->
-    <Prefer32Bit>false</Prefer32Bit>
     <SupportedOSPlatform>windows</SupportedOSPlatform>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EbaDpm.Converter.Core\EbaDpm.Converter.Core.csproj" />
+  </ItemGroup>
 
 </Project>

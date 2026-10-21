@@ -216,10 +216,10 @@ public sealed class SchemaComparisonTests : IClassFixture<SchemaFixture>
         // does not exist, GeneratedDatabase_HasIdenticalTableSet_ToReference already reports it
         // with its own evidence; this test must not mask that failure with a different SQL error.
         var generatedTables = SchemaInspector.GetTableNames(_fixture.GeneratedConnection).ToHashSet(StringComparer.Ordinal);
-        if (!generatedTables.Contains(tableName))
-        {
-            return;
-        }
+        Assert.True(
+            generatedTables.Contains(tableName),
+            $"Table '{tableName}' does not exist in the generated database, so its row count cannot be checked. "
+            + "See GeneratedDatabase_HasIdenticalTableSet_ToReference for the table-set evidence.");
 
         var rowCount = SchemaInspector.GetRowCount(_fixture.GeneratedConnection, tableName);
 

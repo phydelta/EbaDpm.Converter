@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Xunit.Abstractions;
 
 namespace EbaDpm.Converter.Tests.Dictionary;
 
@@ -27,9 +28,12 @@ public sealed class GoldenDiffTests
 {
     private readonly DictionaryFixture _fixture;
 
-    public GoldenDiffTests(DictionaryFixture fixture)
+    private readonly ITestOutputHelper _output;
+
+    public GoldenDiffTests(DictionaryFixture fixture, ITestOutputHelper output)
     {
         _fixture = fixture;
+        _output = output;
     }
 
     private static readonly Regex ReleaseSuffixPattern = new(@"_(\d+(?:\.\d+)*)(?=:)", RegexOptions.Compiled);
@@ -94,11 +98,12 @@ public sealed class GoldenDiffTests
     /// key. The criterion is never relaxed for anyone other than the exact objects of
     /// <paramref name="exceptions"/>.
     /// </summary>
-    private static void AssertContainsReference(
+    internal static void AssertContainsReference(
         string label,
         HashSet<string> generated,
         HashSet<string> reference,
-        IReadOnlyDictionary<string, string>? exceptions = null)
+        IReadOnlyDictionary<string, string>? exceptions = null,
+        ITestOutputHelper? output = null)
     {
         exceptions ??= new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -118,6 +123,16 @@ public sealed class GoldenDiffTests
             + "any object of the 3.2 reference and must be removed from the list of known "
             + $"reference defects: {string.Join(", ", staleExceptions.Select(c => $"{c} ({exceptions[c]})"))}");
 
+        // The other stale kind: the object is still in the reference but the output now GENERATES
+        // it, so it is not missing any more and the exception covers nothing. It would pass
+        // silently (it is never among the missing codes), so it must fail here.
+        var generatedExceptions = exceptions.Keys.Where(generated.Contains).OrderBy(c => c, StringComparer.Ordinal).ToList();
+        Assert.True(
+            generatedExceptions.Count == 0,
+            $"{label}: {generatedExceptions.Count} STALE exception(s) - stale: now generated. The output "
+            + "now contains these objects, so the exception is no longer needed and must be removed "
+            + $"from the list of known reference defects: {string.Join(", ", generatedExceptions.Select(c => $"{c} ({exceptions[c]})"))}");
+
         var missingRaw = reference.Except(generated, StringComparer.Ordinal).ToList();
         var appliedExceptions = missingRaw.Where(exceptions.ContainsKey).OrderBy(c => c, StringComparer.Ordinal).ToList();
         var missing = missingRaw.Except(exceptions.Keys, StringComparer.Ordinal).OrderBy(c => c, StringComparer.Ordinal).ToList();
@@ -127,7 +142,7 @@ public sealed class GoldenDiffTests
         var exceptionsNote = appliedExceptions.Count == 0
             ? "(none)"
             : string.Join(", ", appliedExceptions.Select(c => $"{c} ({exceptions[c]})"));
-        Console.WriteLine($"{label}: exceptions applied: {exceptionsNote}.");
+        output?.WriteLine($"{label}: exceptions applied: {exceptionsNote}.");
 
         Assert.True(
             missing.Count == 0,
@@ -146,7 +161,7 @@ public sealed class GoldenDiffTests
     {
         var generated = GeneratedCodes("SELECT \"DomainCode\" FROM \"mDomain\"");
         var reference = Reference32Codes("SELECT \"DomainCode\" FROM \"mDomain\"");
-        AssertContainsReference("mDomain.DomainCode", generated, reference, DomainCodeExceptions);
+        AssertContainsReference("mDomain.DomainCode", generated, reference, DomainCodeExceptions, _output);
     }
 
     [DataFact]
@@ -154,7 +169,7 @@ public sealed class GoldenDiffTests
     {
         var generated = GeneratedCodes("SELECT \"MemberCode\" FROM \"mMember\"");
         var reference = Reference32Codes("SELECT \"MemberCode\" FROM \"mMember\"");
-        AssertContainsReference("mMember.MemberCode", generated, reference, MemberCodeExceptions);
+        AssertContainsReference("mMember.MemberCode", generated, reference, MemberCodeExceptions, _output);
     }
 
     /// <summary>
@@ -171,7 +186,7 @@ public sealed class GoldenDiffTests
     {
         var generated = GeneratedCodes("SELECT \"DimensionCode\" FROM \"mDimension\"");
         var reference = Reference32Codes("SELECT \"DimensionCode\" FROM \"mDimension\"");
-        AssertContainsReference("mDimension.DimensionCode", generated, reference, DimensionCodeExceptions);
+        AssertContainsReference("mDimension.DimensionCode", generated, reference, DimensionCodeExceptions, _output);
     }
 
     [DataFact]
@@ -191,7 +206,7 @@ public sealed class GoldenDiffTests
             SELECT m."MemberCode" FROM "mMetric" met
             JOIN "mMember" m ON m."MemberID" = met."CorrespondingMemberID"
             """);
-        AssertContainsReference("mMetric (via MemberCode of the CorrespondingMemberID)", generated, reference, MemberCodeExceptions);
+        AssertContainsReference("mMetric (via MemberCode of the CorrespondingMemberID)", generated, reference, MemberCodeExceptions, _output);
     }
 
     // ------------------------------------------------------------------
@@ -211,7 +226,7 @@ public sealed class GoldenDiffTests
         var generatedNormalized = generatedRaw.Select(NormalizeXbrlCode).ToHashSet(StringComparer.Ordinal);
         var referenceNormalized = referenceRaw.Select(NormalizeXbrlCode).ToHashSet(StringComparer.Ordinal);
         AssertContainsReference(
-            "mDimension.DimensionXBRLCode (normalized)", generatedNormalized, referenceNormalized, DimensionXbrlCodeExceptions);
+            "mDimension.DimensionXBRLCode (normalized)", generatedNormalized, referenceNormalized, DimensionXbrlCodeExceptions, _output);
 
         // The normalisation must be harmless: we check that it also holds WITHOUT normalising
         // (with the same template dimension exception), and therefore that it is not masking any
@@ -246,7 +261,7 @@ public sealed class GoldenDiffTests
         var generatedNormalized = generatedRaw.Select(NormalizeXbrlCode).ToHashSet(StringComparer.Ordinal);
         var referenceNormalized = referenceRaw.Select(NormalizeXbrlCode).ToHashSet(StringComparer.Ordinal);
         AssertContainsReference(
-            "mMember.MemberXBRLCode (normalized)", generatedNormalized, referenceNormalized, MemberXbrlCodeExceptions);
+            "mMember.MemberXBRLCode (normalized)", generatedNormalized, referenceNormalized, MemberXbrlCodeExceptions, _output);
 
         var missingWithoutNormalization = referenceRaw.Except(generatedRaw, StringComparer.Ordinal)
             .Except(MemberXbrlCodeExceptions.Keys, StringComparer.Ordinal)
