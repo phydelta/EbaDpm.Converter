@@ -6,6 +6,15 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Changed
+
+- The Access Database Engine 2016 Redistributable is no longer required when Microsoft Office is
+  installed. The converter picks the ACE OLEDB provider itself (`Microsoft.ACE.OLEDB.16.0`, then
+  `12.0`) and reports every provider it tried when none opens the file. The redistributable
+  remains the alternative on machines without Office.
+- 32-bit Office is supported. The release zip, now `EbaDpm.Converter-X.Y.Z-win.zip`, contains
+  the 64-bit executable and a 32-bit one in `x86\`; the 64-bit executable relaunches the 32-bit
+  one when the only provider on the machine is 32-bit.
 ### Fixed
 
 - DPM 2.0: `mDomain.DataType` is now filled for typed domains (for example `DT` → `Date`,

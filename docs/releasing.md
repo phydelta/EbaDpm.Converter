@@ -44,8 +44,9 @@ The workflow then:
    has a pre-release suffix and *prerelease* is not ticked, or if `CHANGELOG.md` has no non-empty
    section for it;
 2. builds the solution and runs the test suite;
-3. publishes the self-contained single-file executable (`win-x64`) and packages it with
-   `LICENSE`, `README.md` and `CHANGELOG.md` as `EbaDpm.Converter-X.Y.Z-win-x64.zip`;
+3. publishes the self-contained single-file executable for `win-x64` (at the root) and
+   `win-x86` (in `x86\`) and packages them with `LICENSE`, `README.md` and `CHANGELOG.md` as
+   `EbaDpm.Converter-X.Y.Z-win.zip`;
 4. writes `SHA256SUMS.txt` and a build provenance attestation for the zip;
 5. creates the tag `vX.Y.Z` on the commit it built and the GitHub release, with the
    `CHANGELOG.md` section as release notes.
@@ -54,10 +55,10 @@ The workflow then:
 
 ```powershell
 # Checksum
-Get-FileHash .\EbaDpm.Converter-X.Y.Z-win-x64.zip -Algorithm SHA256   # compare with SHA256SUMS.txt
+Get-FileHash .\EbaDpm.Converter-X.Y.Z-win.zip -Algorithm SHA256   # compare with SHA256SUMS.txt
 
 # Provenance: proves the file was built by this repository's release workflow
-gh attestation verify .\EbaDpm.Converter-X.Y.Z-win-x64.zip --repo phydelta/EbaDpm.Converter
+gh attestation verify .\EbaDpm.Converter-X.Y.Z-win.zip --repo phydelta/EbaDpm.Converter
 ```
 
 ## Fixing a release

@@ -25,9 +25,9 @@ EbaDpm.Converter.sln
    └─ EbaDpm.Converter.Tests/      xUnit tests: unit, integration, schema, validation
 ```
 
-External dependencies are limited to `System.Data.OleDb` (reading Access through
-`Microsoft.ACE.OLEDB.16.0`) and `Microsoft.Data.Sqlite` (writing and reading SQLite). Both
-projects target .NET 10, x64, Windows.
+External dependencies are limited to `System.Data.OleDb` (reading Access through ACE OLEDB) and
+`Microsoft.Data.Sqlite` (writing and reading SQLite). Both projects target .NET 10 on Windows;
+the executable is published for x64 and x86.
 
 ## Conversion pipeline
 
@@ -140,8 +140,18 @@ paths and signatures.
 content is stored with a reason; validation always reports coverage alongside results, and a check
 that examined nothing is reported as skipped rather than passed.
 
-**Windows-only, single-process access to ACE OLEDB.** `Microsoft.ACE.OLEDB.16.0` is the only
-supported way to read `.accdb` files, which makes the tool Windows x64 only. The provider is not
+**Choosing the ACE OLEDB provider.** ACE OLEDB is the only supported way to read `.accdb`
+files, which makes the tool Windows-only. It comes with Microsoft Office or with the Access
+Database Engine 2016 Redistributable, which register the same providers. `AceProvider` takes,
+among the providers registered for the architecture of the running process, the first of
+`Microsoft.ACE.OLEDB.16.0` and `Microsoft.ACE.OLEDB.12.0` that actually opens the file, and
+reports every candidate it tried when none does. An OLEDB provider can only be loaded by a
+process of its own architecture, so the release ships a 64-bit and a 32-bit executable. When
+the 64-bit process finds no 64-bit provider but a 32-bit one is registered, it relaunches
+`x86\EbaDpm.Converter.exe` with the same arguments and returns its exit code
+(`ArchitectureRelauncher`; the `EBADPM_RELAUNCHED` variable prevents a loop).
+
+**Single-process access to ACE OLEDB.** The provider is not
 safe for concurrent use from several threads of one process — it fails with access violations
 (`0xC0000005`) or provider errors even when each thread opens a different file or connection
 pooling is disabled — because its state is global to the process. The converter therefore reads

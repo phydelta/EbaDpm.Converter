@@ -45,8 +45,9 @@ touches conversion or validation, run that suite locally and report the result i
 
 - Windows x64
 - .NET 10 SDK
-- Microsoft Access Database Engine 2016 Redistributable (x64), which provides
-  `Microsoft.ACE.OLEDB.16.0` — needed to run the converter and the data-dependent tests
+- A **64-bit** Access database engine (`Microsoft.ACE.OLEDB.16.0` or `12.0`): 64-bit Microsoft
+  Office, or the Microsoft Access Database Engine 2016 Redistributable (x64) on machines without
+  Office. It is needed to run the converter and the data-dependent tests; the test project is x64
 
 ## Build
 

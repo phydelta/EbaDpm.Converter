@@ -166,6 +166,11 @@ public static class CliRunner
             stderr.WriteLine($"Error: {ex.Message}");
             return ExitArgumentError;
         }
+        catch (AceProviderNotFoundException ex)
+        {
+            stderr.WriteLine($"Error: {ex.Message}");
+            return ExitArgumentError;
+        }
         catch (TaxonomyKeyResolutionException ex)
         {
             stderr.WriteLine($"Error: {ex.Message}");
@@ -333,6 +338,9 @@ public static class CliRunner
                 sourceModel == DpmSourceModel.Dpm10
                     ? "Detected source model: DPM 1.0."
                     : "Detected source model: DPM 2.0.");
+            stdout.WriteLine(
+                $"ACE OLEDB provider: {AceProvider.Resolve(source)} "
+                + $"({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture} process).");
 
             if (sourceModel == DpmSourceModel.Dpm20)
             {
@@ -419,6 +427,11 @@ public static class CliRunner
             return ExitOk;
         }
         catch (SourceModelDetectionException ex)
+        {
+            stderr.WriteLine($"Error: {ex.Message}");
+            return ExitArgumentError;
+        }
+        catch (AceProviderNotFoundException ex)
         {
             stderr.WriteLine($"Error: {ex.Message}");
             return ExitArgumentError;

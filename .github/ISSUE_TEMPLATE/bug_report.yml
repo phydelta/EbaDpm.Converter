@@ -49,7 +49,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Windows version, how the tool was run (release executable or from source, .NET SDK version), Access Database Engine version.
-      placeholder: Windows 11 x64, release executable, Access Database Engine 2016 x64
+      description: Windows version, how the tool was run (release executable or from source, .NET SDK version), Microsoft Office version and bitness (or Access Database Engine redistributable).
+      placeholder: Windows 11 x64, release executable, Microsoft 365 Apps 32-bit
     validations:
       required: false

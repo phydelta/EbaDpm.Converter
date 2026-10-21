@@ -6,7 +6,7 @@ namespace EbaDpm.Converter.Core.Access;
 /// <summary>
 /// Implementation of <see cref="IDpmSourceReader"/> for the DPM 1.0 Access database
 /// (<c>DPM 1.0 Database_v4_1_20250709.accdb</c> and later releases of the same format),
-/// read via ACE OLEDB. Windows-only x64.
+/// read via ACE OLEDB (16.0 or 12.0). Windows-only, x64 or x86.
 ///
 /// Every read uses <see cref="OleDbDataReader"/> in streaming mode: <c>DataTable</c> /
 /// <c>DataAdapter</c> are not used, because some source tables exceed 2 million rows.
@@ -29,8 +29,7 @@ public sealed class Dpm10AccessReader : IDpmSourceReader
             throw new ArgumentException("The .accdb file path cannot be empty.", nameof(accdbPath));
         }
 
-        _connectionString =
-            $"Provider=Microsoft.ACE.OLEDB.16.0;Data Source={accdbPath};Persist Security Info=False;";
+        _connectionString = AceProvider.ConnectionString(accdbPath);
     }
 
     public void Open()
