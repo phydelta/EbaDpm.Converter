@@ -19,7 +19,7 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 ///
 /// <b>ROWS, not codes</b>: the five derivations are measured by distinct code (109/563/788), but
 /// what is emitted are ROWS — one node for each <c>(TaxonomyID, …)</c> in which that code takes
-/// part: 111/572/847 (846 before the abstract-table closure rule of
+/// part: 111/572/847 in the 4.2 cutoff, 123/631/1,668 in the 4.3 database, measured 2026-10-22 (846 before the abstract-table closure rule of
 /// <see cref="Dpm20TaxonomyDeriver"/>, which adds the <c>C_34.02.b</c> pair with
 /// <c>IF_CLASS2</c>).
 ///
