@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 
 namespace EbaDpm.Converter.Tests.Dpm2;
 
@@ -46,7 +47,7 @@ public sealed class Dpm20SentinelDomainAndOpenAxisOrdinateTests(Dpm20SkeletonFix
 
     // ------------------------------------------------------------------
     // A-AXE-10: the single ordinate of EACH open axis carries Order = 0, never 1. Measured: 0
-    // violations in the reference, all 389 with 0.
+    // violations in the reference, every open axis with 0.
     // ------------------------------------------------------------------
 
     [DataFact]
@@ -62,12 +63,20 @@ public sealed class Dpm20SentinelDomainAndOpenAxisOrdinateTests(Dpm20SkeletonFix
             """,
             2);
 
-        Assert.Equal(389, rows.Count); // 389 open axes, measured.
+        // Each open axis has exactly one ordinate (docs/mapping-dpm2.md): the ordinates examined are
+        // as many as the open axes, counted on mAxis, and as the pinned open Y + open Z census.
+        var openAxes = QueryHelpers.Scalar(fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mAxis\" WHERE \"IsOpenAxis\" = 1");
+        Assert.True(openAxes == rows.Count, $"{rows.Count} ordinates on open axes but mAxis has {openAxes} open axes: one ordinate per open axis was expected.");
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "open-axis ordinates",
+            ReleasePins.Dpm20Cutoff42OpenYAxes + ReleasePins.Dpm20Cutoff42OpenZAxes,
+            rows.Count);
 
         var violations = rows.Where(r => r[1] != "0").ToList();
         Assert.True(
             violations.Count == 0,
-            $"{violations.Count}/389 open-axis ordinates do NOT have Order=0: "
+            $"{violations.Count}/{rows.Count} open-axis ordinates do NOT have Order=0: "
             + string.Join(", ", violations.Take(20).Select(r => $"OrdinateID={r[0]}, Order={r[1]}")));
     }
 }
