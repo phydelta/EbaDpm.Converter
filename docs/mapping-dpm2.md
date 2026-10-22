@@ -409,6 +409,16 @@ cells get a signature. A restricted open axis is written `dim(*[HierarchyCode])`
 `dim(*[HierarchyID])` in the ID variant; without a starting member, the bracket has a single
 part. `Context.Signature` in the source is not used: it serialises internal identifiers.
 
+A cell has one signature: no dimension, the metric included, is repeated, and the dimensions are
+distributed across the axes. "Nearest wins" therefore only arbitrates **within one axis**, between
+an ordinate and its ancestors. A dimension contributed to a cell by ordinates of more than one
+axis, whatever the members and the depths (default members included), is an invalid
+configuration: it is reported under the structural anomalies, once per (table, dimension), with
+the number of affected cells, an example `BusinessCode`, and the ordinates and members of each
+axis involved. The signature itself is not changed: it keeps the pair the depth arbitration
+picks (on a tie, the ordinate of the first closed axis in X, Y, Z order), but that pair has no defined meaning. Measured on 2026-10-22: no table of the 4.2,
+4.2.1 and 4.3 databases declares a dimension on more than one axis.
+
 ---
 
 ## Modules

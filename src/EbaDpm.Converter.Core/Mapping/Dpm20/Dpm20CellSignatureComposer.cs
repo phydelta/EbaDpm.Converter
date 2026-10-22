@@ -147,6 +147,116 @@ internal static class Dpm20CellSignatureComposer
     }
 
     /// <summary>
+    /// A dimension (the metric included) contributed to ONE cell by ordinates of more than one
+    /// axis. <see cref="ByAxisId"/> holds, per axis, the codes of the declaring ordinates and the
+    /// member codes declared there (the open-axis sentinel is shown as <c>*</c>).
+    /// </summary>
+    internal sealed record CrossAxisDimension(
+        int DimensionId,
+        string DimensionXbrlCode,
+        SortedDictionary<int, AxisContribution> ByAxisId);
+
+    /// <summary>What ONE axis contributes of a dimension: the codes of the ordinates that declare it and the member codes.</summary>
+    internal sealed record AxisContribution(SortedSet<string> OrdinateCodes, SortedSet<string> Members);
+
+    /// <summary>
+    /// Structural check of a cell signature: a cell has one signature, so no dimension may be
+    /// declared by ordinates of two or more distinct axes. Every pair that
+    /// <see cref="ComposeCellSignature"/> considers (own and inherited, open-axis and fixed pairs)
+    /// is attributed to the axis of the cell ordinate it was reached from, BEFORE the default
+    /// discard and whatever the depth or whether the members agree. Within ONE axis an ordinate
+    /// overriding an inherited pair is legitimate and never reported. Pure: it does not change
+    /// what <see cref="ComposeCellSignature"/> returns.
+    /// </summary>
+    internal static IReadOnlyList<CrossAxisDimension> FindCrossAxisDimensions(
+        List<int> ordinateIdsOfCell,
+        IReadOnlyDictionary<int, List<(int DimensionId, string DimensionXbrlCode, int MemberId, string? MemberXbrlCode, bool IsDefaultMember, (int HierarchyId, string HierarchyCode)? Restriction)>> ownCategorisationsByOrdinateId,
+        IReadOnlyDictionary<int, int?> parentOrdinateIdByOrdinateId,
+        IReadOnlyDictionary<int, (int Rank, int AxisId)> orientationRankAndAxisIdByOrdinateId,
+        IReadOnlyDictionary<int, string> ordinateCodeByOrdinateId)
+    {
+        // Pass 1: first axis seen per dimension; flag the dimensions seen from a second axis.
+        Dictionary<int, int>? firstAxisByDimension = null;
+        HashSet<int>? conflicting = null;
+
+        foreach (var (start, _, current) in EnumerateReachablePairs(ordinateIdsOfCell, ownCategorisationsByOrdinateId, parentOrdinateIdByOrdinateId))
+        {
+            var axisId = orientationRankAndAxisIdByOrdinateId[start].AxisId;
+            firstAxisByDimension ??= [];
+            if (!firstAxisByDimension.TryAdd(current.DimensionId, axisId) && firstAxisByDimension[current.DimensionId] != axisId)
+            {
+                (conflicting ??= []).Add(current.DimensionId);
+            }
+        }
+
+        if (conflicting is null)
+        {
+            return [];
+        }
+
+        // Pass 2 (rare): the detail of the conflicting dimensions only.
+        var byDimension = new SortedDictionary<string, CrossAxisDimension>(StringComparer.Ordinal);
+        foreach (var (start, declaring, pair) in EnumerateReachablePairs(ordinateIdsOfCell, ownCategorisationsByOrdinateId, parentOrdinateIdByOrdinateId))
+        {
+            if (!conflicting.Contains(pair.DimensionId))
+            {
+                continue;
+            }
+
+            if (!byDimension.TryGetValue(pair.DimensionXbrlCode, out var entry))
+            {
+                entry = new CrossAxisDimension(pair.DimensionId, pair.DimensionXbrlCode, []);
+                byDimension[pair.DimensionXbrlCode] = entry;
+            }
+
+            var axisId = orientationRankAndAxisIdByOrdinateId[start].AxisId;
+            if (!entry.ByAxisId.TryGetValue(axisId, out var contribution))
+            {
+                contribution = new AxisContribution(new SortedSet<string>(StringComparer.Ordinal), new SortedSet<string>(StringComparer.Ordinal));
+                entry.ByAxisId[axisId] = contribution;
+            }
+
+            contribution.OrdinateCodes.Add(ordinateCodeByOrdinateId[declaring]);
+            contribution.Members.Add(pair.MemberId == OpenAxisMemberSentinel ? "*" : pair.MemberXbrlCode ?? $"MemberID={pair.MemberId}");
+        }
+
+        return byDimension.Values.ToList();
+    }
+
+    /// <summary>Every (cell ordinate, pair) reachable from the cell ordinates through <c>ParentOrdinateID</c>, same walk and depth guard as <see cref="ComposeCellSignature"/>.</summary>
+    private static IEnumerable<(int Start, int Declaring, (int DimensionId, string DimensionXbrlCode, int MemberId, string? MemberXbrlCode, bool IsDefaultMember, (int HierarchyId, string HierarchyCode)? Restriction) Pair)> EnumerateReachablePairs(
+        List<int> ordinateIdsOfCell,
+        IReadOnlyDictionary<int, List<(int DimensionId, string DimensionXbrlCode, int MemberId, string? MemberXbrlCode, bool IsDefaultMember, (int HierarchyId, string HierarchyCode)? Restriction)>> ownCategorisationsByOrdinateId,
+        IReadOnlyDictionary<int, int?> parentOrdinateIdByOrdinateId)
+    {
+        foreach (var start in ordinateIdsOfCell)
+        {
+            int? current = start;
+            var steps = 0;
+
+            while (current is { } currentId)
+            {
+                if (++steps > MaxOrdinateTreeDepth)
+                {
+                    throw new InvalidOperationException(
+                        $"The ordinate tree starting at OrdinateID={start} exceeds the maximum " +
+                        $"expected depth ({MaxOrdinateTreeDepth}): possible cycle, unforeseen anomaly.");
+                }
+
+                if (ownCategorisationsByOrdinateId.TryGetValue(currentId, out var pairs))
+                {
+                    foreach (var pair in pairs)
+                    {
+                        yield return (start, currentId, pair);
+                    }
+                }
+
+                current = parentOrdinateIdByOrdinateId.TryGetValue(currentId, out var parent) ? parent : null;
+            }
+        }
+    }
+
+    /// <summary>
     /// The <b>DPS</b> signature (XBRL codes) of ONE PAIR — applied here only at PAIR level; the
     /// composition of a full cell, with inheritance and Y/X/Z order, is done by
     /// <see cref="ComposeCellSignature"/>: metric first (<c>MET(memberXbrl)</c>), open-axis

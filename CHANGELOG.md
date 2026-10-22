@@ -6,6 +6,13 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Added
+
+- DPM 2.0: a dimension, or the metric, that reaches one cell from ordinates of more than one axis
+  is reported as a structural anomaly, per table and dimension. A cell signature must not repeat
+  a dimension; before, the conflict was resolved silently by the order of the ordinates. No
+  table of releases 4.2 to 4.3 has this configuration, and the output is unchanged.
+
 ### Changed
 
 - The Access Database Engine 2016 Redistributable is no longer required when Microsoft Office is

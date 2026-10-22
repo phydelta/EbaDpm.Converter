@@ -399,7 +399,7 @@ public static class Dpm20AxisAndCellLoader
 
             EmitTablePlan(
                 plan, tableId, tableCode, counters, axisRows, tableAxisRows, ordinateRows, cellRows,
-                cellPositionRows, categorisationRows, openAxisRestrictionRows);
+                cellPositionRows, categorisationRows, openAxisRestrictionRows, structuralAnomalies);
         }
 
         WriteAxisRows(destination, axisRows);
@@ -1581,8 +1581,14 @@ public static class Dpm20AxisAndCellLoader
         List<CellRowData> cellRows,
         List<CellPositionRowData> cellPositionRows,
         List<CategorisationRowData> categorisationRows,
-        List<OpenAxisRestrictionRowData> openAxisRestrictionRows)
+        List<OpenAxisRestrictionRowData> openAxisRestrictionRows,
+        List<string> structuralAnomalies)
     {
+        // Axis description (orientation + code/ID) by AxisID, and the cross-axis dimensions found
+        // in the cells of THIS table (aggregated per dimension, reported once at the end).
+        var axisDescriptionByAxisId = new Dictionary<int, (int Rank, string Label)>();
+        var crossAxisByDimension = new SortedDictionary<string, CrossAxisAggregate>(StringComparer.Ordinal);
+
         // ---- What ComposeBusinessCode/ComposeCellSignature need per OrdinateID, accumulated while
         // the ordinates of THIS instantiation are minted (below). ----
         var ordinateCodeByOrdinateId = new Dictionary<int, string>();
@@ -1610,6 +1616,7 @@ public static class Dpm20AxisAndCellLoader
             var label = axis.Orientation switch { "X" => "Columns", "Y" => "Rows", "Z" => "Sheets", _ => axis.Orientation };
 
             axisRows.Add(new AxisRowData(axisId, axis.Orientation, label, false, false, null));
+            axisDescriptionByAxisId[axisId] = (Dpm20CellSignatureComposer.OrientationRank(axis.Orientation), $"{axis.Orientation} axis");
             tableAxisRows.Add(new TableAxisRowData(axisId, tableId, axisOrder++));
 
             var ordinateIdByHeaderId = new Dictionary<int, int>(axis.Survivors.Count);
@@ -1648,6 +1655,7 @@ public static class Dpm20AxisAndCellLoader
         {
             var axisId = counters.NextAxisId++;
             axisRows.Add(new AxisRowData(axisId, openAxis.DestOrientation, openAxis.Label, true, true, openAxis.Code));
+            axisDescriptionByAxisId[axisId] = (Dpm20CellSignatureComposer.OrientationRank(openAxis.DestOrientation), $"{openAxis.DestOrientation} open axis '{openAxis.Code}'");
             tableAxisRows.Add(new TableAxisRowData(axisId, tableId, axisOrder++));
 
             var ordinateId = counters.NextOrdinateId++;
@@ -1797,6 +1805,32 @@ public static class Dpm20AxisAndCellLoader
             if (!isShaded)
             {
                 (dps, dms) = Dpm20CellSignatureComposer.ComposeCellSignature(positionsForThisCell, ownCategorisationsByOrdinateId, parentOrdinateIdByOrdinateId);
+
+                // Report-only: a dimension declared by ordinates of more than one axis. Does not
+                // touch the signature composed above.
+                foreach (var conflict in Dpm20CellSignatureComposer.FindCrossAxisDimensions(
+                    positionsForThisCell, ownCategorisationsByOrdinateId, parentOrdinateIdByOrdinateId, orientationRankAndAxisIdByOrdinateId, ordinateCodeByOrdinateId))
+                {
+                    if (!crossAxisByDimension.TryGetValue(conflict.DimensionXbrlCode, out var aggregate))
+                    {
+                        aggregate = new CrossAxisAggregate(businessCode);
+                        crossAxisByDimension[conflict.DimensionXbrlCode] = aggregate;
+                    }
+
+                    aggregate.Cells++;
+                    foreach (var (axisId, contribution) in conflict.ByAxisId)
+                    {
+                        if (!aggregate.ByAxisId.TryGetValue(axisId, out var all))
+                        {
+                            all = new Dpm20CellSignatureComposer.AxisContribution(
+                                new SortedSet<string>(StringComparer.Ordinal), new SortedSet<string>(StringComparer.Ordinal));
+                            aggregate.ByAxisId[axisId] = all;
+                        }
+
+                        all.OrdinateCodes.UnionWith(contribution.OrdinateCodes);
+                        all.Members.UnionWith(contribution.Members);
+                    }
+                }
             }
 
             cellRows.Add(new CellRowData(cellId, tableId, isShaded, businessCode, dps, dms));
@@ -1806,6 +1840,37 @@ public static class Dpm20AxisAndCellLoader
                 cellPositionRows.Add(new CellPositionRowData(cellId, ordinateId));
             }
         }
+
+        foreach (var (dimensionXbrlCode, aggregate) in crossAxisByDimension)
+        {
+            const int MaxMembersShown = 5;
+            static string Capped(IEnumerable<string> values, int count)
+            {
+                var shown = string.Join(", ", values.Take(MaxMembersShown));
+                return count > MaxMembersShown ? $"{shown}, ... (+{count - MaxMembersShown} more)" : shown;
+            }
+
+            var axes = string.Join("; ", aggregate.ByAxisId
+                .OrderBy(kv => axisDescriptionByAxisId[kv.Key].Rank)
+                .ThenBy(kv => kv.Value.OrdinateCodes.First(), StringComparer.Ordinal)
+                .Select(kv => $"{axisDescriptionByAxisId[kv.Key].Label} ordinates [{Capped(kv.Value.OrdinateCodes, kv.Value.OrdinateCodes.Count)}] "
+                    + $"members [{Capped(kv.Value.Members, kv.Value.Members.Count)}]"));
+
+            structuralAnomalies.Add(
+                $"Table '{tableCode}': dimension '{dimensionXbrlCode}' is declared by ordinates of more than one axis "
+                + $"(a cell signature must not repeat a dimension): {aggregate.Cells} cell(s), "
+                + $"e.g. BusinessCode '{aggregate.ExampleBusinessCode}'; {axes}.");
+        }
+    }
+
+    /// <summary>Per-table accumulator of a cross-axis dimension: affected cells, first example, members by axis.</summary>
+    private sealed class CrossAxisAggregate(string exampleBusinessCode)
+    {
+        public string ExampleBusinessCode { get; } = exampleBusinessCode;
+
+        public int Cells { get; set; }
+
+        public SortedDictionary<int, Dpm20CellSignatureComposer.AxisContribution> ByAxisId { get; } = [];
     }
 
     private static void EmitCategorisation(
