@@ -163,7 +163,10 @@ public sealed class Dpm20SignatureClosureInvariantTests(Dpm20SkeletonFixture fix
         var parentByOrdinateId = BuildClosedParentByOrdinateId(fixture.GeneratedConnection);
 
         var cellRows = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"CellID\", \"DPS\" FROM \"mTableCell\" WHERE \"DPS\" IS NOT NULL", 2);
-        Assert.True(cellRows.Count > 0);
+        var nonShadedCells = QueryHelpers.Scalar(fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 0");
+        Assert.True(
+            nonShadedCells == cellRows.Count,
+            $"{cellRows.Count} cells examined (DPS NOT NULL) but {nonShadedCells} cells are non-shaded: only non-shaded cells carry a signature.");
 
         var positionRows = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"CellID\", \"OrdinateID\" FROM \"mCellPosition\"", 2);
         var ordinateIdsByCell = new Dictionary<int, List<int>>();
@@ -216,7 +219,9 @@ public sealed class Dpm20SignatureClosureInvariantTests(Dpm20SkeletonFixture fix
         var nonShadedWithDps = QueryHelpers.Scalar(
             fixture.GeneratedConnection,
             "SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 0 AND \"DPS\" IS NOT NULL");
-        Assert.True(nonShadedWithDps > 90000, $"Derived census suspiciously small: {nonShadedWithDps} non-shaded cells with DPS.");
+        Assert.True(
+            nonShadedWithDps == nonShadedCells,
+            $"{nonShadedWithDps} non-shaded cells with DPS but {nonShadedCells} non-shaded cells: DPS is NULL if and only if the cell is shaded.");
         Assert.Equal(
             nonShadedWithDps,
             compared);

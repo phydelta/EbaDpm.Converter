@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -10,23 +11,31 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// conversion always runs <c>Dpm20AxisAndCellLoader.Load</c>, so the large DPM 2.0 Access database does
 /// not need to be re-read.
 ///
-/// It confirms the measured figures: 207 rows, 199 business keys on each side with an intersection
-/// of 199 (0/0 orphans), the contract <c>HierarchyStartingMemberID</c> NULL /
-/// <c>IsStartingMemberIncluded</c> = 0 in all 207, and <c>DPS</c> rising from 62.42% to 90.02%.
+/// It confirms the figures pinned in <see cref="ReleasePins"/> (scope
+/// <see cref="ReleasePins.Dpm20Cutoff42"/> for the generated side, <see cref="ReleasePins.Reference42"/>
+/// for the reference): the row count, the business keys on each side with a full intersection
+/// (0/0 orphans), the contract <c>HierarchyStartingMemberID</c> NULL /
+/// <c>IsStartingMemberIncluded</c> = 0 in every row, and the <c>DPS</c> match against the reference.
 /// </summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
 public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixture)
 {
     // ------------------------------------------------------------------
-    // Sanity - the measured count: 207, not 205 (the plan of distinct headers undercounts because
-    // some plans are repeated in pairs of axes).
+    // Sanity - the pinned count: it is higher than the count of distinct headers because some
+    // plans are repeated in pairs of axes. The rule (key headers with a SubCategoryVID, per table
+    // and taxonomy pair) is not re-derivable from the source without re-implementing it, so it is
+    // a scoped pin.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MOpenAxisValueRestriction_HasTheMeasuredCount_207()
+    public void MOpenAxisValueRestriction_MatchesThePinnedCensus()
     {
-        Assert.Equal(207, CountRows("mOpenAxisValueRestriction"));
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mOpenAxisValueRestriction rows",
+            ReleasePins.Dpm20Cutoff42OpenAxisValueRestrictionRows,
+            CountRows("mOpenAxisValueRestriction"));
     }
 
     // ------------------------------------------------------------------
@@ -39,7 +48,11 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
     [DataFact]
     public void EveryAxisID_IsAnOpenAxis_ActuallyEmitted_AndLinkedInMTableAxis()
     {
-        Assert.True(CountRows("mOpenAxisValueRestriction") > 0, "There are no rows: the invariant would be empty.");
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mOpenAxisValueRestriction rows examined",
+            ReleasePins.Dpm20Cutoff42OpenAxisValueRestrictionRows,
+            CountRows("mOpenAxisValueRestriction"));
 
         QueryHelpers.AssertNoOrphans(fixture.GeneratedConnection, "mOpenAxisValueRestriction", "AxisID", "mAxis", "AxisID");
 
@@ -62,21 +75,28 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
     [DataFact]
     public void EveryHierarchyID_IsAHierarchy_ActuallyEmitted()
     {
-        Assert.True(CountRows("mOpenAxisValueRestriction") > 0, "There are no rows: the invariant would be empty.");
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mOpenAxisValueRestriction rows examined",
+            ReleasePins.Dpm20Cutoff42OpenAxisValueRestrictionRows,
+            CountRows("mOpenAxisValueRestriction"));
 
         QueryHelpers.AssertNoOrphans(fixture.GeneratedConnection, "mOpenAxisValueRestriction", "HierarchyID", "mHierarchy", "HierarchyID");
     }
 
     // ------------------------------------------------------------------
-    // HierarchyStartingMemberID = NULL and IsStartingMemberIncluded = 0 (FALSE, NOT NULL) in all 207
-    // rows - the DPM 2.0 source does not model a starting member.
+    // HierarchyStartingMemberID = NULL and IsStartingMemberIncluded = 0 (FALSE, NOT NULL) in every
+    // row - the DPM 2.0 source does not model a starting member.
     // ------------------------------------------------------------------
 
     [DataFact]
     public void HierarchyStartingMemberID_IsNull_InAllRows()
     {
-        var total = CountRows("mOpenAxisValueRestriction");
-        Assert.True(total > 0);
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mOpenAxisValueRestriction rows examined",
+            ReleasePins.Dpm20Cutoff42OpenAxisValueRestrictionRows,
+            CountRows("mOpenAxisValueRestriction"));
 
         var notNull = ScalarLong("SELECT COUNT(*) FROM \"mOpenAxisValueRestriction\" WHERE \"HierarchyStartingMemberID\" IS NOT NULL");
         Assert.Equal(0, notNull);
@@ -85,8 +105,11 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
     [DataFact]
     public void IsStartingMemberIncluded_IsZero_NeverNull_InAllRows()
     {
-        var total = CountRows("mOpenAxisValueRestriction");
-        Assert.True(total > 0);
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mOpenAxisValueRestriction rows examined",
+            ReleasePins.Dpm20Cutoff42OpenAxisValueRestrictionRows,
+            CountRows("mOpenAxisValueRestriction"));
 
         // "IS NOT 0" in SQLite distinguishes an explicit 0 from NULL (unlike "<> 0", which does not
         // capture NULL). The two checks are kept separate to make clear which of them would fail.
@@ -99,12 +122,13 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
 
     // ------------------------------------------------------------------
     // Against the reference (by business key -- table code, axis code, hierarchy code -- NEVER by
-    // AxisID/HierarchyID): 199 keys on each side, intersection 199, zero only-in-reference and zero
-    // only-in-generated. Critical layer: exact equality, no threshold.
+    // AxisID/HierarchyID): the same keys on each side, zero only-in-reference and zero
+    // only-in-generated. Critical layer: exact equality, no threshold. The reference side is a scoped
+    // pin of the reference export; the generated side is compared by equality with the reference.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void BusinessKey_TableAxisHierarchy_MatchesReference42Exactly_199Of199()
+    public void BusinessKey_TableAxisHierarchy_MatchesReference42Exactly()
     {
         RepoPaths.EnsureReferenceDatabaseExists();
 
@@ -112,8 +136,14 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
         using var referenceConnection = OpenReadOnly(RepoPaths.ReferenceDatabasePath);
         var referenceKeys = RestrictionKeys(referenceConnection);
 
-        Assert.Equal(199, generatedKeys.Count);
-        Assert.Equal(199, referenceKeys.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42,
+            "restriction business keys in the reference export",
+            ReleasePins.Reference42OpenAxisRestrictionKeys,
+            referenceKeys.Count);
+        Assert.True(
+            generatedKeys.Count == referenceKeys.Count,
+            $"{generatedKeys.Count} restriction business keys generated, {referenceKeys.Count} in the reference export ({ReleasePins.Reference42}).");
 
         var onlyInReference = referenceKeys.Except(generatedKeys).ToList();
         var onlyInGenerated = generatedKeys.Except(referenceKeys).ToList();
@@ -211,7 +241,11 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
     public void ComposeDpsAndComposeDms_OnlyDivergeInTheOpenAxisBracket_ZeroDivergencesOutside()
     {
         var rows = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"CellID\", \"DPS\", \"DatapointSignature\" FROM \"mTableCell\" WHERE \"DPS\" IS NOT NULL", 3);
-        Assert.True(rows.Count > 60000, $"Only {rows.Count} rows with DPS: the check does not cover the expected volume.");
+        // A signature is carried by exactly the non-shaded cells (docs/mapping-dpm2.md, Signatures).
+        var nonShaded = ScalarLong("SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 0");
+        Assert.True(
+            nonShaded == rows.Count,
+            $"{rows.Count} cells examined (DPS NOT NULL) but {nonShaded} cells are non-shaded: the check does not cover every signature.");
 
         var failures = new List<string>();
         var pairCountMismatches = 0;
@@ -286,10 +320,29 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
         using var referenceConnection = OpenReadOnly(RepoPaths.ReferenceDatabasePath);
         var referencePairs = DpsPairs(referenceConnection);
 
-        Assert.True(referencePairs.Count > 90000, $"Only {referencePairs.Count} pairs with DPS in reference 4.2: unexpectedly low volume.");
+        // The population iterated is the distinct (TableCode,BusinessCode) set with a DPS: count it
+        // on each database with the SQL engine, independently of the loop that built the dictionary.
+        var distinctPairsSql =
+            """
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT t."TableCode", c."BusinessCode"
+                FROM "mTableCell" c JOIN "mTable" t ON t."TableID" = c."TableID"
+                WHERE c."DPS" IS NOT NULL)
+            """;
+        var referenceDistinct = QueryHelpers.Scalar(referenceConnection, distinctPairsSql);
+        Assert.True(
+            referencePairs.Count == referenceDistinct,
+            $"{referencePairs.Count} (TableCode,BusinessCode) pairs with DPS read from reference 4.2, {referenceDistinct} counted by SQL.");
+        var generatedDistinct = ScalarLong(distinctPairsSql);
+        Assert.True(
+            generatedPairs.Count == generatedDistinct,
+            $"{generatedPairs.Count} (TableCode,BusinessCode) pairs with DPS read from the output, {generatedDistinct} counted by SQL.");
 
         var commonKeys = referencePairs.Keys.Intersect(generatedPairs.Keys).ToList();
-        Assert.True(commonKeys.Count > 80000, $"Only {commonKeys.Count} common (TableCode,BusinessCode) keys: unexpectedly low volume.");
+        var commonBySql = CommonKeysBySql(referenceConnection, fixture.GeneratedDatabasePath);
+        Assert.True(
+            commonKeys.Count == commonBySql,
+            $"{commonKeys.Count} common (TableCode,BusinessCode) keys with DPS computed in memory, {commonBySql} by SQL INTERSECT.");
 
         var matched = commonKeys.Count(key => generatedPairs[key].Overlaps(referencePairs[key]));
         var ratio = (double)matched / commonKeys.Count;
@@ -298,6 +351,42 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
             ratio >= 0.90,
             $"DPS matched by (TableCode,BusinessCode) against EBA_4.2_Hotfix.db: {matched}/{commonKeys.Count} = {ratio:P4}, "
             + "below the 90% minimum threshold (8,095 pairs and 885 of MET vocabulary remain, unrelated to the open-axis restriction).");
+    }
+
+    /// <summary>
+    /// Size of the intersection of the (TableCode,BusinessCode) sets with a DPS of the reference and
+    /// of the generated database, counted by the SQL engine (the generated file is attached).
+    /// </summary>
+    private static long CommonKeysBySql(SqliteConnection referenceConnection, string generatedPath)
+    {
+        using (var attach = referenceConnection.CreateCommand())
+        {
+            attach.CommandText = "ATTACH DATABASE $path AS gen";
+            attach.Parameters.AddWithValue("$path", generatedPath);
+            attach.ExecuteNonQuery();
+        }
+
+        try
+        {
+            return QueryHelpers.Scalar(
+                referenceConnection,
+                """
+                SELECT COUNT(*) FROM (
+                    SELECT t."TableCode", c."BusinessCode"
+                    FROM main."mTableCell" c JOIN main."mTable" t ON t."TableID" = c."TableID"
+                    WHERE c."DPS" IS NOT NULL
+                    INTERSECT
+                    SELECT t."TableCode", c."BusinessCode"
+                    FROM gen."mTableCell" c JOIN gen."mTable" t ON t."TableID" = c."TableID"
+                    WHERE c."DPS" IS NOT NULL)
+                """);
+        }
+        finally
+        {
+            using var detach = referenceConnection.CreateCommand();
+            detach.CommandText = "DETACH DATABASE gen";
+            detach.ExecuteNonQuery();
+        }
     }
 
     private static Dictionary<(string TableCode, string BusinessCode), HashSet<string>> DpsPairs(SqliteConnection connection)

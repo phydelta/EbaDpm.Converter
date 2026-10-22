@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -19,10 +20,10 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// (case,cell)-derivable except for the secondary ordering (about 1,183 of 144,463, chosen, not
 /// derived).
 ///
-/// <c>mTableCell</c> has 163,218 rows (including the table <c>C_34.02.b/if 4.2</c>, which adds 440
-/// rows); the counts in this file were measured against the real .db. That table has its THREE axes
-/// closed (X/Y/Z, none open), so it contributes no rows to the open-axis-with-restriction bracket
-/// pattern: the count of Invariant 2 (28,065) does not move.
+/// <c>mTableCell</c> includes the table <c>C_34.02.b/if 4.2</c>. The censuses of this file are
+/// scoped pins of <see cref="ReleasePins"/> (scope <see cref="ReleasePins.Dpm20Cutoff42"/>); the
+/// failure message prints the scope. That table has its THREE axes closed (X/Y/Z, none open), so
+/// it contributes no rows to the open-axis-with-restriction bracket pattern.
 /// </summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
@@ -37,7 +38,7 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
     public void OnlyNonShadedCells_CarryASignature_0ExceptionsInBothDirections()
     {
         var total = ScalarLong("SELECT COUNT(*) FROM \"mTableCell\"");
-        Assert.Equal(163218, total);
+        ReleasePins.AssertPinned(ReleasePins.Dpm20Cutoff42, "mTableCell rows", ReleasePins.Dpm20Cutoff42MTableCellRows, total);
 
         var shadedWithSignature = ScalarLong(
             "SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 1 AND (\"DPS\" IS NOT NULL OR \"DatapointSignature\" IS NOT NULL)");
@@ -58,8 +59,8 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
     // Invariant 2 - DatapointSignature = DMS, with the numeric HierarchyID inside the bracket,
     // whereas DPS carries the hierarchy code. The two can ONLY diverge inside a '(*[...]' bracket.
     // Verified literally IN THE REFERENCE 4.2 ITSELF (not only in the generated output): its
-    // mTableCell has EXACTLY 28,065 rows with DPS != DatapointSignature -- the same number, digit
-    // for digit, as the rows with a bracket -- so a "literally equal always" assertion would be
+    // mTableCell has EXACTLY as many rows with DPS != DatapointSignature as rows with a bracket
+    // (the same census, digit for digit) -- so a "literally equal always" assertion would be
     // wrong even AGAINST the reference; it is not a real property of the schema.
     // ------------------------------------------------------------------
 
@@ -92,7 +93,13 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
             $"{bracketedButEqual.Count} rows with a bracket in the DPS but DatapointSignature EQUAL to the DPS (the numeric HierarchyID was expected): "
             + string.Join(" | ", bracketedButEqual.Take(10).Select(r => $"CellID={r[0]}: DPS='{r[1]}'")));
 
-        Assert.Equal(28065, mismatches.Count); // measured: exactly the rows with a bracket
+        ReleasePins.AssertPinned(ReleasePins.Dpm20Cutoff42, "cells with DPS != DatapointSignature", ReleasePins.Dpm20Cutoff42BracketCells, mismatches.Count);
+
+        // Second measurement: the divergences are exactly the rows with a bracket.
+        var bracketed = rows.Count(r => r[1]!.Contains("(*[", StringComparison.Ordinal));
+        Assert.True(
+            bracketed == mismatches.Count,
+            $"{bracketed} rows with a bracket in the DPS but {mismatches.Count} DPS/DatapointSignature divergences.");
     }
 
     // ------------------------------------------------------------------
@@ -103,7 +110,7 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
     public void BusinessCode_IsCarriedByAllCells_ShadedOnesIncluded()
     {
         var total = ScalarLong("SELECT COUNT(*) FROM \"mTableCell\"");
-        Assert.Equal(163218, total);
+        ReleasePins.AssertPinned(ReleasePins.Dpm20Cutoff42, "mTableCell rows", ReleasePins.Dpm20Cutoff42MTableCellRows, total);
 
         var withoutBusinessCode = ScalarLong("SELECT COUNT(*) FROM \"mTableCell\" WHERE \"BusinessCode\" IS NULL");
         Assert.Equal(0, withoutBusinessCode);
@@ -117,14 +124,18 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
 
     // ------------------------------------------------------------------
     // Invariant 4 - MET(...) ALWAYS comes first in the DPS, and the rest is ordered ordinally
-    // (StringComparer.Ordinal) by dimension XBRL code. Over ALL signatures (~97,678).
+    // (StringComparer.Ordinal) by dimension XBRL code. Over ALL signatures.
     // ------------------------------------------------------------------
 
     [DataFact]
     public void MetAlwaysComesFirst_AndTheRestIsOrderedOrdinally_OverAllSignatures()
     {
         var rows = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"CellID\", \"DPS\" FROM \"mTableCell\" WHERE \"DPS\" IS NOT NULL", 2);
-        Assert.True(rows.Count > 60000, $"Only {rows.Count} rows with DPS: the check does not cover the expected volume.");
+        // A signature is carried by exactly the non-shaded cells: the check covers every one.
+        var nonShaded = ScalarLong("SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 0");
+        Assert.True(
+            nonShaded == rows.Count,
+            $"{rows.Count} signatures examined (DPS NOT NULL) but {nonShaded} cells are non-shaded.");
 
         var failures = new List<string>();
         foreach (var row in rows)
@@ -183,7 +194,10 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
         Assert.True(defaultMemberCodes.Count > 0, "There is no default member in mMember: the invariant would check nothing.");
 
         var rows = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"CellID\", \"DPS\" FROM \"mTableCell\" WHERE \"DPS\" IS NOT NULL", 2);
-        Assert.True(rows.Count > 60000);
+        var nonShaded = ScalarLong("SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 0");
+        Assert.True(
+            nonShaded == rows.Count,
+            $"{rows.Count} signatures examined (DPS NOT NULL) but {nonShaded} cells are non-shaded.");
 
         var failures = new List<string>();
         foreach (var row in rows)
@@ -224,11 +238,11 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
 
     // ------------------------------------------------------------------
     // Invariant 6 - The BusinessCode has the form {table,...} and its first component is the
-    // TableCode of the cell, in all 163,218 rows.
+    // TableCode of the cell, in every row of mTableCell.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void BusinessCode_HasTheFormTableEtc_AndItsFirstComponentIsTheCellTableCode_In163218Rows()
+    public void BusinessCode_HasTheFormTableEtc_AndItsFirstComponentIsTheCellTableCode_InEveryRow()
     {
         var rows = QueryHelpers.Rows(
             fixture.GeneratedConnection,
@@ -239,7 +253,7 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
             """,
             3);
 
-        Assert.Equal(163218, rows.Count);
+        ReleasePins.AssertPinned(ReleasePins.Dpm20Cutoff42, "cells joined to their table", ReleasePins.Dpm20Cutoff42MTableCellRows, rows.Count);
 
         var failures = new List<string>();
         foreach (var row in rows)
@@ -263,7 +277,7 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
 
         Assert.True(
             failures.Count == 0,
-            $"{failures.Count}/163218 BusinessCode values that do NOT have the form '{{TableCode,...}}':\n" + string.Join("\n", failures.Take(30)));
+            $"{failures.Count}/{rows.Count} BusinessCode values that do NOT have the form '{{TableCode,...}}':\n" + string.Join("\n", failures.Take(30)));
     }
 
     // ------------------------------------------------------------------
@@ -289,7 +303,17 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
             .Select(r => (TableCode: r[0]!, BusinessCode: r[1]!))
             .ToHashSet();
 
-        Assert.True(generatedPairs.Count > 140000, $"Only {generatedPairs.Count} generated (TableCode,BusinessCode) pairs: unexpectedly low volume.");
+        // The population iterated is the distinct (TableCode,BusinessCode) set: counted by SQL, not by the loop.
+        const string DistinctPairsSql =
+            """
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT t."TableCode", c."BusinessCode"
+                FROM "mTableCell" c JOIN "mTable" t ON t."TableID" = c."TableID")
+            """;
+        var generatedDistinct = ScalarLong(DistinctPairsSql);
+        Assert.True(
+            generatedPairs.Count == generatedDistinct,
+            $"{generatedPairs.Count} generated (TableCode,BusinessCode) pairs read, {generatedDistinct} counted by SQL.");
 
         using var referenceConnection = OpenReadOnly(RepoPaths.ReferenceDatabasePath);
         var referencePairs = QueryHelpers.Rows(
@@ -303,7 +327,10 @@ public sealed class Dpm20SignatureTests(Dpm20SkeletonFixture fixture)
             .Select(r => (TableCode: r[0]!, BusinessCode: r[1]!))
             .ToHashSet();
 
-        Assert.True(referencePairs.Count > 140000, $"Only {referencePairs.Count} (TableCode,BusinessCode) pairs in reference 4.2: unexpectedly low volume.");
+        var referenceDistinct = QueryHelpers.Scalar(referenceConnection, DistinctPairsSql);
+        Assert.True(
+            referencePairs.Count == referenceDistinct,
+            $"{referencePairs.Count} (TableCode,BusinessCode) pairs read from reference 4.2, {referenceDistinct} counted by SQL.");
 
         var matched = referencePairs.Intersect(generatedPairs).Count();
 
