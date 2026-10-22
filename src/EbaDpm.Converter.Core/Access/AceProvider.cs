@@ -132,22 +132,17 @@ public static class AceProvider
         {
             var view = Environment.Is64BitProcess ? RegistryView.Registry32 : RegistryView.Registry64;
             using var root = RegistryKey.OpenBaseKey(RegistryHive.ClassesRoot, view);
-            foreach (var clsidPath in Candidates.Select(candidate => $@"{candidate}\CLSID"))
+            return Candidates.Any(candidate =>
             {
-                using var key = root.OpenSubKey(clsidPath);
-                if (key is not null)
-                {
-                    return true;
-                }
-            }
+                using var key = root.OpenSubKey($@"{candidate}\CLSID");
+                return key is not null;
+            });
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException
                                        or IOException or PlatformNotSupportedException or ArgumentException)
         {
             return false;
         }
-
-        return false;
     }
 
     private static Exception? TryOpen(string provider, string accdbPath)
