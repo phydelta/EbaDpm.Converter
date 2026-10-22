@@ -21,7 +21,7 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 /// <item><description>
 /// <b>The T2 transposition</b>: a key header of direction <c>X</c> becomes an open <c>Y</c> axis
 /// with a single ordinate; one of direction <c>Z</c> becomes an open <c>Z</c> axis. There are no
-/// key headers of direction <c>Y</c> in the source (0/23,537, measured) — if one appeared, it is
+/// key headers of direction <c>Y</c> in the source (0/23,575 in the 4.2.1 database, 0/24,510 in 4.3, measured 2026-10-22) — if one appeared, it is
 /// an unforeseen case and the conversion fails (it is reported, not forced), just as DPM 1.0
 /// failed on an open X axis.
 /// </description></item>
@@ -70,7 +70,9 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 ///
 /// <b><c>mTableCell.BusinessCode</c>/<c>DatapointSignature</c>/<c>DPS</c></b>. The algorithm is
 /// the same as DPM 1.0 (it is not re-derived): <see cref="Dpm20CellSignatureComposer.ComposeBusinessCode"/> composes
-/// <c>{table,Y,X,Z}</c> by ORIENTATION (not by <c>mTableAxis.Order</c> — 100% against 96.54%) and
+/// <c>{table,Y,X,Z}</c> by ORIENTATION (not by <c>mTableAxis.Order</c> — the 4.2 reference export's own BusinessCodes
+/// recomposed from its own positions agree 100% by orientation and 96.54% by its own
+/// <c>mTableAxis.Order</c>, measured 2026-10-22; 13.41% on the 4.0 reference export) and
 /// <see cref="Dpm20CellSignatureComposer.ComposeCellSignature"/> composes the closure by <c>ParentOrdinateID</c> with
 /// nearest-ancestor inheritance, discarding default members except the metric.
 /// <c>BusinessCode</c> is emitted for ALL cells; <c>DPS</c>/<c>DatapointSignature</c> (identical)
@@ -167,9 +169,9 @@ public static class Dpm20AxisAndCellLoader
         /// <c>HeaderVersion.ContextID</c> — the DPM 2.0 equivalent of the DPM 1.0 <c>'999 '</c>
         /// sentinel which, besides the open pair, carries fixed categorisations. Before this was
         /// handled, the key header's <c>ContextID</c> was read (<see cref="HeaderNode.ContextId"/>)
-        /// and never consulted: a dead read — measured in 1/406 current key headers in the 4.2
-        /// Access database (0/429 in 4.3; the source itself nulled that <c>ContextID</c> between
-        /// releases). Empty in the general case.
+        /// and never consulted: a dead read — a key header with a <c>ContextID</c> was measured in
+        /// 0/406 current key headers of the 4.2.1 database and 0/429 of the 4.3 database
+        /// (2026-10-22). Empty in the general case.
         /// </summary>
         public List<(int DimensionId, string DimensionXbrlCode, int MemberId, string? MemberXbrlCode, bool IsDefaultMember)> FixedPairs = [];
     }
@@ -240,7 +242,7 @@ public static class Dpm20AxisAndCellLoader
         // (SubCategoryID=19674) EXACTLY at the cutoff of a new release and does NOT propagate the
         // new SubCategoryVID to all the HeaderVersion rows that used it — of ~90 headers, only 5
         // ended up with the new version. The literal SubCategoryVID of the header stops being
-        // current and the strict lookup fails (48 cases in 4.3, 0 in 4.2). It is SAFE by
+        // current and the strict lookup fails (48 cases in the 4.3 database, 0 in the 4.2.1 database and in the 4.2 cutoff, measured 2026-10-22). It is SAFE by
         // construction: hierarchyBySubCategoryId is indexed by SubCategoryID, which is stable
         // between versions of the SAME subcategory — the old and the new window resolve to the SAME
         // Hierarchy, so the fallback can never change a case that ALREADY resolved through the
@@ -303,7 +305,7 @@ public static class Dpm20AxisAndCellLoader
             .Distinct()
             .ToList();
 
-        // ---- Bulk read, bounded to the selection (not the 59,356/23,537/48,481 total rows) ----
+        // ---- Bulk read, bounded to the selection (not the whole tables) ----
         var tableVersionHeadersByTableVId = reader.ReadTableVersionHeaders(distinctTableVIds)
             .GroupBy(h => h.TableVId)
             .ToDictionary(g => g.Key, g => g.ToList());
@@ -537,7 +539,7 @@ public static class Dpm20AxisAndCellLoader
             writer.AddRow(
                 row.AxisId, row.HierarchyId,
                 null, // HierarchyStartingMemberID: always NULL (the source does not model a starting member)
-                false); // IsStartingMemberIncluded: 0 (false, NOT null — measured 207/207)
+                false); // IsStartingMemberIncluded: 0 (false, NOT null — measured 2026-10-22: 207/207 on the 4.2 cutoff against the 4.2 reference export; 398 in the 4.2.1 database, 413 in 4.3)
         }
     }
 
@@ -903,18 +905,20 @@ public static class Dpm20AxisAndCellLoader
     /// <paramref name="nodes"/> carries ALL those of this table version, with the release cutoff
     /// already applied upstream in <c>ReadTableVersions</c>/<c>ReadTableVersionHeaders</c> — the
     /// cutoff is NOT cosmetic) whose <c>HeaderVersion.ContextID</c> declares the dimension.
-    /// Measured 100% in agreement with the reference where it decides (6,805/6,805). If more than
-    /// one direction declared the SAME dimension (0 measured with the release cutoff applied), it
+    /// Measured 2026-10-22 on the 4.2 cutoff: 100% in agreement with the 4.2 reference export where it
+    /// decides (6,805/6,805 declared (TableVID, dimension) pairs, not conflicts). If more than
+    /// one direction declared the SAME dimension (0 measured with the release cutoff applied, in the 4.2 cutoff,
+    /// 4.2.1 and 4.3 outputs), it
     /// does not decide — it falls to level 2/3 of the caller.
     /// </description></item>
     /// <item><description>
     /// <b>Level 2</b> — if no header decides and the dimension is in
     /// <c>TableVersion.ContextID</c> (<paramref name="tableContextId"/>), the owner axis is
-    /// <c>X</c>: empirical (63/63 measured on release 4.2 and one exporter — not a property of the
+    /// <c>X</c>: empirical (63/63 measured 2026-10-22 on the 4.2 cutoff against the 4.2 reference export — not a property of the
     /// format), NOT derived from which direction carries the table context.
     /// </description></item>
     /// </list>
-    /// What neither level decides (0 measured cases) is left unresolved: the caller
+    /// What neither level decides (0 cases measured 2026-10-22 in the 4.2 cutoff, 4.2.1 and 4.3 outputs) is left unresolved: the caller
     /// (<see cref="ArbitrateDimensionAxisConflicts"/>) decides what to do with it (level 3: it is
     /// not touched, it is counted).
     /// </summary>
@@ -947,7 +951,7 @@ public static class Dpm20AxisAndCellLoader
                 owner[dimensionId] = directions.Single();
             }
 
-            // directions.Count > 1: 0 measured with the release cutoff — not decided here, it
+            // directions.Count > 1: 0 measured with the release cutoff (4.2 cutoff, 4.2.1 and 4.3 outputs, 2026-10-22) — not decided here, it
             // falls to level 3 of the caller (not forced).
         }
 
@@ -955,7 +959,7 @@ public static class Dpm20AxisAndCellLoader
         {
             foreach (var dimensionId in ResolveDeclaredDimensionIds(tableContextId, contextCompositionsByContextId, resolver))
             {
-                owner.TryAdd(dimensionId, "X"); // Level 2: empirical, 63/63.
+                owner.TryAdd(dimensionId, "X"); // Level 2: empirical, 63/63 (4.2 cutoff vs 4.2 reference export, measured 2026-10-22).
             }
         }
 
@@ -1118,7 +1122,7 @@ public static class Dpm20AxisAndCellLoader
                 {
                     "X" => "Y", // transposition: key X -> open Y
                     "Z" => "Z", // transposition: key Z -> open Z
-                    _ => null, // key Y: not contemplated (0 measured in the whole source)
+                    _ => null, // key Y: not contemplated (0 measured 2026-10-22 in the 4.2.1 and 4.3 Access databases)
                 };
 
                 if (destOrientation is null)
@@ -1253,6 +1257,8 @@ public static class Dpm20AxisAndCellLoader
             }
         }
 
+        // Invariant measured 2026-10-22: 846/846 tables of the 4.2 reference export have an X axis; the
+        // 4.2 cutoff output holds 847 tables, and 0 tables lack an X axis in the 4.2 cutoff, 4.2.1 and 4.3 outputs.
         if (closedAxes.All(a => a.Orientation != "X"))
         {
             structuralAnomalies.Add(
@@ -1369,7 +1375,7 @@ public static class Dpm20AxisAndCellLoader
             {
                 if (!tableContextOwnerAxisByDimension.TryGetValue(dimensionId, out var ownerOrientation))
                 {
-                    continue; // Level 3: neither a header nor the table context decides a single axis — nothing is invented. 0 measured cases.
+                    continue; // Level 3: neither a header nor the table context decides a single axis — nothing is invented. 0 cases measured 2026-10-22 in the 4.2 cutoff, 4.2.1 and 4.3 outputs.
                 }
 
                 foreach (var axis in closedAxes)
@@ -1661,7 +1667,7 @@ public static class Dpm20AxisAndCellLoader
             var ordinateId = counters.NextOrdinateId++;
             ordinateRows.Add(new OrdinateRowData(
                 axisId, ordinateId, openAxis.Label, openAxis.Code, openAxis.IsAbstract,
-                true, // IsRowKey: 1 in the only ordinate of the open axis (389/389 measured)
+                true, // IsRowKey: 1 in the only ordinate of the open axis (389/389 measured 2026-10-22 on the 4.2 cutoff; 742 in 4.2.1, 765 in 4.3)
                 0, // Level: 0 in the ordinates of an open axis
                 0, null)); // Order: 0, not 1 (check A-AXE-10 — 0 violations in the reference, all 389 with 0)
 
@@ -1797,7 +1803,8 @@ public static class Dpm20AxisAndCellLoader
             var cellId = counters.NextCellId++;
 
             // BusinessCode for ALL cells, order Y,X,Z (by orientation, NOT by mTableAxis.Order —
-            // 100% against 96.54%, measured). DPS/DatapointSignature only if NOT shaded; shaded ->
+            // the 4.2 reference export's own BusinessCodes agree 100% by orientation and 96.54% by its own
+            // mTableAxis.Order, measured 2026-10-22). DPS/DatapointSignature only if NOT shaded; shaded ->
             // NULL, not an empty string.
             var businessCode = Dpm20CellSignatureComposer.ComposeBusinessCode(tableCode, positionsForThisCell, orientationRankAndAxisIdByOrdinateId, ordinateCodeByOrdinateId);
             string? dps = null;

@@ -47,11 +47,13 @@ public static class Dpm20DictionaryLoader
     // metric property uses them, they are collected in UnresolvedCases and reported — nothing is
     // invented.
     //
-    // The source 's'/'es' do not decide anything by themselves — measured, 's' goes to BOTH
-    // destination families (173 to NotEmptyString, 137 to String) and 'es' too (15 to String, 1 to
+    // The source 's'/'es' do not decide anything by themselves — measured 2026-10-22 on the 4.2 cutoff
+    // and the 4.2.1 database, 's' goes to BOTH destination families (173 to NotEmptyString, 137 to
+    // String; 183 to NotEmptyString in the 4.3 database) and 'es' too (15 to String, 1 to
     // NotEmptyString). The real discriminator is the property NAMING LAW: if the code matches
     // <c>^[a-z][a-z][0-9]+$</c> (e.g. <c>si1036</c>) → <c>String</c>; otherwise (e.g. <c>qANS</c>)
-    // → <c>NotEmptyString</c>. Zero failures over 2,100 measured against the reference. A first
+    // → <c>NotEmptyString</c>. Zero failures (measured 2026-10-22 on the 4.2 cutoff) over the 2,104 metrics in common with the
+    // 4.2 reference export, with 0 DataType differences. A first
     // version ('s'→NotEmptyString, 'es'→String fixed) was an unmeasured inference from the NAME of
     // the source column — the pattern of reading the source with the destination's vocabulary,
     // which this project avoids. See <see cref="ResolveDataType"/>.
@@ -446,7 +448,7 @@ public static class Dpm20DictionaryLoader
             if (item.CategoryId == prCategoryId)
             {
                 // Role fact ∪ non-key header ∪ naming law — metric identification, closed and
-                // measured (2,104/2,104 against the reference). It is used ONLY to decide membership
+                // measured (2,104/2,104 containment in the 4.2 reference export, 4.2 cutoff, 2026-10-22). It is used ONLY to decide membership
                 // of the MET domain of mMember; mMetric (DataType, referenced hierarchy, FlowType…)
                 // is handled separately and is not touched here.
                 var isMetric = factPropertyIds.Contains(item.ItemId)

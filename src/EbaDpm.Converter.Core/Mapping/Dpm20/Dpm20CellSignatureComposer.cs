@@ -15,27 +15,35 @@ internal static class Dpm20CellSignatureComposer
 
     /// <summary>
     /// <c>mTableCell.BusinessCode</c>: <c>{table,ordinates in order Y,X,Z}</c>. The PRIMARY order
-    /// is the orientation (100% measured): there are no two ordinates of the same cell with
+    /// is the orientation (100% measured 2026-10-22 on the 4.2 and 4.0 reference exports, 163,206/163,206
+    /// and 59,027/59,027 cells, and on the 4.2 cutoff, 4.2.1 and 4.3 outputs; it is not a DPM 1.0
+    /// property, the 3.2 reference breaks it): there are no two ordinates of the same cell with
     /// different orientations to break a tie.
     ///
     /// The SECONDARY order — between several ordinates of the SAME orientation in the SAME cell,
     /// which only occurs with several OPEN axes of that orientation (several key X headers of the
     /// same TableVID, transposed to Y; it never coexists with a CLOSED axis of that same
-    /// orientation, 0 measured cases) — has NO rule derivable from a single source column:
+    /// orientation, 0 cases measured 2026-10-22 in the 4.2 cutoff, 4.2.1 and 4.3 outputs, in both DPM 2.0
+    /// reference exports and in the Access source of 4.2.1 and 4.3) — has NO rule derivable from a single source column:
     /// <list type="bullet">
     /// <item><description>
-    /// It is NOT <c>mTableAxis.Order</c> (measured: it gives the OPPOSITE order to the reference in
-    /// <c>K_50.00</c>).
+    /// It is NOT <c>mTableAxis.Order</c> (measured 2026-10-22 against the 4.2 reference export: the
+    /// reference has two <c>K_50.00</c> tables, frameworks pillar3 4.1 and pillar3 4.2, with the same
+    /// two key headers, <c>0010</c> (Order 10) and <c>0020</c> (Order 20), ordered both ways:
+    /// <c>0020,0010</c> in one and <c>0010,0020</c> in the other; so <c>mTableAxis.Order</c> gives the
+    /// OPPOSITE order to the reference in one and the same order in the other).
     /// </description></item>
     /// <item><description>
     /// It is NOT the <c>HeaderID</c>/<c>TableVersionHeader.Order</c> of the source key header, in
-    /// either direction: in <c>K_50.00</c> (2 axes) descending DOES reproduce the reference, but in
+    /// either direction (measured 2026-10-22 against the 4.2 reference export): in <c>K_50.00</c>
+    /// (2 axes) descending reproduces only the pillar3 4.1 table, not the pillar3 4.2 one, and in
     /// <c>K_43.00.a</c> (3 axes, codes <c>0010</c>/<c>0020</c>/<c>0040</c> with source
     /// <c>Order</c> 1020/1030/1040) the reference gives <c>0040,0010,0020</c> — neither ascending
     /// nor descending by either field.
     /// </description></item>
     /// </list>
-    /// Measured on release 4.2 only (not a property of the format), over the 144,463 (table,
+    /// Measured 2026-10-22 on the 4.2 cutoff of the 4.2.1 database against the 4.2 reference export
+    /// (not a property of the format), over the 144,463 (table,
     /// BusinessCode) keys of the 4.2 reference: ascending by own
     /// <c>AxisID</c> matches 142,488 (98.63%); descending, 143,280 (99.18%). NEITHER closes at
     /// 100%, and — the proof that there is no rule slipping away — they are NOT a subset of each
@@ -46,7 +54,7 @@ internal static class Dpm20CellSignatureComposer
     ///
     /// That is why DESCENDING is a DECLARED CHOICE, not a derived rule — it is documented as a
     /// divergence from the reference, with the two measured figures, not as "the variant that
-    /// matches most". The residue (~1,183 of 144,463 BusinessCode, 0.8%, on release 4.2) stays named, not forced.
+    /// matches most". The residue (~1,183 of 144,463 BusinessCode, 0.8%, same scope and date) stays named, not forced.
     /// </summary>
     internal static string ComposeBusinessCode(
         string tableCode,

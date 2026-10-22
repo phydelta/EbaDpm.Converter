@@ -11,7 +11,7 @@ namespace EbaDpm.Converter.Core.Validation.Checks;
 /// <c>I-SIG-*</c> (signatures and categorisation) and <c>I-CPT-02b</c> (concepts per type ==
 /// rows of the entity, discounting the sentinel 9999 ONLY in <c>Domain</c>, not in <c>Member</c>:
 /// <c>mMember</c> 9999 DOES carry a concept in DPM 2.0). <c>I-CPT-02b</c> is critical only in
-/// DPM 2.0 (0/0 measured in 4.2 and 4.3); in DPM 1.0 the Hierarchy/HierarchyNode/Release/
+/// DPM 2.0 (0 failed of 13 examined, measured 2026-10-22 on the 4.2 cutoff, 4.2.1 and 4.3 outputs); in DPM 1.0 the Hierarchy/HierarchyNode/Release/
 /// TemplateOrTable mismatch is covered by <c>A-CPT-02</c>, informative and not fully closed.
 /// </summary>
 public static class ConceptChecks
