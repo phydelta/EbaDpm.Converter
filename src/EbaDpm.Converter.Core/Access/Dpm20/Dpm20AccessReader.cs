@@ -205,58 +205,55 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
         EnsureOpen();
 
         var distinctIds = ids.Distinct().ToList();
-        OleDbCommand? fullCommand = null;
-        try
+        var fullChunks = distinctIds.Count / IdListChunkSize;
+        var remainder = distinctIds.Count % IdListChunkSize;
+
+        if (fullChunks > 0)
         {
-            for (var offset = 0; offset < distinctIds.Count; offset += IdListChunkSize)
+            using var fullCommand = CreateIdListCommand(sqlPrefix, IdListChunkSize);
+            for (var chunk = 0; chunk < fullChunks; chunk++)
             {
-                var size = Math.Min(IdListChunkSize, distinctIds.Count - offset);
-                OleDbCommand command;
-                var isFull = size == IdListChunkSize;
-                if (isFull && fullCommand is not null)
+                foreach (var row in StreamChunk(fullCommand, distinctIds, chunk * IdListChunkSize, IdListChunkSize))
                 {
-                    command = fullCommand;
-                }
-                else
-                {
-                    var sql = sqlPrefix + string.Join(", ", Enumerable.Repeat("?", size)) + ")";
-                    command = new OleDbCommand(sql, _connection);
-                    for (var i = 0; i < size; i++)
-                    {
-                        command.Parameters.Add(new OleDbParameter());
-                    }
-
-                    if (isFull)
-                    {
-                        fullCommand = command;
-                    }
-                }
-
-                try
-                {
-                    for (var i = 0; i < size; i++)
-                    {
-                        command.Parameters[i].Value = distinctIds[offset + i];
-                    }
-
-                    using var reader = command.ExecuteReader(CommandBehavior.SequentialAccess);
-                    while (reader.Read())
-                    {
-                        yield return reader;
-                    }
-                }
-                finally
-                {
-                    if (!ReferenceEquals(command, fullCommand))
-                    {
-                        command.Dispose();
-                    }
+                    yield return row;
                 }
             }
         }
-        finally
+
+        if (remainder > 0)
         {
-            fullCommand?.Dispose();
+            using var partialCommand = CreateIdListCommand(sqlPrefix, remainder);
+            foreach (var row in StreamChunk(partialCommand, distinctIds, fullChunks * IdListChunkSize, remainder))
+            {
+                yield return row;
+            }
+        }
+    }
+
+    private OleDbCommand CreateIdListCommand(string sqlPrefix, int size)
+    {
+        var sql = sqlPrefix + string.Join(", ", Enumerable.Repeat("?", size)) + ")";
+        var command = new OleDbCommand(sql, _connection);
+        for (var i = 0; i < size; i++)
+        {
+            command.Parameters.Add(new OleDbParameter());
+        }
+
+        return command;
+    }
+
+    private static IEnumerable<IDataRecord> StreamChunk(
+        OleDbCommand command, List<int> distinctIds, int offset, int size)
+    {
+        for (var i = 0; i < size; i++)
+        {
+            command.Parameters[i].Value = distinctIds[offset + i];
+        }
+
+        using var reader = command.ExecuteReader(CommandBehavior.SequentialAccess);
+        while (reader.Read())
+        {
+            yield return reader;
         }
     }
 

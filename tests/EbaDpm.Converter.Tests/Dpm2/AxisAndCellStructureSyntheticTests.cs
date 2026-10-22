@@ -234,24 +234,19 @@ public sealed class AxisAndCellStructureSyntheticTests
     public void ClosedAxes_AreMultiplied_AxisByAxis_OneCellAndOnePositionPerAxis(int columns, int rows, int sheets)
     {
         var w = new AxisCellWorld();
-        for (var i = 1; i <= columns; i++) { w.AddHeader("X", $"x{i}"); }
-        for (var j = 1; j <= rows; j++) { w.AddHeader("Y", $"y{j}"); }
-        for (var k = 1; k <= sheets; k++) { w.AddHeader("Z", $"z{k}"); }
+        // Header insertion order is preserved: all X, then all Y, then all Z, ascending.
+        AddHeaders(w, "X", "x", columns);
+        AddHeaders(w, "Y", "y", rows);
+        AddHeaders(w, "Z", "z", sheets);
         using var outcome = w.Run();
 
         // Expected, from the docs: one cell per (column, row, sheet); BusinessCode Y,X,Z; one
         // position per axis.
-        var expected = new Dictionary<string, List<string>>();
-        for (var i = 1; i <= columns; i++)
-        {
-            for (var j = 1; j <= rows; j++)
-            {
-                for (var k = 1; k <= sheets; k++)
-                {
-                    expected[$"{{T_01,y{j},x{i},z{k}}}"] = [$"x{i}", $"y{j}", $"z{k}"];
-                }
-            }
-        }
+        var expected = (from i in Enumerable.Range(1, columns)
+                        from j in Enumerable.Range(1, rows)
+                        from k in Enumerable.Range(1, sheets)
+                        select (Code: $"{{T_01,y{j},x{i},z{k}}}", Positions: new List<string> { $"x{i}", $"y{j}", $"z{k}" }))
+            .ToDictionary(e => e.Code, e => e.Positions);
 
         var cells = outcome.Cells();
         var total = columns * rows * sheets;
@@ -262,6 +257,14 @@ public sealed class AxisAndCellStructureSyntheticTests
         foreach (var cell in cells)
         {
             Assert.Equal(expected[cell.BusinessCode!], outcome.PositionCodes(cell.CellId));
+        }
+    }
+
+    private static void AddHeaders(AxisCellWorld world, string axis, string prefix, int count)
+    {
+        foreach (var n in Enumerable.Range(1, count))
+        {
+            world.AddHeader(axis, $"{prefix}{n}");
         }
     }
 
