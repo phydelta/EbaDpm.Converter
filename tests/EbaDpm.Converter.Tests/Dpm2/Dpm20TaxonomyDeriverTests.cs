@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Core.Mapping.Dpm20;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -65,10 +66,20 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
             fixture.Reader.CutoffReleaseId);
 
     [DataFact]
-    public void CurrentTableVersions_Are929_With126Abstract()
+    public void CurrentTableVersions_AndTheirAbstracts_MatchTheAccessSource()
     {
-        Assert.Equal(929, fixture.TableVersions.Count);
-        Assert.Equal(126, fixture.TableVersions.Count(tv => tv.IsAbstract));
+        // Derived with independent OLEDB queries (AccessCensus), by Release.Code, not measured literals.
+        var accdb = RepoPaths.AccessDpm20DatabasePath;
+        var expectedCurrent = AccessCensus.CountInForce(accdb, "TableVersion", RepoPaths.Cutoff42ReleaseCode);
+        var expectedAbstract = AccessCensus.CountAbstractTableVersionsInForce(accdb, RepoPaths.Cutoff42ReleaseCode);
+
+        Assert.True(
+            expectedCurrent == fixture.TableVersions.Count,
+            $"TableVersion in force at {RepoPaths.Cutoff42ReleaseCode}: the source counts {expectedCurrent}, the reader returned {fixture.TableVersions.Count}.");
+        var abstractCount = fixture.TableVersions.Count(tv => tv.IsAbstract);
+        Assert.True(
+            expectedAbstract == abstractCount,
+            $"Abstract TableVersion in force at {RepoPaths.Cutoff42ReleaseCode}: the source counts {expectedAbstract}, the reader returned {abstractCount}.");
     }
 
     /// <summary>Emitted = non-abstract, without DORA -> 788, and 788 DISTINCT codes.</summary>
@@ -102,7 +113,7 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
     }
 
     [DataFact]
-    public void Derive_Produces32Taxonomies_18DistinctFrameworks()
+    public void Derive_Produces32Taxonomies_AndThePinnedNumberOfDistinctFrameworks()
     {
         var derivation = Derive();
 
@@ -110,7 +121,9 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
         Assert.Equal(32, derivation.Taxonomies.Count);
 
         var distinctFrameworks = derivation.Taxonomies.Select(t => t.FrameworkId).Distinct().Count();
-        Assert.Equal(18, distinctFrameworks);
+        Assert.True(
+            ReleasePins.Dpm20Cutoff42FrameworksWithTaxonomies == distinctFrameworks,
+            ReleasePins.Message(ReleasePins.Dpm20Cutoff42, "distinct frameworks carrying a derived taxonomy", ReleasePins.Dpm20Cutoff42FrameworksWithTaxonomies, distinctFrameworks));
     }
 
     /// <summary>Exact breakdown, one by one, against <see cref="ExpectedTableCountByTaxonomyCode"/>.</summary>
