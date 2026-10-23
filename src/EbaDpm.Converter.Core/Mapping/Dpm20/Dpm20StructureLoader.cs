@@ -94,7 +94,7 @@ public static class Dpm20StructureLoader
     private readonly record struct L2Key(int TaxonomyId, int TemplateTableId);
 
     public static Result Load(
-        Dpm20AccessReader reader,
+        IDpm20StructureSource reader,
         SqliteConnection destination,
         Dpm20TaxonomyDerivationResult derivation,
         IReadOnlyList<Dpm20TableVersionRow> currentTableVersions,
