@@ -46,6 +46,25 @@ internal static class AccessCensus
         }
     }
 
+    /// <summary>Every column of every row of the query (values as read by OLEDB; NULL is <see cref="DBNull"/>).</summary>
+    public static List<object[]> Rows(string accdb, string sql)
+    {
+        using var connection = Open(accdb);
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.CommandTimeout = 600;
+        using var rows = command.ExecuteReader();
+        var result = new List<object[]>();
+        while (rows.Read())
+        {
+            var values = new object[rows.FieldCount];
+            rows.GetValues(values);
+            result.Add(values);
+        }
+
+        return result;
+    }
+
     /// <summary>Two columns (a text business key and an integer) of every row of the query.</summary>
     public static Dictionary<string, int> IntByCode(string accdb, string sql)
     {

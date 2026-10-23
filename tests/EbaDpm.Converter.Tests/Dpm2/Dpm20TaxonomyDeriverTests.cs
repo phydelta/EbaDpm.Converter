@@ -6,18 +6,20 @@ using Microsoft.Data.Sqlite;
 namespace EbaDpm.Converter.Tests.Dpm2;
 
 /// <summary>
-/// <c>Dpm20TaxonomyDeriver</c>: the taxonomy derivation. Figures measured against the source, all
-/// exact except where containment (not equality) is the right comparison.
+/// <c>Dpm20TaxonomyDeriver</c>: the taxonomy derivation. The populations are scoped pins of
+/// <see cref="ReleasePins"/> (scope <see cref="ReleasePins.Dpm20Cutoff42"/>), exact except where
+/// containment (not equality) is the right comparison.
 /// </summary>
 [Collection("Dpm2")]
 public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
 {
     /// <summary>
-    /// EXACT breakdown per taxonomy, summing to 847 (it was 846 before the abstract-table closure
-    /// rule): a module composition declared <c>C_34.02.b</c> as an ABSTRACT table in <c>if 4.2</c>,
+    /// EXACT breakdown per taxonomy, a scoped census (<see cref="ReleasePins.Dpm20Cutoff42"/>) that
+    /// sums to <see cref="ReleasePins.Dpm20Cutoff42MTableRows"/> (one more than before the
+    /// abstract-table closure rule): a module composition declared <c>C_34.02.b</c> as an ABSTRACT table in <c>if 4.2</c>,
     /// and the abstract-closure rule adds its current concrete children -- the pair
-    /// <c>(if 4.2, C_34.02.b)</c> goes from 0 to 1, and only <c>if 4.2</c> changes (47 -&gt; 48):
-    /// no other taxonomy moves.
+    /// <c>(if 4.2, C_34.02.b)</c> goes from 0 to 1, and only <c>if 4.2</c> changes: no other
+    /// taxonomy moves.
     /// </summary>
     private static readonly Dictionary<string, int> ExpectedTableCountByTaxonomyCode = new(StringComparer.Ordinal)
     {
@@ -82,9 +84,9 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
             $"Abstract TableVersion in force at {RepoPaths.Cutoff42ReleaseCode}: the source counts {expectedAbstract}, the reader returned {abstractCount}.");
     }
 
-    /// <summary>Emitted = non-abstract, without DORA -> 788, and 788 DISTINCT codes.</summary>
+    /// <summary>Emitted = non-abstract, without DORA: the pinned number of table versions, and as many DISTINCT codes.</summary>
     [DataFact]
-    public void Derive_EmitsExactly788DistinctTableCodes()
+    public void Derive_EmitsExactlyThePinnedDistinctTableCodes()
     {
         var derivation = Derive();
 
@@ -93,32 +95,36 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
             .Distinct()
             .ToList();
 
-        Assert.Equal(788, emittedTableVIds.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42, "distinct emitted table versions", ReleasePins.Dpm20Cutoff42EmittedTableCodes, emittedTableVIds.Count);
 
         var tableVersionByVId = fixture.TableVersions.ToDictionary(tv => tv.TableVId);
         var distinctCodes = emittedTableVIds.Select(id => tableVersionByVId[id].Code).Distinct().ToList();
-        Assert.Equal(788, distinctCodes.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42, "distinct emitted table codes", ReleasePins.Dpm20Cutoff42EmittedTableCodes, distinctCodes.Count);
     }
 
     [DataFact]
-    public void Derive_Produces847TableTaxonomyPairs()
+    public void Derive_ProducesThePinnedTableTaxonomyPairs()
     {
         var derivation = Derive();
 
         var totalPairs = derivation.TableCounts.Sum(c => c.TableCount);
 
-        // 847, not 846: the abstract-closure rule adds the pair (if 4.2, C_34.02.b) that the closure
-        // without resolving abstract tables used to lose.
-        Assert.Equal(847, totalPairs);
+        // The abstract-closure rule adds the pair (if 4.2, C_34.02.b) that the closure without
+        // resolving abstract tables used to lose.
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42, "derived (taxonomy, table) pairs", ReleasePins.Dpm20Cutoff42MTableRows, totalPairs);
     }
 
     [DataFact]
-    public void Derive_Produces32Taxonomies_AndThePinnedNumberOfDistinctFrameworks()
+    public void Derive_ProducesThePinnedTaxonomies_AndThePinnedNumberOfDistinctFrameworks()
     {
         var derivation = Derive();
 
-        // 32, NOT 31: deliberate -- all 31 of the reference, plus "pay 4.1".
-        Assert.Equal(32, derivation.Taxonomies.Count);
+        // One more than the reference, deliberate: all of the reference's, plus "pay 4.1".
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42, "derived taxonomies", ReleasePins.Dpm20Cutoff42MTaxonomyRows, derivation.Taxonomies.Count);
 
         var distinctFrameworks = derivation.Taxonomies.Select(t => t.FrameworkId).Distinct().Count();
         Assert.True(
@@ -136,24 +142,24 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
             .Join(derivation.TableCounts, t => t.TaxonomyId, c => c.TaxonomyId, (t, c) => (t.TaxonomyCode, c.TableCount))
             .ToDictionary(x => x.TaxonomyCode, x => x.TableCount, StringComparer.Ordinal);
 
-        Assert.Equal(ExpectedTableCountByTaxonomyCode.Count, countByCode.Count);
+        var pin = ReleasePins.Dpm20Cutoff42;
+        ReleasePins.AssertPinned(pin, "derived taxonomies with a table count", ExpectedTableCountByTaxonomyCode.Count, countByCode.Count);
 
         foreach (var (code, expectedCount) in ExpectedTableCountByTaxonomyCode)
         {
-            Assert.True(countByCode.TryGetValue(code, out var actualCount), $"Derived taxonomy '{code}' is missing.");
-            Assert.True(
-                expectedCount == actualCount,
-                $"'{code}': expected {expectedCount} tables, derived {actualCount}.");
+            Assert.True(countByCode.TryGetValue(code, out var actualCount), $"Derived taxonomy '{code}' is missing ({pin}).");
+            ReleasePins.AssertPinned(pin, $"tables derived for taxonomy '{code}'", expectedCount, actualCount);
         }
 
-        // 847, not 846: see the comment on ExpectedTableCountByTaxonomyCode.
-        Assert.Equal(847, countByCode.Values.Sum());
+        // Identity: the breakdown sums to the pinned mTable population.
+        ReleasePins.AssertPinned(
+            pin, "sum of the tables derived per taxonomy", ReleasePins.Dpm20Cutoff42MTableRows, countByCode.Values.Sum());
     }
 
     /// <summary>
     /// Comparison by CONTAINMENT, never by equality. The 31 <c>TaxonomyCode</c> values of
-    /// <c>mTaxonomy</c> (EBA_4.2_Hotfix.db) must ALL be among the 32 derived ones, and ZERO may be
-    /// left only in the reference. A test demanding equal censuses (31 == 32) would be wrongly written.
+    /// <c>mTaxonomy</c> (EBA_4.2_Hotfix.db) must ALL be among the derived ones, and NONE may be
+    /// left only in the reference. A test demanding equal censuses would be wrongly written.
     /// </summary>
     [DataFact]
     public void Derive_Contains_AllReferenceTaxonomyCodes_ByContainment()
@@ -167,9 +173,12 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
 
         var onlyInReference = referenceCodes.Except(derivedCodes).ToList();
 
-        Assert.Equal(31, referenceCodes.Count);
-        Assert.Empty(onlyInReference);
-        Assert.True(referenceCodes.IsSubsetOf(derivedCodes));
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42, "reference mTaxonomy codes", ReleasePins.Reference42MTaxonomyRows, referenceCodes.Count);
+        Assert.True(
+            onlyInReference.Count == 0,
+            $"Reference taxonomy codes not derived: {string.Join(", ", onlyInReference)}.");
+        Assert.True(referenceCodes.IsSubsetOf(derivedCodes), "The reference taxonomy codes are not a subset of the derived ones.");
     }
 
     private static HashSet<string> ReadReferenceTaxonomyCodes()

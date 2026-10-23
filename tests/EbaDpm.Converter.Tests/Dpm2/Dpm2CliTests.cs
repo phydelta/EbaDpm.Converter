@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Cli;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -10,7 +11,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 public sealed class Dpm2CliTests
 {
     [DataFact]
-    public void ListTaxonomies_OnDpm20Source_Exits0_AndReports32Taxonomies()
+    public void ListTaxonomies_OnDpm20Source_Exits0_AndReportsThePinnedTaxonomyCount()
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
@@ -22,11 +23,14 @@ public sealed class Dpm2CliTests
 
         Assert.Equal(CliRunner.ExitOk, exitCode);
         Assert.Empty(stderr.ToString());
-        Assert.Contains("Total: 32 taxonomies.", stdout.ToString(), StringComparison.Ordinal);
+        var expected = $"Total: {ReleasePins.Dpm20Cutoff42MTaxonomyRows} taxonomies.";
+        Assert.True(
+            stdout.ToString().Contains(expected, StringComparison.Ordinal),
+            $"--list-taxonomies output lacks '{expected}' (cutoff {RepoPaths.Cutoff42ReleaseCode}, {ReleasePins.Dpm20Cutoff42}). Output: {stdout}");
     }
 
     [DataFact]
-    public void ListTaxonomies_OnDpm10Source_Exits0_AndReports128Taxonomies()
+    public void ListTaxonomies_OnDpm10Source_Exits0_AndReportsThePinnedTaxonomyCount()
     {
         RepoPaths.EnsureAccessDatabaseExists();
 
@@ -38,7 +42,10 @@ public sealed class Dpm2CliTests
 
         Assert.Equal(CliRunner.ExitOk, exitCode);
         Assert.Empty(stderr.ToString());
-        Assert.Contains("Total: 128 taxonomies.", stdout.ToString(), StringComparison.Ordinal);
+        var expected = $"Total: {ReleasePins.Dpm10All41ListedTaxonomies} taxonomies.";
+        Assert.True(
+            stdout.ToString().Contains(expected, StringComparison.Ordinal),
+            $"--list-taxonomies output lacks '{expected}' ({ReleasePins.Dpm10All41}). Output: {stdout}");
     }
 
     /// <summary>

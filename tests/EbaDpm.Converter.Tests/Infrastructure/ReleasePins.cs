@@ -176,6 +176,45 @@ internal static class ReleasePins
     /// <summary><c>COUNT(1)</c> of <c>mModule</c> in the 4.2 reference export (<see cref="Reference42"/>).</summary>
     public const int Reference42MModuleRows = 50;
 
+    // ------------------------------------------------------------------
+    // DPM 2.0 structure (mTable, mTemplateOrTable tree) and taxonomy derivation, scope
+    // Dpm20Cutoff42. Table closure, abstract resolution and the template tree are rules, so the
+    // populations are pinned; the identities between them are asserted separately.
+    // ------------------------------------------------------------------
+
+    /// <summary><c>COUNT(1)</c> of <c>mTable</c> (and of <c>mTaxonomyTable</c> and of the <c>BusinessTable</c> rows of <c>mTemplateOrTable</c>).</summary>
+    public const int Dpm20Cutoff42MTableRows = 847;
+
+    /// <summary><c>TableGroup</c> rows of <c>mTemplateOrTable</c> with <c>Level</c> 1 (the root groups).</summary>
+    public const int Dpm20Cutoff42TableGroupLevel1Rows = 111;
+
+    /// <summary><c>TableGroup</c> rows of <c>mTemplateOrTable</c> with <c>Level</c> 2 (the templates).</summary>
+    public const int Dpm20Cutoff42TableGroupLevel2Rows = 572;
+
+    /// <summary>Distinct <c>TemplateOrTableCode</c> values of the <c>Level</c> 2 <c>TableGroup</c> rows.</summary>
+    public const int Dpm20Cutoff42DistinctLevel2TemplateCodes = 563;
+
+    /// <summary><c>BusinessTable</c> rows of <c>mTemplateOrTable</c> whose parent is a real node (<c>ParentTemplateOrTableID</c> not 0).</summary>
+    public const int Dpm20Cutoff42BusinessTablesWithRealParent = 799;
+
+    /// <summary><c>BusinessTable</c> rows of <c>mTemplateOrTable</c> that are orphans (<c>ParentTemplateOrTableID</c> = 0).</summary>
+    public const int Dpm20Cutoff42OrphanBusinessTables = 48;
+
+    /// <summary>Distinct table codes emitted (non-abstract, without DORA): distinct <c>mTable.TableCode</c>.</summary>
+    public const int Dpm20Cutoff42EmittedTableCodes = 788;
+
+    /// <summary><c>COUNT(1)</c> of <c>mTaxonomy</c> in the 4.2 reference export (<see cref="Reference42"/>).</summary>
+    public const int Reference42MTaxonomyRows = 31;
+
+    /// <summary><c>COUNT(1)</c> of <c>mReportingFramework</c> in the 4.2 reference export (<see cref="Reference42"/>).</summary>
+    public const int Reference42MReportingFrameworkRows = 18;
+
+    /// <summary>Distinct <c>mTable.TableCode</c> values in the 4.2 reference export (<see cref="Reference42"/>).</summary>
+    public const int Reference42MTableCodes = 788;
+
+    /// <summary>The DPM 1.0 release 4.1 taxonomies listed by <c>--list-taxonomies</c> (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41ListedTaxonomies = 128;
+
     /// <summary>Asserts a pinned figure; the failure message prints the scope of the pin.</summary>
     public static void AssertPinned(ReleasePin pin, string what, long expected, long actual)
         => Xunit.Assert.True(expected == actual, Message(pin, what, expected, actual));
