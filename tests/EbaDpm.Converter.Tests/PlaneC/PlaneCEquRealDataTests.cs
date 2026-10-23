@@ -1,5 +1,6 @@
 using EbaDpm.Converter.Core.Validation;
 using EbaDpm.Converter.Tests.Dpm2;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Support;
 
 namespace EbaDpm.Converter.Tests.PlaneC;
@@ -18,10 +19,11 @@ namespace EbaDpm.Converter.Tests.PlaneC;
 /// The PROPERTY is asserted, never a figure that can move with each layout re-extraction -- except
 /// the counter of relaxations (<c>RulesRelaxedByOpenAxisBracket</c>), which is the positive control
 /// that the relaxation is really being applied (if it were 0, the relaxation would have no effect
-/// on the real corpus), and the exact figure of checkable rules (4,960), a deliberate exception:
-/// it proves that restricting the ordinate index by <c>TableID</c> genuinely RECOVERS coverage
-/// (4,849 without the restriction) and not just "more than 1,000". If it stops being 4,960 it is
-/// a FINDING -- the test is not relaxed to make it pass again: it is documented and reported.
+/// on the real corpus), and the exact figures of checkable and total rules, pinned to
+/// <see cref="ReleasePins.Layouts42"/>: they prove that restricting the ordinate index by
+/// <c>TableID</c> genuinely RECOVERS coverage and not just "more than a threshold". If a pin
+/// stops holding it is a FINDING -- the test is not relaxed to make it pass again: it is
+/// documented and reported.
 /// </summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
@@ -34,10 +36,10 @@ public sealed class PlaneCEquRealDataTests(Dpm20SkeletonFixture fixture)
 
         var cEqu01 = Assert.Single(result.Report.Checks, c => c.Id == "C-EQU-01");
 
-        // The exact FIGURE, not a threshold -- 4,960 checkable out of 5,120 total rules (versus
-        // 4,849 without the restriction by TableID: the 111 recovered are exactly those that fell
-        // into "ambiguous cell" because of table codes shared between taxonomies).
-        Assert.Equal(4960, cEqu01.Examined);
+        // The exact FIGURE, not a threshold (the rules recovered by restricting the ordinate
+        // index by TableID are those that fell into "ambiguous cell" because of table codes shared
+        // between taxonomies).
+        ReleasePins.AssertPinned(ReleasePins.Layouts42, "C-EQU-01 checkable rules", 4960, cEqu01.Examined);
 
         Assert.NotEqual("skipped", cEqu01.Status);
         Assert.Equal(0, cEqu01.Failed);
@@ -55,7 +57,7 @@ public sealed class PlaneCEquRealDataTests(Dpm20SkeletonFixture fixture)
         var coverage = Assert.Single(result.Report.Checks, c => c.Id == "C-EQU-02");
 
         Assert.Equal("info", coverage.Status);
-        Assert.True(coverage.Examined > 1000, $"C-EQU-02 examined only {coverage.Examined} total rules.");
+        ReleasePins.AssertPinned(ReleasePins.Layouts42, "C-EQU-02 total rules", 5120, coverage.Examined);
         Assert.Contains("checkable", coverage.Statement);
 
         // The positive control that the relaxation really has an effect on the real corpus: if

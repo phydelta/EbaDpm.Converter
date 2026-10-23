@@ -1,6 +1,7 @@
 using EbaDpm.Converter.Core.Validation;
 using EbaDpm.Converter.Core.Validation.PlaneC;
 using EbaDpm.Converter.Tests.Dpm2;
+using EbaDpm.Converter.Tests.Infrastructure;
 using Microsoft.Data.Sqlite;
 using EbaDpm.Converter.Tests.Support;
 
@@ -111,7 +112,7 @@ public sealed class PlaneCKeyColumnRealDataTests(Dpm20SkeletonFixture fixture)
     }
 
     /// <summary>Surface property (not the exact figure): C-KEY-01 excludes a positive number of
-    /// signatures, in more than one table -- 22 in 16 tables were measured on the 4.2 corpus.</summary>
+    /// signatures, in more than one table (the figures are pinned to <see cref="ReleasePins.Layouts42"/>).</summary>
     [DataFact]
     public void CKey01_OnTheRealDpm2042Corpus_ExcludesAPositiveSetInSeveralTables()
     {
@@ -119,9 +120,9 @@ public sealed class PlaneCKeyColumnRealDataTests(Dpm20SkeletonFixture fixture)
 
         var cKey01 = Assert.Single(result.Report.Checks, c => c.Id == "C-KEY-01");
 
-        Assert.True(cKey01.Examined > 0, "C-KEY-01 examined 0 key columns on the real corpus -- 22 were measured.");
+        ReleasePins.AssertPinned(ReleasePins.Layouts42, "C-KEY-01 key columns excluded", 22, cKey01.Examined);
         var tablesNamed = cKey01.Samples.Select(s => s.BusinessKey.Split(' ')[0]).Distinct().ToList();
-        Assert.True(tablesNamed.Count > 1, $"C-KEY-01 names only {tablesNamed.Count} table(s) -- 16 were measured.");
+        ReleasePins.AssertPinned(ReleasePins.Layouts42, "C-KEY-01 distinct tables named in the samples", 16, tablesNamed.Count);
 
         // The exclusion reduces SignaturesCompared of C-DPS-01/C-COB-01 by exactly the same amount
         // it excludes -- it must not appear duplicated or lost in the coverage.

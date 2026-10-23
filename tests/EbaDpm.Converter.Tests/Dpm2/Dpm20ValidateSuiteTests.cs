@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Core.Validation;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using EbaDpm.Converter.Tests.Support;
 
@@ -16,13 +17,12 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <c>Validator.Run</c> requires -- so no second full conversion is needed.
 ///
 /// Without a reference, over <c>--all</c>, all critical checks pass. With the 4.2 reference,
-/// <c>B-OCA-01</c> measures thousands of failures out of roughly 18,500 leaf ordinates (about
-/// 46%); the order of magnitude, not the exact figure, is what this suite records.
+/// <c>B-OCA-01</c> is run and its universe is pinned (<see cref="ReleasePins.Reference42"/>); the
+/// number of failures is recorded, not asserted.
 ///
-/// The number of critical checks used to be asserted with a FIXED value, which broke every time a
-/// new invariant was added. What the test really protects is "no critical check fails" and "the
-/// harness has not been emptied by accident", so the count is a FLOOR (it must not drop below 214,
-/// which would reveal a check deleted by accident) and not an equality.
+/// The number of critical checks is pinned to <see cref="ReleasePins.Dpm20Cutoff42"/> (exact, so a
+/// check deleted by accident is caught). Adding a critical check makes the pin fail on purpose:
+/// it is a re-measure, not a defect.
 /// </summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
@@ -31,9 +31,8 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
     /// <summary>
     /// <c>--validate</c> WITHOUT a reference over the <c>--all</c> conversion. What it protects is
     /// <b>"no critical check fails"</b> -- not an exact number of checks, which grows every time a
-    /// new invariant is registered. The count is kept as an informative FLOOR (not an equality
-    /// assertion): it protects against a harness that is emptied by accident, without breaking
-    /// every time the catalogue grows.
+    /// new invariant is registered. The count is a scoped pin (see the class comment): it protects
+    /// against a harness that is emptied by accident.
     /// </summary>
     [DataFact]
     public void Validate_WithoutReference_OverAll_AllCriticalChecksPass()
@@ -53,22 +52,27 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
 
         Assert.Equal(0, result.Report.Summary.Critical.Failed);
 
-        // Floor, not equality: 214 is the measured count of critical checks. One more critical check
-        // raises it without breaking this test; if it DROPS below 214 the test must fail -- it would
-        // be the harness silently losing coverage.
-        Assert.True(
-            result.Report.Summary.Critical.Checks >= 214,
-            $"Only {result.Report.Summary.Critical.Checks} critical checks were run "
-            + "(expected floor: 214). The harness appears to have lost coverage.");
+        // Run WITHOUT a reference (referencePath: null above). A drop would be the harness silently
+        // losing coverage; a rise is a new critical check, to be re-measured.
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42, "critical checks run without a reference", 216, result.Report.Summary.Critical.Checks);
         Assert.Equal(0, result.ExitCode);
 
         // Explicit protection of the merge of the ABSTRACT ordinate with its own cells: without it,
-        // A-OCA-01 broke on 444 of 18,529 leaves. If someone removes that merge, this assertion --
+        // A-OCA-01 broke on part of the leaves. If someone removes that merge, this assertion --
         // and the ones above -- are what catch it; there is no other one in the whole suite.
         var aoca01 = Assert.Single(result.Report.Checks, c => c.Id == "A-OCA-01");
         Assert.Equal("pass", aoca01.Status);
         Assert.Equal(0, aoca01.Failed);
-        Assert.True(aoca01.Examined > 18000, $"A-OCA-01 examined only {aoca01.Examined} leaves: unexpectedly small universe.");
+
+        // Derived with an independent SQL over the output: the distinct leaf ordinates (not abstract
+        // headers) of the closed axes linked to a table.
+        var leaves = ScalarOnOutput(
+            "SELECT COUNT(DISTINCT o.OrdinateID) FROM mAxisOrdinate o JOIN mAxis a ON a.AxisID = o.AxisID "
+            + "JOIN mTableAxis ta ON ta.AxisID = a.AxisID WHERE a.IsOpenAxis = 0 AND o.IsAbstractHeader = 0");
+        Assert.True(
+            leaves == aoca01.Examined,
+            $"A-OCA-01 leaves examined: expected {leaves} (derived by SQL from the generated mAxisOrdinate/mAxis/mTableAxis), actual {aoca01.Examined}.");
     }
 
     /// <summary>
@@ -86,14 +90,13 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
 
         var bOca01 = Assert.Single(result.Report.Checks, c => c.Id == "B-OCA-01");
 
-        Assert.True(
-            bOca01.Examined > 17000,
-            $"B-OCA-01 examined only {bOca01.Examined} leaf ordinates: unexpectedly small universe.");
+        ReleasePins.AssertPinned(ReleasePins.Reference42, "B-OCA-01 leaf ordinates examined", 18556, bOca01.Examined);
 
         // No concrete number of failures is asserted (similarity of a table that is not compared by
-        // census is not pursued) -- it is only recorded that the check KEEPS running, and its order
-        // of magnitude, so the report has an anchor.
-        Assert.True(bOca01.Failed >= 0 && bOca01.Failed <= bOca01.Examined);
+        // census is not pursued): only that the failures are a subset of what was examined.
+        Assert.True(
+            bOca01.Failed <= bOca01.Examined,
+            $"B-OCA-01 failed {bOca01.Failed} of {bOca01.Examined} examined: failures exceed the universe.");
     }
 
     /// <summary>
@@ -194,6 +197,21 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
         }
 
         Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
+    }
+
+    private long ScalarOnOutput(string sql)
+    {
+        var connectionString = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+        {
+            DataSource = fixture.ValidatedDatabasePath,
+            Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadOnly,
+            Pooling = false,
+        }.ToString();
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection(connectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToInt64(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static long CountDimension(string path, string dimensionCode)
