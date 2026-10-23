@@ -33,7 +33,7 @@ namespace EbaDpm.Converter.Core.Access.Dpm20;
 /// The methods that would need a larger JOIN read the tables separately and combine them in
 /// memory in the mapping layer (<c>Dpm20TaxonomyDeriver</c>): the volumes involved are small.
 /// </summary>
-public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDisposable
+public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20DictionarySource, IDisposable
 {
     private readonly string _connectionString;
     private readonly int? _requestedCutoffReleaseId;

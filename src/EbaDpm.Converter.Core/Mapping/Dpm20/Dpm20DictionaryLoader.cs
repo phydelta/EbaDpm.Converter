@@ -789,7 +789,7 @@ public static class Dpm20DictionaryLoader
     /// Output: the named cases that are not fully resolved (failures and "no link"/"no
     /// PropertyCategory"). They are reported, not forced.
     /// </param>
-    public static Result Load(Dpm20AccessReader reader, SqliteConnection destination, out Diagnostics diagnostics)
+    public static Result Load(IDpm20DictionarySource reader, SqliteConnection destination, out Diagnostics diagnostics)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(destination);
