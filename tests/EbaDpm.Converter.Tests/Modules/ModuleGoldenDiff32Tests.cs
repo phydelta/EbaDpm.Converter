@@ -35,15 +35,14 @@ public sealed class ModuleGoldenDiff32Tests
     private static readonly HashSet<string> TargetTaxonomies =
         new(StringComparer.Ordinal) { "ae_3.2", "corep_3.2", "gsii_3.2", "if_3.2" };
 
-    /// <summary>Known divergences of the reference database: the five rows, named one by one.</summary>
-    private static readonly HashSet<(string Taxonomy, string Module)> DeclaredXbrlSchemaRefDivergences = new()
-    {
-        ("if_3.2", "IF_CLASS2"),
-        ("if_3.2", "IF_CLASS3"),
-        ("if_3.2", "IF_GROUPTEST"),
-        ("if_3.2", "IF_TM"),
-        ("gsii_3.2", "GSII"),
-    };
+    /// <summary>
+    /// Known divergences of the reference database (registry DD-1..DD-5, check <c>B-MOD-02</c>): the
+    /// registry key is <c>taxonomy|module</c>. This class keeps no copy.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> RegisteredXbrlSchemaRefDivergences =
+        RegistryExceptions.ByKey("B-MOD-02", "DD-1", "DD-2", "DD-3", "DD-4", "DD-5");
+
+    private static string DivergenceKey((string Taxonomy, string Module) key) => $"{key.Taxonomy}|{key.Module}";
 
     private readonly ModulesFixture _fixture;
 
@@ -257,14 +256,14 @@ public sealed class ModuleGoldenDiff32Tests
         {
             Assert.True(generated.TryGetValue(key, out var genValue), $"{key.Taxonomy}/{key.Module} missing from the generated output");
 
-            var isDeclaredDivergence = DeclaredXbrlSchemaRefDivergences.Contains(key);
+            var isDeclaredDivergence = RegisteredXbrlSchemaRefDivergences.ContainsKey(DivergenceKey(key));
             var literalMatch = string.Equals(genValue, refValue, StringComparison.Ordinal);
 
             if (isDeclaredDivergence)
             {
                 if (literalMatch)
                 {
-                    unexpectedMatches.Add($"{key.Taxonomy}/{key.Module}: declared divergence but it now matches ('{genValue}'): stale exception");
+                    unexpectedMatches.Add($"{key.Taxonomy}/{key.Module}: declared divergence {RegisteredXbrlSchemaRefDivergences[DivergenceKey(key)]} but it now matches ('{genValue}'): stale exception");
                 }
                 else
                 {
@@ -295,10 +294,10 @@ public sealed class ModuleGoldenDiff32Tests
             $"the exception is stale and must be removed:\n" + string.Join("\n", unexpectedMatches));
 
         Assert.True(
-            declaredDivergences == DeclaredXbrlSchemaRefDivergences.Count,
-            $"Declared XBRLSchemaRef divergences seen: expected {DeclaredXbrlSchemaRefDivergences.Count} (the declared list), actual {declaredDivergences}.");
+            declaredDivergences == RegisteredXbrlSchemaRefDivergences.Count,
+            $"Declared XBRLSchemaRef divergences seen: expected {RegisteredXbrlSchemaRefDivergences.Count} (the declared list), actual {declaredDivergences}.");
         Assert.True(
-            literalMatches == reference.Count - DeclaredXbrlSchemaRefDivergences.Count,
-            $"XBRLSchemaRef literal matches: expected {reference.Count - DeclaredXbrlSchemaRefDivergences.Count} (reference modules {reference.Count} minus declared divergences {DeclaredXbrlSchemaRefDivergences.Count}), actual {literalMatches}.");
+            literalMatches == reference.Count - RegisteredXbrlSchemaRefDivergences.Count,
+            $"XBRLSchemaRef literal matches: expected {reference.Count - RegisteredXbrlSchemaRefDivergences.Count} (reference modules {reference.Count} minus declared divergences {RegisteredXbrlSchemaRefDivergences.Count}), actual {literalMatches}.");
     }
 }

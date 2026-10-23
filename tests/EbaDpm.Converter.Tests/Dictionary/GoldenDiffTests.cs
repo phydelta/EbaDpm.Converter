@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using EbaDpm.Converter.Tests.Infrastructure;
 using Xunit.Abstractions;
 
 namespace EbaDpm.Converter.Tests.Dictionary;
@@ -42,42 +43,72 @@ public sealed class GoldenDiffTests
     private static string NormalizeXbrlCode(string code) => ReleaseSuffixPattern.Replace(code, string.Empty);
 
     // ------------------------------------------------------------------
-    // Exceptions named by business key, one per comparison. "Everything Technical_*" is never
-    // excluded; only these four exact codes.
+    // Exceptions named by business key, one per comparison, READ FROM THE REGISTRY
+    // (KnownExceptions.All, filtered by Id and Check): this class keeps no copy. "Everything
+    // Technical_*" is never excluded; only the exact registered keys.
     // ------------------------------------------------------------------
 
-    private static readonly IReadOnlyDictionary<string, string> DomainCodeExceptions = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        ["met_temp"] = "temporary metrics domain",
-        ["templateDomain"] = "template domain",
-    };
+    private static readonly IReadOnlyDictionary<string, string> DomainCodeExceptions =
+        RegistryExceptions.ByKey("B-DIC-01-DOMAIN-CODE", "E-2", "E-3");
 
-    private static readonly IReadOnlyDictionary<string, string> DimensionCodeExceptions = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        ["template"] = "template dimension",
-    };
+    private static readonly IReadOnlyDictionary<string, string> DimensionCodeExceptions =
+        RegistryExceptions.ByKey("B-DIC-01-DIMENSION-CODE", "E-4");
 
-    private static readonly IReadOnlyDictionary<string, string> MemberCodeExceptions = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        ["filed"] = "filed member",
-    };
+    private static readonly IReadOnlyDictionary<string, string> MemberCodeExceptions =
+        RegistryExceptions.ByKey("B-DIC-01-MEMBER-CODE", "E-5");
 
-    private static readonly IReadOnlyDictionary<string, string> DimensionXbrlCodeExceptions = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        ["Technical_dim:template"] = "template dimension",
-    };
+    // The member 'filed' is also a metric: the registry has its own entry for the metric census.
+    private static readonly IReadOnlyDictionary<string, string> MetricCodeExceptions =
+        RegistryExceptions.ByKey("B-DIC-01-METRIC-CODE", "E-5");
 
-    private static readonly IReadOnlyDictionary<string, string> MemberXbrlCodeExceptions = new Dictionary<string, string>(StringComparer.Ordinal)
+    // XBRL censuses: the registry key is the LOCAL PART of the XBRL code (after ':'), while the
+    // compared sets hold full codes. See ResolveXbrlExceptions.
+    private static readonly IReadOnlyDictionary<string, string> DimensionXbrlLocalPartExceptions =
+        RegistryExceptions.ByKey("B-DIC-01-DIMENSION-XBRL", "E-4");
+
+    // E-2 registers the 3 members of the already excluded met_temp domain one by one (si288,
+    // si730, si731), E-5 registers 'filed'. A fourth "eba_met_temp:*" that is not exactly one of
+    // these keys must still fail: the guard is not a pattern.
+    private static readonly IReadOnlyDictionary<string, string> MemberXbrlLocalPartExceptions =
+        RegistryExceptions.ByKey("B-DIC-01-MEMBER-XBRL", "E-2", "E-5");
+
+    private static string LocalPart(string xbrlCode) => xbrlCode[(xbrlCode.LastIndexOf(':') + 1)..];
+
+    /// <summary>
+    /// Turns registry keys (local part of the XBRL code) into the exact full codes they exempt: for
+    /// each registered key, the reference code with that local part that the output does not
+    /// generate. The match must be EXACTLY one code per key: none means the exception is stale (the
+    /// object left the reference or is now generated), more than one means the key would act as a
+    /// pattern. Both fail.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> ResolveXbrlExceptions(
+        string label,
+        IReadOnlyDictionary<string, string> localPartExceptions,
+        HashSet<string> generated,
+        HashSet<string> reference)
     {
-        ["Technical_met:filed"] = "filed member",
-        // Scope extension of the temporary metrics domain exception: the 3 members of the
-        // already excluded `met_temp` domain itself. Named one by one; a fourth MemberXBRLCode
-        // "eba_met_temp:*" that is not exactly one of these three must still fail (the guard is
-        // not a pattern).
-        ["eba_met_temp:si288"] = "temporary metrics domain",
-        ["eba_met_temp:si730"] = "temporary metrics domain",
-        ["eba_met_temp:si731"] = "temporary metrics domain",
-    };
+        var resolved = new Dictionary<string, string>(StringComparer.Ordinal);
+        var problems = new List<string>();
+        foreach (var (key, reason) in localPartExceptions)
+        {
+            var codes = reference
+                .Where(c => string.Equals(LocalPart(c), key, StringComparison.Ordinal) && !generated.Contains(c))
+                .OrderBy(c => c, StringComparer.Ordinal)
+                .ToList();
+            if (codes.Count != 1)
+            {
+                problems.Add($"{key} ({reason}): {codes.Count} reference code(s) with this local part are missing from the output [{string.Join(", ", codes)}]; exactly 1 expected");
+                continue;
+            }
+
+            resolved[codes[0]] = reason;
+        }
+
+        Assert.True(
+            problems.Count == 0,
+            $"{label}: registered exception(s) not resolved to exactly one missing reference code (stale, or acting as a pattern): " + string.Join("; ", problems));
+        return resolved;
+    }
 
     private HashSet<string> GeneratedCodes(string sql) =>
         QueryHelpers.Rows(_fixture.GeneratedConnection, sql, 1)
@@ -206,7 +237,7 @@ public sealed class GoldenDiffTests
             SELECT m."MemberCode" FROM "mMetric" met
             JOIN "mMember" m ON m."MemberID" = met."CorrespondingMemberID"
             """);
-        AssertContainsReference("mMetric (via MemberCode of the CorrespondingMemberID)", generated, reference, MemberCodeExceptions, _output);
+        AssertContainsReference("mMetric (via MemberCode of the CorrespondingMemberID)", generated, reference, MetricCodeExceptions, _output);
     }
 
     // ------------------------------------------------------------------
@@ -225,14 +256,16 @@ public sealed class GoldenDiffTests
 
         var generatedNormalized = generatedRaw.Select(NormalizeXbrlCode).ToHashSet(StringComparer.Ordinal);
         var referenceNormalized = referenceRaw.Select(NormalizeXbrlCode).ToHashSet(StringComparer.Ordinal);
+        var dimensionXbrlExceptions = ResolveXbrlExceptions(
+            "mDimension.DimensionXBRLCode (normalized)", DimensionXbrlLocalPartExceptions, generatedNormalized, referenceNormalized);
         AssertContainsReference(
-            "mDimension.DimensionXBRLCode (normalized)", generatedNormalized, referenceNormalized, DimensionXbrlCodeExceptions, _output);
+            "mDimension.DimensionXBRLCode (normalized)", generatedNormalized, referenceNormalized, dimensionXbrlExceptions, _output);
 
         // The normalisation must be harmless: we check that it also holds WITHOUT normalising
         // (with the same template dimension exception), and therefore that it is not masking any
         // real suffix difference.
         var missingWithoutNormalization = referenceRaw.Except(generatedRaw, StringComparer.Ordinal)
-            .Except(DimensionXbrlCodeExceptions.Keys, StringComparer.Ordinal)
+            .Except(dimensionXbrlExceptions.Keys, StringComparer.Ordinal)
             .ToList();
         Assert.True(
             missingWithoutNormalization.Count == 0,
@@ -249,7 +282,7 @@ public sealed class GoldenDiffTests
     /// excluded `met_temp` domain and another under the `MET` domain. The Access only has the
     /// second. They are the members of `met_temp` itself, covered by the scope extension of the
     /// temporary metrics domain exception, named one by one in
-    /// <see cref="MemberXbrlCodeExceptions"/>: a fourth <c>eba_met_temp:*</c> that is not exactly
+    /// <see cref="MemberXbrlLocalPartExceptions"/> (registry E-2): a fourth <c>eba_met_temp:*</c> that is not exactly
     /// one of these three must still fail.
     /// </summary>
     [DataFact]
@@ -260,11 +293,13 @@ public sealed class GoldenDiffTests
 
         var generatedNormalized = generatedRaw.Select(NormalizeXbrlCode).ToHashSet(StringComparer.Ordinal);
         var referenceNormalized = referenceRaw.Select(NormalizeXbrlCode).ToHashSet(StringComparer.Ordinal);
+        var memberXbrlExceptions = ResolveXbrlExceptions(
+            "mMember.MemberXBRLCode (normalized)", MemberXbrlLocalPartExceptions, generatedNormalized, referenceNormalized);
         AssertContainsReference(
-            "mMember.MemberXBRLCode (normalized)", generatedNormalized, referenceNormalized, MemberXbrlCodeExceptions, _output);
+            "mMember.MemberXBRLCode (normalized)", generatedNormalized, referenceNormalized, memberXbrlExceptions, _output);
 
         var missingWithoutNormalization = referenceRaw.Except(generatedRaw, StringComparer.Ordinal)
-            .Except(MemberXbrlCodeExceptions.Keys, StringComparer.Ordinal)
+            .Except(memberXbrlExceptions.Keys, StringComparer.Ordinal)
             .ToList();
         Assert.True(
             missingWithoutNormalization.Count == 0,

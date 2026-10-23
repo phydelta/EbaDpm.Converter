@@ -25,8 +25,11 @@ namespace EbaDpm.Converter.Tests.Modules;
 /// It reuses a known defect of the reference: the node
 /// <c>eba_tgIF_Class2_K-Factor_Requirements_-_Additional_Details</c> is also wrongly attributed to
 /// <c>corep 4.0</c> in <c>mModuleBusinessTemplate</c> (row of module <c>COREP_OF</c>), not only in
-/// the plain <c>mTemplateOrTable</c> census. It is the SAME object, named the same way, reused in
-/// a different comparison context; it is excluded by name and nothing else is.
+/// the plain <c>mTemplateOrTable</c> census. It is the SAME object as registry entry E-6
+/// (<c>corep_4.0|IF_Class2_K-Factor_Requirements_-_Additional_Details</c>, check <c>B-TPL-01-L1-CODE</c>),
+/// reused in a different comparison context (<c>mModuleBusinessTemplate.Order</c>), for which no
+/// validator check exists and therefore no registry entry can be bound; it is excluded by name and
+/// nothing else is.
 /// </summary>
 [Collection("Modules")]
 public sealed class ModuleGoldenDiff40Tests

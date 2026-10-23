@@ -298,6 +298,23 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
                 Accdb,
                 "SELECT COUNT(1) FROM [ItemCategory] ic INNER JOIN [Category] c ON c.[CategoryID] = ic.[CategoryID] WHERE c.[Code] = 'qIO'"),
             qioMembers.Count);
+
+        // The emitted qIO members ARE the registry's E-7 set (check B-DIC-01.9, keyed by
+        // MemberXBRLCode), in both directions: a registered member that is no longer emitted, or an
+        // emitted qIO member that is not registered, fails. The test keeps no copy of the list.
+        var registeredQio = RegistryExceptions.ByKey("B-DIC-01.9", "E-7").Keys.ToHashSet(StringComparer.Ordinal);
+        var emittedQioXbrl = ReadStringColumn(
+                """
+                SELECT m.MemberXBRLCode FROM mMember m JOIN mDomain d ON m.DomainID = d.DomainID
+                WHERE d.DomainCode = 'qIO'
+                """)
+            .ToHashSet(StringComparer.Ordinal);
+        var registeredNotEmitted = registeredQio.Except(emittedQioXbrl).OrderBy(c => c, StringComparer.Ordinal).ToList();
+        var emittedNotRegistered = emittedQioXbrl.Except(registeredQio).OrderBy(c => c, StringComparer.Ordinal).ToList();
+        Assert.True(
+            registeredNotEmitted.Count == 0 && emittedNotRegistered.Count == 0,
+            $"E-7 (B-DIC-01.9): registered but not emitted: [{string.Join(", ", registeredNotEmitted)}]; emitted qIO members not registered: [{string.Join(", ", emittedNotRegistered)}].");
+
         Assert.Contains("qx0", qioMembers);
         Assert.Contains("qx2000", qioMembers);
         Assert.Contains("qx2107", qioMembers);
@@ -409,11 +426,22 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
         var onlyInGenerated = generatedMetHierarchies.Except(referenceMetHierarchies).ToList();
         Assert.Empty(onlyInGenerated);
 
-        // The remaining 5, named - the DD-16 exception, applied by business key.
+        // The remaining ones are the DD-16 exceptions (check B-DIC-01.8) of domain MET, read from the
+        // registry (key DomainCode:HierarchyCode) and applied by exact business key, in both
+        // directions: a registered hierarchy that is no longer missing, or a missing one that is not
+        // registered, fails. The test keeps no copy of the list.
+        var registeredMet = RegistryExceptions.ByKey("B-DIC-01.8", "DD-16").Keys
+            .Where(k => k.StartsWith("MET:", StringComparison.Ordinal))
+            .Select(k => k["MET:".Length..])
+            .OrderBy(c => c, StringComparer.Ordinal)
+            .ToList();
+        Assert.True(registeredMet.Count > 0, "DD-16 (B-DIC-01.8): no registry key for domain MET; the exemption would be empty.");
         var missingFromGenerated = referenceMetHierarchies.Except(generatedMetHierarchies)
             .OrderBy(c => c, StringComparer.Ordinal)
             .ToList();
-        Assert.Equal(["AT106", "AT11", "AT6", "AT81", "AT9"], missingFromGenerated);
+        Assert.True(
+            registeredMet.SequenceEqual(missingFromGenerated, StringComparer.Ordinal),
+            $"DD-16 (B-DIC-01.8) MET hierarchies: registered [{string.Join(", ", registeredMet)}] vs missing from the output [{string.Join(", ", missingFromGenerated)}].");
     }
 
     /// <summary>
