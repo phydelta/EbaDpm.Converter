@@ -1,3 +1,4 @@
+using EbaDpm.Converter.Tests.Infrastructure;
 using Microsoft.Data.Sqlite;
 
 namespace EbaDpm.Converter.Tests.Layouts;
@@ -51,7 +52,7 @@ public sealed class LayoutCellReconstructionTests(LayoutRepositoryFixture fixtur
         using var sheetCountCmd = con.CreateCommand();
         sheetCountCmd.CommandText = "SELECT COUNT(DISTINCT SheetId) FROM LayoutCell WHERE RowOrdinateId IS NOT NULL";
         var closedAxisSheets = Convert.ToInt64(sheetCountCmd.ExecuteScalar());
-        Assert.True(closedAxisSheets > 500, $"Only {closedAxisSheets} closed-axis sheets were checked; review the extraction.");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "closed-axis sheets checked", ReleasePins.LayoutExtraction42ClosedAxisSheets, closedAxisSheets);
     }
 
     [DataFact]
@@ -66,7 +67,7 @@ public sealed class LayoutCellReconstructionTests(LayoutRepositoryFixture fixtur
         using var totalCmd = con.CreateCommand();
         totalCmd.CommandText = "SELECT COUNT(*) FROM LayoutCell";
         var total = Convert.ToInt64(totalCmd.ExecuteScalar());
-        Assert.True(total > 100000, $"Only {total} LayoutCell rows in the 4.2 corpus; review the extraction.");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "LayoutCell rows", ReleasePins.LayoutExtraction42CellRows, total);
 
         using var badRowCmd = con.CreateCommand();
         badRowCmd.CommandText =

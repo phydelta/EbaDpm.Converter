@@ -1,3 +1,4 @@
+using EbaDpm.Converter.Tests.Infrastructure;
 using Microsoft.Data.Sqlite;
 
 namespace EbaDpm.Converter.Tests.Layouts;
@@ -16,10 +17,24 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
         // Files/sheets/declarations do NOT depend on the X-axis annotation grammar.
         var summary = fixture.Summary42WithDictionary;
 
-        Assert.Equal(51, summary.FilesProcessed);
-        Assert.Equal(1117, summary.SheetsProcessed);
-        Assert.True(summary.DictionaryUsed);
-        Assert.Equal(11515, summary.DeclarationsWritten);
+        // Derived: the extractor reads every '*.xlsx' under the directory (it applies no other
+        // filename filter), so the number of files processed is the number of such files.
+        var xlsxFiles = Directory.GetFiles(Schema.RepoPaths.TableLayouts42Directory, "*.xlsx", SearchOption.AllDirectories).Length;
+        Assert.True(xlsxFiles == summary.FilesProcessed,
+            $"Files processed: expected {xlsxFiles} (the '*.xlsx' files enumerated under '{Schema.RepoPaths.TableLayouts42DirectoryName}'), actual {summary.FilesProcessed}.");
+
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "sheets processed", ReleasePins.LayoutExtraction42Sheets, summary.SheetsProcessed);
+        Assert.True(summary.DictionaryUsed, "The 4.2 extraction was run with a dictionary: DictionaryUsed must be true.");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "declarations written", ReleasePins.LayoutExtraction42Declarations, summary.DeclarationsWritten);
+
+        // Second measurement: the summary counters equal the rows of the repository tables.
+        var con = fixture.Repository42WithDictionary;
+        var sheetRows = QueryScalarLong(con, "SELECT COUNT(*) FROM LayoutSheet");
+        var declarationRows = QueryScalarLong(con, "SELECT COUNT(*) FROM LayoutDeclaration");
+        Assert.True(summary.SheetsProcessed == sheetRows,
+            $"SheetsProcessed {summary.SheetsProcessed} must equal COUNT(1) of LayoutSheet {sheetRows}.");
+        Assert.True(summary.DeclarationsWritten == declarationRows,
+            $"DeclarationsWritten {summary.DeclarationsWritten} must equal COUNT(1) of LayoutDeclaration {declarationRows}.");
     }
 
     [DataFact]
@@ -37,7 +52,7 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
         using var totalYCmd = con.CreateCommand();
         totalYCmd.CommandText = "SELECT COUNT(*) FROM LayoutOrdinate WHERE Axis = 'Y'";
         var totalY = Convert.ToInt64(totalYCmd.ExecuteScalar());
-        Assert.True(totalY > 10000, $"Only {totalY} Y ordinates: review the extraction.");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "Y ordinates", ReleasePins.LayoutExtraction42YOrdinates, totalY);
 
         using var unreferencedCmd = con.CreateCommand();
         unreferencedCmd.CommandText =
@@ -57,8 +72,9 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
     {
         // The production counter (OrdinateDatapointSlotMismatches) keeps its meaning -- how many Y
         // rows had a populated third column whose shape was NOT that of a datapoint. This checks
-        // that it keeps being reported (never silently) and as a RATE with a denominator, not an
-        // exact count equality that expires with every corpus change.
+        // that it keeps being reported (never silently) with its denominator: both the counter and
+        // the number of Y rows are pinned to the extraction, so a change of either is read as a
+        // re-measure of the release.
         var summary = fixture.Summary42WithDictionary;
         var con = fixture.Repository42WithDictionary;
 
@@ -66,22 +82,19 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
         totalYCmd.CommandText = "SELECT COUNT(*) FROM LayoutOrdinate WHERE Axis = 'Y'";
         var totalY = Convert.ToInt64(totalYCmd.ExecuteScalar());
 
-        Assert.True(summary.OrdinateDatapointSlotMismatches >= 0, "The counter must always be reported, even when it is 0.");
-        var mismatchRate = (double)summary.OrdinateDatapointSlotMismatches / totalY;
-        Assert.True(mismatchRate < 0.05,
-            $"{mismatchRate:P1} of the Y rows ({summary.OrdinateDatapointSlotMismatches}/{totalY}) have a " +
-            "datapoint slot with the wrong shape; a large increase here indicates an " +
-            "uncharacterised grammar change.");
-
-        // Structural regression canary, not the main assertion.
-        Assert.Equal(185, summary.OrdinateDatapointSlotMismatches);
+        // Numerator and denominator of the share of Y rows with a datapoint slot of the wrong
+        // shape: a change here indicates an uncharacterised grammar change.
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "Y rows (denominator of the datapoint slot mismatches)",
+            ReleasePins.LayoutExtraction42YOrdinates, totalY);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "Y rows with a datapoint slot of the wrong shape (OrdinateDatapointSlotMismatches)",
+            ReleasePins.LayoutExtraction42DatapointSlotMismatches, summary.OrdinateDatapointSlotMismatches);
     }
 
     [DataFact]
-    public void Extraction42_LayoutUnparsed_Is693OrphanDeclarations_Plus238UnlinkedValues_DerivedIndependently()
+    public void Extraction42_LayoutUnparsed_IsOrphanDeclarationsPlusUnlinkedValues_DerivedIndependently()
     {
         // LayoutUnparsed has four directions; the total is not only "declarations without a value"
-        // (693): it is 693 + 238 = 931 (the 238 being UnlinkedValue). Each summand is derived with
+        // (OrphanDeclaration): it is OrphanDeclaration + UnlinkedValue. Each summand is derived with
         // its own SQL, independent of the production counter, against the same table that
         // describes each one separately. (LayoutUnparsedGateTests shows why a bare "0" would not
         // be a measurement.)
@@ -106,29 +119,28 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
             """;
         var unlinkedValues = Convert.ToInt64(unlinkedValueCmd.ExecuteScalar());
 
-        Assert.Equal(693L, orphanDeclarations);
-        Assert.Equal(238L, unlinkedValues);
-        Assert.Equal(orphanDeclarations + unlinkedValues, unparsedTotal);
-        Assert.Equal(931L, unparsedTotal);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "declarations without any value", ReleasePins.LayoutExtraction42OrphanDeclarations, orphanDeclarations);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "unlinked values", ReleasePins.LayoutExtraction42UnlinkedValues, unlinkedValues);
+        Assert.True(orphanDeclarations + unlinkedValues == unparsedTotal,
+            $"COUNT(1) of LayoutUnparsed {unparsedTotal} must equal the orphan declarations {orphanDeclarations} plus the unlinked values {unlinkedValues}.");
     }
 
     [DataFact]
-    public void Extraction42_DatapointSlotMismatches_Is185_Not195_TheTwoThingsWereConflated()
+    public void Extraction42_DatapointSlotMismatches_AreTheThirdColumnsWithTheWrongShape_NotTheRowsWithoutThirdColumn()
     {
-        // The figure "195" mixed two distinct phenomena. This derives here, by independent SQL
-        // over LayoutRaw (without using the production counter), which of the two is
+        // Two distinct phenomena could be conflated. This derives here, by independent SQL over
+        // LayoutRaw (without using the production counter), which of the two is
         // "DatapointSlotMismatches":
         //
-        // - 10 Y-ordinate rows with FEWER than 3 populated columns: there is no datapoint slot to
+        // - Y-ordinate rows with FEWER than 3 populated columns: there is no datapoint slot to
         //   evaluate -- they are structural rows (group headings such as "A-IRB",
         //   "REQUIRED STABLE FUNDING", "Categories"), verified by Label. It is not a mismatch:
         //   there is nothing that fails to match.
-        // - 185 rows WITH a populated third column whose content has no datapoint shape
+        // - Rows WITH a populated third column whose content has no datapoint shape
         //   ("NNNNN_x000D_type"): here there IS a slot, and its shape is not the expected one.
         //
-        // 195 = 10 + 185: the original figure adds both. The right one for "slot mismatch" is
-        // 185 -- it matches the production counter (OrdinateDatapointSlotMismatches), measured here
-        // in a completely independent way.
+        // The right one for "slot mismatch" is the second -- it matches the production counter
+        // (OrdinateDatapointSlotMismatches), measured here in a completely independent way.
         var con = fixture.Repository42WithDictionary;
 
         // LayoutOrdinate has no CellRef: the Excel row of each Y ordinate is read via LayoutCell
@@ -153,7 +165,7 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
         var cellPattern = new System.Text.RegularExpressions.Regex(@"^([A-Z]+)(\d+)$");
 
         // Preload ALL of LayoutRaw grouped by sheet+row, in memory: a single pass over the table
-        // instead of one query for each of the 18,754 row ordinates.
+        // instead of one query for each row ordinate.
         var rawByRow = new Dictionary<(long SheetId, int Row), List<(int Col, string Value)>>();
         using var rawCmd = con.CreateCommand();
         rawCmd.CommandText = "SELECT SheetId, CellRef, Value FROM LayoutRaw";
@@ -182,6 +194,7 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
 
         var noThirdColumn = 0;
         var thirdColumnWrongForm = 0;
+        var thirdColumnWellFormed = 0;
 
         foreach (var (sheetId, cellRef) in yOrdinates)
         {
@@ -197,15 +210,30 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
                 continue;
             }
 
-            if (!dpPrefix.IsMatch(populatedCols[2].Value.Trim()))
+            if (dpPrefix.IsMatch(populatedCols[2].Value.Trim()))
+            {
+                thirdColumnWellFormed++;
+            }
+            else
             {
                 thirdColumnWrongForm++;
             }
         }
 
-        Assert.Equal(10, noThirdColumn);
-        Assert.Equal(185, thirdColumnWrongForm);
-        Assert.Equal(195, noThirdColumn + thirdColumnWrongForm); // the original figure, now explained
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "Y rows without a third populated column",
+            ReleasePins.LayoutExtraction42YRowsWithoutThirdColumn, noThirdColumn);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "Y rows whose third column has the wrong shape",
+            ReleasePins.LayoutExtraction42DatapointSlotMismatches, thirdColumnWrongForm);
+
+        // Identity: the three classes partition the Y rows read.
+        Assert.True(noThirdColumn + thirdColumnWrongForm + thirdColumnWellFormed == yOrdinates.Count,
+            $"The classes without third column ({noThirdColumn}), wrong shape ({thirdColumnWrongForm}) and well formed " +
+            $"({thirdColumnWellFormed}) must partition the {yOrdinates.Count} Y rows read.");
+
+        // Identity: the independent derivation equals the production counter.
+        Assert.True(thirdColumnWrongForm == fixture.Summary42WithDictionary.OrdinateDatapointSlotMismatches,
+            $"Wrong-shape third columns derived from LayoutRaw ({thirdColumnWrongForm}) must equal " +
+            $"OrdinateDatapointSlotMismatches ({fixture.Summary42WithDictionary.OrdinateDatapointSlotMismatches}).");
     }
 
     private static int ColumnLetterToIndex(string letters)
@@ -220,21 +248,25 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
     }
 
     [DataFact]
-    public void Extraction43_Has70TableSheets_NotTheErroneous74()
+    public void Extraction43_ProcessesEveryFile_AndOnlyTheTableSheets_NotTheTocSheets()
     {
-        // 74 included the 4 TOC sheets, which --extract-layouts explicitly excludes
-        // (LayoutExtractor skips the "TOC" sheet).
+        // The count of sheets must not include the TOC sheets, which --extract-layouts explicitly
+        // excludes (LayoutExtractor skips the "TOC" sheet).
         var summary = fixture.Summary43WithDictionary;
 
-        Assert.Equal(4, summary.FilesProcessed);
-        Assert.Equal(70, summary.SheetsProcessed);
+        // Derived: the extractor reads every '*.xlsx' under the directory (no other filename filter).
+        var xlsxFiles = Directory.GetFiles(Schema.RepoPaths.TableLayouts43Directory, "*.xlsx", SearchOption.AllDirectories).Length;
+        Assert.True(xlsxFiles == summary.FilesProcessed,
+            $"Files processed: expected {xlsxFiles} (the '*.xlsx' files enumerated under '{Schema.RepoPaths.TableLayouts43DirectoryName}'), actual {summary.FilesProcessed}.");
+
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction43, "sheets processed", ReleasePins.LayoutExtraction43Sheets, summary.SheetsProcessed);
     }
 
     [DataFact]
-    public void TableCodeCoverage_Matches_787_Matched_1_Missing_19_LayoutOnly()
+    public void TableCodeCoverage_MatchesTheReference_ExceptOneMissingAndTheLayoutOnlySheets()
     {
-        // Cross of mTable.TableCode (788 distinct) against the base name of each layout sheet.
-        // 787 match, F_19.00.dp has no sheet, and 19 layout sheets (B_01.01 ... B_04.01, among
+        // Cross of mTable.TableCode (distinct, 4.2 reference export) against the base name of each
+        // layout sheet. F_19.00.dp has no sheet, and some layout sheets (B_01.01 ... B_04.01, among
         // others) have no table in the 4.2 reference database.
         var con = fixture.Repository42WithDictionary;
 
@@ -252,17 +284,26 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
         var referenceOnly = referenceCodes.Except(layoutCodes).ToHashSet();
         var layoutOnly = layoutCodes.Except(referenceCodes).ToHashSet();
 
-        Assert.Equal(788, referenceCodes.Count);
-        Assert.Equal(787, matched.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference42, "distinct table codes of the reference export",
+            ReleasePins.Reference42MTableCodes, referenceCodes.Count);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "table codes matched by a layout sheet",
+            ReleasePins.LayoutExtraction42TableCodesMatchedByReference, matched.Count);
         Assert.Equal(["F_19.00.dp"], referenceOnly.Order().ToArray());
-        Assert.Equal(19, layoutOnly.Count);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "layout table codes absent from the reference export",
+            ReleasePins.LayoutExtraction42TableCodesLayoutOnly, layoutOnly.Count);
+
+        // Identities: the two partitions are exhaustive.
+        Assert.True(matched.Count + referenceOnly.Count == referenceCodes.Count,
+            $"Matched ({matched.Count}) plus reference-only ({referenceOnly.Count}) must equal the reference table codes ({referenceCodes.Count}).");
+        Assert.True(matched.Count + layoutOnly.Count == layoutCodes.Count,
+            $"Matched ({matched.Count}) plus layout-only ({layoutOnly.Count}) must equal the layout table codes ({layoutCodes.Count}).");
     }
 
     [DataFact]
-    public void ZSuffixSheets_Total194_And186GroupsWithIdenticalCrossModuleHash()
+    public void ZSuffixSheets_RepeatedGroupsCarryIdenticalCrossModuleHash()
     {
-        // 194 sheets with a Z suffix out of 1,117; 186 sheets repeat in more than one module, and
-        // all 186 carry the SAME annotation (same hash over the cells of the form "(...)").
+        // The sheets with a Z suffix that repeat in more than one module all carry the SAME
+        // annotation (same hash over the cells of the form "(...)").
         // The implementation groups by (TableCode, ZSuffix); the independent derivation groups by
         // EXACT sheet name. BOTH groupings are verified and checked to produce the same result.
         var con = fixture.Repository42WithDictionary;
@@ -270,7 +311,7 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
         using var cmd = con.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM LayoutSheet WHERE ZSuffix IS NOT NULL";
         var zSuffixCount = Convert.ToInt32(cmd.ExecuteScalar());
-        Assert.Equal(194, zSuffixCount);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "sheets with a Z suffix", ReleasePins.LayoutExtraction42ZSuffixSheets, zSuffixCount);
 
         using var sheetsCmd = con.CreateCommand();
         sheetsCmd.CommandText = "SELECT SheetId, SheetName, TableCode, ZSuffix FROM LayoutSheet";
@@ -292,13 +333,15 @@ public sealed class LayoutRealDataContrastTests(LayoutRepositoryFixture fixture)
         var multiByName = byName.Values.Where(v => v.Count > 1).Select(v => v.OrderBy(x => x).ToArray()).ToHashSet(new SequenceComparer());
         var multiByPair = byPair.Values.Where(v => v.Count > 1).Select(v => v.OrderBy(x => x).ToArray()).ToHashSet(new SequenceComparer());
 
-        Assert.Equal(186, multiByName.Count);
-        Assert.Equal(186, multiByPair.Count);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "repeated Z-suffix groups by sheet name",
+            ReleasePins.LayoutExtraction42ZSuffixRepeatedGroups, multiByName.Count);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "repeated Z-suffix groups by (TableCode, ZSuffix)",
+            ReleasePins.LayoutExtraction42ZSuffixRepeatedGroups, multiByPair.Count);
         // The two groupings must produce EXACTLY the same SheetId groups.
         Assert.True(multiByName.SetEquals(multiByPair),
             "The grouping by (TableCode, ZSuffix) and the grouping by exact sheet name must " +
             "coincide; if they do not, one of them produces different groups and it must be " +
-            "decided which is the right one before relying on the 186/186.");
+            "decided which is the right one before relying on the equal group counts.");
 
         var mismatches = 0;
         foreach (var group in multiByName)

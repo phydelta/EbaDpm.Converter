@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Core.Layouts;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -21,10 +22,10 @@ public sealed class LayoutCellShadedDatapointExclusionTests(LayoutRepositoryFixt
     [DataFact]
     public void RealData_NoCellIsBothShadedAndHasADatapoint_WithExplicitDenominators()
     {
-        // The property, with BOTH denominators explicit (a "0" without the universe it examines is
-        // not a measurement) -- not only "0 violations", but "0 of 31,898 shaded" and
-        // "0 of 111,528/111,529 with a datapoint": the field discriminates both ways, neither
-        // universe is empty.
+        // The property, with BOTH denominators explicit and pinned (a "0" without the universe it
+        // examines is not a measurement) -- not only "0 violations", but "0 of the shaded cells" and
+        // "0 of the cells with a datapoint": the field discriminates both ways, neither universe is
+        // empty.
         var con = fixture.Repository42WithDictionary;
 
         var totalCells = Scalar(con, "SELECT COUNT(*) FROM LayoutCell");
@@ -32,9 +33,9 @@ public sealed class LayoutCellShadedDatapointExclusionTests(LayoutRepositoryFixt
         var datapointTotal = Scalar(con, "SELECT COUNT(*) FROM LayoutCell WHERE DatapointId IS NOT NULL");
         var violations = Scalar(con, "SELECT COUNT(*) FROM LayoutCell WHERE IsShaded = 1 AND DatapointId IS NOT NULL");
 
-        Assert.True(totalCells > 100000, $"Only {totalCells} LayoutCell rows: review the extraction.");
-        Assert.True(shadedTotal > 1000, $"Only {shadedTotal} shaded cells out of {totalCells}: the IsShaded field may be dead.");
-        Assert.True(datapointTotal > 1000, $"Only {datapointTotal} cells with a datapoint out of {totalCells}: review the extraction.");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "LayoutCell rows", ReleasePins.LayoutExtraction42CellRows, totalCells);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "shaded cells (a dead IsShaded field would show here)", ReleasePins.LayoutExtraction42ShadedCells, shadedTotal);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "cells with a datapoint", ReleasePins.LayoutExtraction42DatapointCells, datapointTotal);
 
         Assert.Equal(0L, violations);
     }

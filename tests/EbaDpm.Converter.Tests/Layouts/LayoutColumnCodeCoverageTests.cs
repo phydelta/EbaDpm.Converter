@@ -7,8 +7,8 @@ namespace EbaDpm.Converter.Tests.Layouts;
 /// <summary>
 /// Covers a defect that had no test: <b>the set of ordinates of an axis is that of its row
 /// (column) of CODES, not that of the cells with visible content.</b> <c>J_05.00.a</c> is the case
-/// that exposed it: its row 10 carries all 39 column codes, complete and consecutive
-/// (<c>D=0010, E=0020 ... AL=0350</c>... up to <c>0390</c>), but the earlier extractor only created
+/// that exposed it: in the 4.2 layouts its row 10 carries all the column codes, complete and consecutive
+/// (<c>D=0010, E=0020 ...</c> up to <c>0390</c>), but the earlier extractor only created
 /// an ordinate for the columns where it found a datapoint -- so two blocks of six entirely shaded
 /// columns (without a single visible datum) disappeared from the X axis even though their code was
 /// written.
@@ -17,7 +17,7 @@ namespace EbaDpm.Converter.Tests.Layouts;
 public sealed class LayoutColumnCodeCoverageTests(LayoutRepositoryFixture fixture)
 {
     [DataFact]
-    public void J_05_00_a_XAxis_Has39Ordinates_TheFullCodeRow_NotJustColumnsWithVisibleData()
+    public void J_05_00_a_XAxis_HasAllOrdinates_TheFullCodeRow_NotJustColumnsWithVisibleData()
     {
         var con = fixture.Repository42WithDictionary;
         var sheetId = QueryScalarLong(con, "SELECT SheetId FROM LayoutSheet WHERE TableCode = 'J_05.00.a' LIMIT 1");
@@ -32,8 +32,6 @@ public sealed class LayoutColumnCodeCoverageTests(LayoutRepositoryFixture fixtur
             codes.Add(reader.GetString(0));
         }
 
-        Assert.Equal(39, codes.Count);
-
         // The specific columns the original defect skipped: two blocks of six, entirely shaded in
         // the visible part ("Notional amount/optionality/Bought/Sold/yield/maturity" of the fixed
         // and the floating leg). If they disappeared again, this test detects it by code, not by
@@ -43,14 +41,16 @@ public sealed class LayoutColumnCodeCoverageTests(LayoutRepositoryFixture fixtur
 
         // The code goes from 0010 to 0390 in steps of 10, with no gaps -- the code row is continuous.
         var expectedAll = Enumerable.Range(1, 39).Select(i => (i * 10).ToString("0000")).ToList();
+        Assert.True(codes.Count == expectedAll.Count,
+            $"J_05.00.a X ordinates: expected the {expectedAll.Count} codes of the full code row, actual {codes.Count}.");
         Assert.Equal(expectedAll, codes);
     }
 
     [DataFact]
-    public void J_05_00_a_CellCount_IsExactlyTheFullCartesianProduct_39By49()
+    public void J_05_00_a_CellCount_IsExactlyTheFullCartesianProduct()
     {
-        // Regression canary of the full magnitude, measured independently: 39 columns x 49 rows =
-        // 1,911 cells, of which 588 are shaded.
+        // Regression canary of the full magnitude on this sheet of the 4.2 layouts, measured
+        // independently (39 columns x 49 rows, of which 588 cells are shaded).
         var con = fixture.Repository42WithDictionary;
         var sheetId = QueryScalarLong(con, "SELECT SheetId FROM LayoutSheet WHERE TableCode = 'J_05.00.a' LIMIT 1");
 

@@ -3,7 +3,7 @@ using Microsoft.Data.Sqlite;
 namespace EbaDpm.Converter.Tests.Layouts;
 
 /// <summary>
-/// Of the 194 sheets with a Z suffix, 14 have no value in the <c>Header</c> region
+/// Among the sheets with a Z suffix of the 4.2 layouts, some have no value in the <c>Header</c> region
 /// (<c>C_18.00(0001)</c>, <c>C_21.00(0001)</c>, <c>C_34.02.a/b(0001)</c>,
 /// <c>K_74.00.a..f(0010)</c>). "Nothing is lost" because those dimensions vary per grid row.
 ///
@@ -19,7 +19,7 @@ namespace EbaDpm.Converter.Tests.Layouts;
 public sealed class LayoutZSuffixMissingHeaderTests(LayoutRepositoryFixture fixture)
 {
     [DataFact]
-    public void ExactlyFourteenZSuffixSheets_HaveNoHeaderRegionValue()
+    public void NamedZSuffixSheets_HaveNoHeaderRegionValue_AndNoOtherDoes()
     {
         var con = fixture.Repository42WithDictionary;
 
@@ -42,16 +42,17 @@ public sealed class LayoutZSuffixMissingHeaderTests(LayoutRepositoryFixture fixt
             names.Add(reader.GetString(0));
         }
 
-        Assert.Equal(14, names.Count);
-        Assert.Equal(
-            new[]
-            {
-                "C_18.00(0001)", "C_18.00(0001)", "C_21.00(0001)", "C_21.00(0001)",
-                "C_34.02.a(0001)", "C_34.02.a(0001)", "C_34.02.b(0001)", "C_34.02.b(0001)",
-                "K_74.00.a(0010)", "K_74.00.b(0010)", "K_74.00.c(0010)",
-                "K_74.00.d(0010)", "K_74.00.e(0010)", "K_74.00.f(0010)",
-            }.OrderBy(x => x),
-            names.OrderBy(x => x));
+        // The expected sheets are named; their number is the length of this list, not a figure.
+        var expected = new[]
+        {
+            "C_18.00(0001)", "C_18.00(0001)", "C_21.00(0001)", "C_21.00(0001)",
+            "C_34.02.a(0001)", "C_34.02.a(0001)", "C_34.02.b(0001)", "C_34.02.b(0001)",
+            "K_74.00.a(0010)", "K_74.00.b(0010)", "K_74.00.c(0010)",
+            "K_74.00.d(0010)", "K_74.00.e(0010)", "K_74.00.f(0010)",
+        };
+        Assert.True(names.Count == expected.Length,
+            $"Z-suffix sheets without a Header-region value: expected the {expected.Length} named sheets, actual {names.Count} ({string.Join(", ", names)}).");
+        Assert.Equal(expected.OrderBy(x => x), names.OrderBy(x => x));
     }
 
     [DataFact]
@@ -66,7 +67,7 @@ public sealed class LayoutZSuffixMissingHeaderTests(LayoutRepositoryFixture fixt
         var tableId = QueryScalarLong(reference, "SELECT MAX(TableID) FROM mTable WHERE TableCode = 'C_18.00'");
 
         var signaturesZ0001 = QuerySignatures(reference, tableId, "0001");
-        Assert.NotEmpty(signaturesZ0001);
+        Assert.True(signaturesZ0001.Count > 0, "C_18.00 has no reference signature for Z ordinate 0001: the comparison would be vacuous.");
         Assert.All(signaturesZ0001, sig => Assert.DoesNotContain("qAYX", sig ?? string.Empty));
     }
 
@@ -81,8 +82,8 @@ public sealed class LayoutZSuffixMissingHeaderTests(LayoutRepositoryFixture fixt
         var signaturesZ0010 = QuerySignatures(reference, tableId, "0010");
         var signaturesZ0020 = QuerySignatures(reference, tableId, "0020");
 
-        Assert.NotEmpty(signaturesZ0010);
-        Assert.NotEmpty(signaturesZ0020);
+        Assert.True(signaturesZ0010.Count > 0, "K_74.00.a has no reference signature for Z ordinate 0010: the comparison would be vacuous.");
+        Assert.True(signaturesZ0020.Count > 0, "K_74.00.a has no reference signature for Z ordinate 0020: the comparison would be vacuous.");
         Assert.All(signaturesZ0010, sig => Assert.DoesNotContain("qBEG", sig ?? string.Empty));
         Assert.Contains(signaturesZ0020, sig => (sig ?? string.Empty).Contains("qBEG"));
     }

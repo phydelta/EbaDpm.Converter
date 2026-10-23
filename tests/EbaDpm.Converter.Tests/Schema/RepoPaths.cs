@@ -117,8 +117,11 @@ internal static class RepoPaths
     /// <summary>Directory with the 4.2 Annotated Table Layouts.</summary>
     public static string TableLayouts42Directory => Path.Join(DataDirectory, TableLayouts42DirectoryName);
 
+    /// <summary>Name of the directory with the 4.3 Annotated Table Layouts, under the data directory.</summary>
+    public const string TableLayouts43DirectoryName = "4.3 table layouts";
+
     /// <summary>Directory with the 4.3 Annotated Table Layouts.</summary>
-    public static string TableLayouts43Directory => Path.Join(DataDirectory, "4.3 table layouts");
+    public static string TableLayouts43Directory => Path.Join(DataDirectory, TableLayouts43DirectoryName);
 
     /// <summary>
     /// Directory with the 3.2 Annotated Table Layouts: the DPM 1.0 era, with no date or module in

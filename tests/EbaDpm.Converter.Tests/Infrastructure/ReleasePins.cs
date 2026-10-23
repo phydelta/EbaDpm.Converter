@@ -300,6 +300,118 @@ internal static class ReleasePins
     /// <summary><c>MetricInheritedFromAncestorCellCount</c> of <c>AxisAndCellLoader.Result</c> (no table holds it).</summary>
     public const int Dpm10Selected8MetricInheritedFromAncestorCells = 0;
 
+    // ------------------------------------------------------------------
+    // The Annotated Table Layouts extraction (LayoutExtractor). The layout corpus is an EBA
+    // publication per release, so every figure of the extracted repository is scoped to the
+    // directory it was extracted from. These scopes are the extraction itself; Layouts42 scopes the
+    // 4.2 OUTPUT against the same layouts (plane C).
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// The 4.2 Annotated Table Layouts (<see cref="Schema.RepoPaths.TableLayouts42DirectoryName"/>)
+    /// extracted with the 4.2 reference export as dictionary (<c>--dictionary</c>).
+    /// </summary>
+    public static readonly ReleasePin LayoutExtraction42 = new(
+        Schema.RepoPaths.Cutoff42ReleaseCode,
+        $"layouts in '{Schema.RepoPaths.TableLayouts42DirectoryName}' extracted with dictionary '{Schema.RepoPaths.ReferenceDatabaseFileName}'",
+        "2026-10-23");
+
+    /// <summary>
+    /// The 4.2 Annotated Table Layouts extracted WITHOUT a dictionary, compared with the extraction
+    /// <see cref="LayoutExtraction42"/>.
+    /// </summary>
+    public static readonly ReleasePin LayoutExtraction42NoDictionary = new(
+        Schema.RepoPaths.Cutoff42ReleaseCode,
+        $"layouts in '{Schema.RepoPaths.TableLayouts42DirectoryName}' extracted without a dictionary, against the extraction with dictionary '{Schema.RepoPaths.ReferenceDatabaseFileName}'",
+        "2026-10-23");
+
+    /// <summary>
+    /// The 4.3 Annotated Table Layouts (<see cref="Schema.RepoPaths.TableLayouts43DirectoryName"/>)
+    /// extracted with the 4.2 reference export as dictionary.
+    /// </summary>
+    public static readonly ReleasePin LayoutExtraction43 = new(
+        "4.3",
+        $"layouts in '{Schema.RepoPaths.TableLayouts43DirectoryName}' extracted with dictionary '{Schema.RepoPaths.ReferenceDatabaseFileName}'",
+        "2026-10-23");
+
+    /// <summary><c>SheetsProcessed</c> (and <c>COUNT(1)</c> of <c>LayoutSheet</c>) of <see cref="LayoutExtraction42"/>.</summary>
+    public const int LayoutExtraction42Sheets = 1117;
+
+    /// <summary><c>DeclarationsWritten</c> (and <c>COUNT(1)</c> of <c>LayoutDeclaration</c>) of <see cref="LayoutExtraction42"/>.</summary>
+    public const int LayoutExtraction42Declarations = 11515;
+
+    /// <summary><c>COUNT(1)</c> of <c>LayoutCell</c> in <see cref="LayoutExtraction42"/>.</summary>
+    public const int LayoutExtraction42CellRows = 143427;
+
+    /// <summary><c>LayoutCell</c> rows of <see cref="LayoutExtraction42"/> with a non-NULL <c>RowOrdinateId</c> (closed row axis).</summary>
+    public const int LayoutExtraction42CellsWithRowOrdinate = 141550;
+
+    /// <summary>Distinct sheets of <see cref="LayoutExtraction42"/> with at least one <c>LayoutCell</c> with a non-NULL <c>RowOrdinateId</c> (closed-axis sheets).</summary>
+    public const int LayoutExtraction42ClosedAxisSheets = 972;
+
+    /// <summary><c>LayoutCell</c> rows of <see cref="LayoutExtraction42"/> with <c>IsShaded</c> = 1.</summary>
+    public const int LayoutExtraction42ShadedCells = 31898;
+
+    /// <summary><c>LayoutCell</c> rows of <see cref="LayoutExtraction42"/> with a non-NULL <c>DatapointId</c>.</summary>
+    public const int LayoutExtraction42DatapointCells = 111528;
+
+    /// <summary>Distinct (sheet, dimension code) pairs of <c>LayoutDeclaration</c> in <see cref="LayoutExtraction42"/>.</summary>
+    public const int LayoutExtraction42SheetDimensionPairs = 10147;
+
+    /// <summary><c>LayoutOrdinate</c> rows with <c>Axis</c> = 'Y' in <see cref="LayoutExtraction42"/>.</summary>
+    public const int LayoutExtraction42YOrdinates = 18754;
+
+    /// <summary><c>LayoutOrdinate</c> rows with <c>Axis</c> = 'X' in <see cref="LayoutExtraction42"/>.</summary>
+    public const int LayoutExtraction42XOrdinates = 7809;
+
+    /// <summary><c>COUNT(1)</c> of <c>LayoutValue</c> in <see cref="LayoutExtraction42"/>.</summary>
+    public const int LayoutExtraction42ValueRows = 99636;
+
+    /// <summary><c>LayoutValue</c> rows of <see cref="LayoutExtraction42"/> with a non-NULL <c>OrdinateId</c>.</summary>
+    public const int LayoutExtraction42LinkedValues = 99398;
+
+    /// <summary><c>LayoutValue</c> rows of <see cref="LayoutExtraction42"/> with a NULL <c>OrdinateId</c> (<c>LayoutUnparsed.Kind</c> = 'UnlinkedValue').</summary>
+    public const int LayoutExtraction42UnlinkedValues = 238;
+
+    /// <summary>Declarations of <see cref="LayoutExtraction42"/> without any <c>LayoutValue</c> (<c>LayoutUnparsed.Kind</c> = 'OrphanDeclaration').</summary>
+    public const int LayoutExtraction42OrphanDeclarations = 693;
+
+    /// <summary>Orphan declarations of <see cref="LayoutExtraction42"/> with <c>IsKey</c> = 1.</summary>
+    public const int LayoutExtraction42OrphanKeyDeclarations = 426;
+
+    /// <summary>Orphan declarations with <c>IsKey</c> = 0 that have an <c>IsKey</c> = 1 sibling with the same dimension in the same sheet (<see cref="LayoutExtraction42"/>).</summary>
+    public const int LayoutExtraction42OrphanNonKeyWithKeySibling = 251;
+
+    /// <summary>Orphan declarations with <c>IsKey</c> = 0 and no such sibling (<see cref="LayoutExtraction42"/>).</summary>
+    public const int LayoutExtraction42OrphanNonKeyWithoutSibling = 16;
+
+    /// <summary><c>OrdinateDatapointSlotMismatches</c> of <see cref="LayoutExtraction42"/>: Y rows with a populated third column that has no datapoint shape.</summary>
+    public const int LayoutExtraction42DatapointSlotMismatches = 185;
+
+    /// <summary>Y rows of <see cref="LayoutExtraction42"/> with fewer than three populated columns (structural rows: no datapoint slot to evaluate).</summary>
+    public const int LayoutExtraction42YRowsWithoutThirdColumn = 10;
+
+    /// <summary>Distinct <c>mTable.TableCode</c> values of the 4.2 reference export that also name a layout sheet of <see cref="LayoutExtraction42"/>.</summary>
+    public const int LayoutExtraction42TableCodesMatchedByReference = 787;
+
+    /// <summary>Distinct table codes of the layout sheets of <see cref="LayoutExtraction42"/> that are not in the 4.2 reference export.</summary>
+    public const int LayoutExtraction42TableCodesLayoutOnly = 19;
+
+    /// <summary>Sheets of <see cref="LayoutExtraction42"/> with a non-NULL <c>ZSuffix</c>.</summary>
+    public const int LayoutExtraction42ZSuffixSheets = 194;
+
+    /// <summary>Groups of Z-suffix sheets of <see cref="LayoutExtraction42"/> that repeat in more than one module (grouped by sheet name, equal to grouped by table code and suffix).</summary>
+    public const int LayoutExtraction42ZSuffixRepeatedGroups = 186;
+
+    /// <summary><c>SheetsProcessed</c> of <see cref="LayoutExtraction43"/> (the TOC sheets are excluded by the extractor).</summary>
+    public const int LayoutExtraction43Sheets = 70;
+
+    /// <summary>Distinct <c>MET</c> member codes that appear only in the extraction without a dictionary (<see cref="LayoutExtraction42NoDictionary"/>).</summary>
+    public const int LayoutExtraction42NoDictionaryExtraMetCodes = 151;
+
+    /// <summary><c>LayoutValue</c> rows with domain <c>MET</c> carrying those extra codes (<see cref="LayoutExtraction42NoDictionary"/>).</summary>
+    public const int LayoutExtraction42NoDictionaryExtraMetValues = 251;
+
     /// <summary>Asserts a pinned figure; the failure message prints the scope of the pin.</summary>
     public static void AssertPinned(ReleasePin pin, string what, long expected, long actual)
         => Xunit.Assert.True(expected == actual, Message(pin, what, expected, actual));
