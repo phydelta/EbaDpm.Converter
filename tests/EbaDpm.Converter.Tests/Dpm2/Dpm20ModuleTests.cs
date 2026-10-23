@@ -1,5 +1,5 @@
-using EbaDpm.Converter.Core.Access.Dpm20;
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -12,9 +12,14 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// so the large DPM 2.0 Access database does not need to be re-read for the generated content.
 ///
 /// <b>The third module filter</b>: without excluding <c>[Module].isDocumentModule</c>,
-/// <c>mModule</c> emits 52 rows, not 50 -- <c>P3_NONREM_DIS_DOCS</c> and <c>P3_REM_DIS_DOCS</c> are
-/// left over (links to <c>PILLAR3</c> PDFs, with no table in <c>ModuleVersionComposition</c>, absent
-/// from <c>EBA_4.2_Hotfix.db</c>). A NOMINAL test below explicitly checks that they are NOT emitted.
+/// <c>mModule</c> would emit two rows more -- <c>P3_NONREM_DIS_DOCS</c> and <c>P3_REM_DIS_DOCS</c>
+/// are left over (links to <c>PILLAR3</c> PDFs, with no table in <c>ModuleVersionComposition</c>,
+/// absent from the reference export). A test below checks on the Access source that exactly those two
+/// exist and that they are NOT emitted.
+///
+/// The module count is DERIVED from the Access source (<see cref="AccessCensus"/>): the
+/// <c>ModuleVersion</c> rows in force at the cutoff release, of a module that is not a document
+/// module and whose framework is not DORA (docs/mapping-dpm2.md, "Modules").
 /// </summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
@@ -24,19 +29,59 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
     // 1 - Row counts (critical layer: table coverage/structure).
     // ------------------------------------------------------------------
 
-    [DataFact]
-    public void MModule_Has50Rows() => Assert.Equal(50, CountRows("mModule"));
+    private static string Accdb => RepoPaths.AccessDpm20DatabasePath;
+
+    /// <summary>Asserts a figure derived from the Access source; the failure message says what and from where.</summary>
+    private static void AssertDerived(string what, long expectedFromAccess, long actual)
+        => Assert.True(
+            expectedFromAccess == actual,
+            $"{what}: expected {expectedFromAccess} (derived from '{RepoPaths.AccessDpm20DatabaseFileName}'), actual {actual}.");
+
+    /// <summary>Asserts a figure derived from another generated table (a 1:1 mirror).</summary>
+    private static void AssertMirrors(string what, long expectedFromOtherTable, long actual)
+        => Assert.True(expectedFromOtherTable == actual, $"{what}: expected {expectedFromOtherTable} (derived from the generated mModule), actual {actual}.");
+
+    private const string ModuleVersionJoin =
+        "FROM ([ModuleVersion] mv INNER JOIN [Module] m ON m.[ModuleID] = mv.[ModuleID]) "
+        + "INNER JOIN [Framework] f ON f.[FrameworkID] = m.[FrameworkID]";
+
+    /// <summary>The "in force at the cutoff release" predicate over <c>mv</c>.</summary>
+    private static string InForceAtCutoff()
+        => AccessCensus.InForce(AccessCensus.ReleaseId(Accdb, RepoPaths.Cutoff42ReleaseCode), "mv");
+
+    /// <summary>Code to <c>ModuleVID</c> of the module versions in force that are not DORA, split by <c>isDocumentModule</c>.</summary>
+    private static Dictionary<string, int> ModuleVersionsInAccess(bool documentModules)
+        => AccessCensus.IntByCode(
+            Accdb,
+            $"SELECT mv.[Code], mv.[ModuleVID] {ModuleVersionJoin} WHERE {InForceAtCutoff()} "
+            + $"AND m.[isDocumentModule] {(documentModules ? "<>" : "=")} 0 AND f.[Code] <> 'DORA'");
+
+    /// <summary>The expected <c>mModule</c> rows: in force, not a document module, not DORA.</summary>
+    private static long ExpectedModuleRows() => ModuleVersionsInAccess(documentModules: false).Count;
 
     [DataFact]
-    public void MConceptualModule_Has50Rows() => Assert.Equal(50, CountRows("mConceptualModule"));
+    public void MModule_RowCount_IsTheModuleVersionsInForceExcludingDocumentModulesAndDora()
+        => AssertDerived(
+            "mModule rows (ModuleVersion in force, not a document module, framework not DORA)",
+            ExpectedModuleRows(),
+            CountRows("mModule"));
 
     [DataFact]
-    public void MModuleBusinessTemplate_Has127Rows() => Assert.Equal(127, CountRows("mModuleBusinessTemplate"));
+    public void MConceptualModule_RowCount_MirrorsMModule()
+        => AssertMirrors("mConceptualModule rows (1:1 mirror of mModule)", CountRows("mModule"), CountRows("mConceptualModule"));
+
+    [DataFact]
+    public void MModuleBusinessTemplate_RowCount_MatchesThePinnedCensus()
+        => ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mModuleBusinessTemplate rows",
+            ReleasePins.Dpm20Cutoff42MModuleBusinessTemplateRows,
+            CountRows("mModuleBusinessTemplate"));
 
     // ------------------------------------------------------------------
     // 2 - The third filter: the two PILLAR3 document modules are NOT emitted.
     // It is the kind of filter that a future refactor might remove thinking it is redundant:
-    // without it, the count would go from 50 to 52 without any other structural check noticing.
+    // without it, mModule would gain two rows without any other structural check noticing.
     // ------------------------------------------------------------------
 
     [DataFact]
@@ -51,25 +96,45 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
         Assert.DoesNotContain("P3_NONREM_DIS_DOCS", codes);
         Assert.DoesNotContain("P3_REM_DIS_DOCS", codes);
 
-        // That the count would indeed be 52 without the third filter cannot be checked by this test
-        // without re-reading the Access database (the filter was already applied when the .db was
-        // generated) -- the evidence is in the comment of Dpm20ModuleLoader.
+    }
+
+    /// <summary>
+    /// Positive control of the third filter, on the Access source: the document modules in force are
+    /// exactly the two named ones, and without the <c>isDocumentModule</c> filter the in-force,
+    /// non-DORA module versions would be the derived <c>mModule</c> count plus those two.
+    /// </summary>
+    [DataFact]
+    public void DocumentModulesInForce_AreExactlyTheTwoNamedOnes_AndWouldAddTwoRowsWithoutTheFilter()
+    {
+        var documentCodes = ModuleVersionsInAccess(documentModules: true).Keys
+            .OrderBy(c => c, StringComparer.Ordinal)
+            .ToList();
+        Assert.Equal(["P3_NONREM_DIS_DOCS", "P3_REM_DIS_DOCS"], documentCodes);
+
+        var withoutTheFilter = AccessCensus.Scalar(
+            Accdb,
+            $"SELECT COUNT(1) {ModuleVersionJoin} WHERE {InForceAtCutoff()} AND f.[Code] <> 'DORA'");
+        AssertDerived(
+            "ModuleVersion in force, framework not DORA, WITHOUT the isDocumentModule filter (expected mModule rows + 2 document modules)",
+            ExpectedModuleRows() + 2,
+            withoutTheFilter);
     }
 
     // ------------------------------------------------------------------
     // 3 - ModuleCode in UPPERCASE. Internal invariant over what was generated: NO ModuleCode
     // contains lowercase letters. And against the raw source (ModuleVersion.Code, not normalized):
-    // only TWO codes change, REM_HR_Country and REM_HR_Institution.
+    // the generated codes are exactly the upper-cased source codes, and only TWO source codes
+    // change, REM_HR_Country and REM_HR_Institution.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MModule_ModuleCode_IsAlwaysUppercase_All50Rows()
+    public void MModule_ModuleCode_IsAlwaysUppercase()
     {
         var codes = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"ModuleCode\" FROM \"mModule\"", 1)
             .Select(r => r[0]!)
             .ToList();
 
-        Assert.Equal(50, codes.Count);
+        AssertDerived("mModule ModuleCode rows read", ExpectedModuleRows(), codes.Count);
 
         var notUpper = codes.Where(c => c != c.ToUpperInvariant()).ToList();
         Assert.True(notUpper.Count == 0, $"ModuleCode with lowercase letters: {string.Join(", ", notUpper)}");
@@ -83,23 +148,20 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
         var generatedCodes = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"ModuleCode\" FROM \"mModule\"", 1)
             .Select(r => r[0]!)
             .ToHashSet(StringComparer.Ordinal);
-        Assert.Equal(50, generatedCodes.Count);
 
-        // Fresh, cheap read: only ModuleVersion (the rest of the large DPM 2.0 Access database is not needed).
-        using var rawReader = new Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath, cutoffReleaseCode: RepoPaths.Cutoff42ReleaseCode);
-        rawReader.Open();
-        var rawModuleVersions = rawReader.ReadModuleVersions().ToList();
+        // Raw source codes (ModuleVersion.Code, not normalized) of the emitted population, read straight
+        // from Access (no production reader).
+        var rawCodes = ModuleVersionsInAccess(documentModules: false).Keys.ToList();
+        AssertDerived("mModule distinct ModuleCode", rawCodes.Count, generatedCodes.Count);
 
-        // Those that survive the emission filter are exactly those that, in uppercase, are in the
-        // generated set (DORA and the two isDocumentModule modules are left out as they do not appear there).
-        var emittedRaw = rawModuleVersions
-            .Where(mv => generatedCodes.Contains(mv.Code.ToUpperInvariant()))
-            .ToList();
-        Assert.Equal(50, emittedRaw.Count);
+        var expectedGenerated = rawCodes.Select(c => c.ToUpperInvariant()).ToHashSet(StringComparer.Ordinal);
+        Assert.True(
+            expectedGenerated.SetEquals(generatedCodes),
+            $"ModuleCode set differs from the upper-cased source codes. Only in source: {string.Join(", ", expectedGenerated.Except(generatedCodes))}. "
+            + $"Only in output: {string.Join(", ", generatedCodes.Except(expectedGenerated))}.");
 
-        var changedByUppercasing = emittedRaw
-            .Where(mv => mv.Code != mv.Code.ToUpperInvariant())
-            .Select(mv => mv.Code)
+        var changedByUppercasing = rawCodes
+            .Where(c => c != c.ToUpperInvariant())
             .OrderBy(c => c, StringComparer.Ordinal)
             .ToList();
 
@@ -107,25 +169,25 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
     }
 
     // ------------------------------------------------------------------
-    // 4 - ModuleLabel = ModuleVersion.Name, verbatim, 50/50 against the reference. The candidate
-    // "code with underscores as spaces" is NOT used as an assertion (it would only match 11/50,
+    // 4 - ModuleLabel = ModuleVersion.Name, verbatim, every row against the reference. The candidate
+    // "code with underscores as spaces" is NOT used as an assertion (it would match only a minority,
     // e.g. IF_TM -> "IF Credit Institution Threshold Monitoring" is not "If Tm"): it stays only as
     // a note so the mistake is not repeated.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MModule_ModuleLabel_MatchesTheReference_50Of50_ByModuleCode()
+    public void MModule_ModuleLabel_MatchesTheReference_ByModuleCode()
     {
         RepoPaths.EnsureReferenceDatabaseExists();
 
         var generatedByCode = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"ModuleCode\", \"ModuleLabel\" FROM \"mModule\"", 2)
             .ToDictionary(r => r[0]!, r => r[1], StringComparer.Ordinal);
-        Assert.Equal(50, generatedByCode.Count);
+        AssertDerived("generated mModule rows", ExpectedModuleRows(), generatedByCode.Count);
 
         using var referenceConnection = OpenReadOnly(RepoPaths.ReferenceDatabasePath);
         var referenceByCode = QueryHelpers.Rows(referenceConnection, "SELECT \"ModuleCode\", \"ModuleLabel\" FROM \"mModule\"", 2)
             .ToDictionary(r => r[0]!, r => r[1], StringComparer.Ordinal);
-        Assert.Equal(50, referenceByCode.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference42, "reference mModule rows", ReleasePins.Reference42MModuleRows, referenceByCode.Count);
 
         var missingInGenerated = referenceByCode.Keys.Except(generatedByCode.Keys).ToList();
         Assert.True(missingInGenerated.Count == 0, $"Reference ModuleCode values missing from the generated output: {string.Join(", ", missingInGenerated)}");
@@ -147,27 +209,27 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
         var expected = new[] { "CODIS: generated='Common disclosures' reference='Commun disclosures'" };
         Assert.True(
             mismatches.SequenceEqual(expected, StringComparer.Ordinal),
-            $"{mismatches.Count}/50 ModuleLabel values differ from the reference; expected exactly {string.Join(", ", expected)}. Actual:\n" + string.Join("\n", mismatches));
+            $"{mismatches.Count}/{referenceByCode.Count} ModuleLabel values differ from the reference; expected exactly {string.Join(", ", expected)}. Actual:\n" + string.Join("\n", mismatches));
     }
 
     // ------------------------------------------------------------------
-    // 5 - XBRLSchemaRef, derived pattern, 50/50 against the reference. In DPM 1.0 this was NOT
+    // 5 - XBRLSchemaRef, derived pattern, every row against the reference. In DPM 1.0 this was NOT
     // derivable; here it is compared with no threshold, exactly as the reference has it.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MModule_XBRLSchemaRef_MatchesTheReference_50Of50_ByModuleCode()
+    public void MModule_XBRLSchemaRef_MatchesTheReference_ByModuleCode()
     {
         RepoPaths.EnsureReferenceDatabaseExists();
 
         var generatedByCode = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"ModuleCode\", \"XBRLSchemaRef\" FROM \"mModule\"", 2)
             .ToDictionary(r => r[0]!, r => r[1], StringComparer.Ordinal);
-        Assert.Equal(50, generatedByCode.Count);
+        AssertDerived("generated mModule rows", ExpectedModuleRows(), generatedByCode.Count);
 
         using var referenceConnection = OpenReadOnly(RepoPaths.ReferenceDatabasePath);
         var referenceByCode = QueryHelpers.Rows(referenceConnection, "SELECT \"ModuleCode\", \"XBRLSchemaRef\" FROM \"mModule\"", 2)
             .ToDictionary(r => r[0]!, r => r[1], StringComparer.Ordinal);
-        Assert.Equal(50, referenceByCode.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference42, "reference mModule rows", ReleasePins.Reference42MModuleRows, referenceByCode.Count);
 
         var mismatches = new List<string>();
         foreach (var (code, referenceRef) in referenceByCode)
@@ -179,18 +241,18 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
             }
         }
 
-        Assert.True(mismatches.Count == 0, $"{mismatches.Count}/50 XBRLSchemaRef values differ from the reference:\n" + string.Join("\n", mismatches));
+        Assert.True(mismatches.Count == 0, $"{mismatches.Count}/{referenceByCode.Count} XBRLSchemaRef values differ from the reference:\n" + string.Join("\n", mismatches));
     }
 
     // ------------------------------------------------------------------
     // 6 - Constant / source-less columns: AutogenerateRefs = 1, JsonBlob empty (not NULL),
-    // DefaultFrequency and JSONSchemaRef NULL. Over the 50 rows.
+    // DefaultFrequency and JSONSchemaRef NULL. Over all the rows.
     // ------------------------------------------------------------------
 
     [DataFact]
     public void MModule_ConstantColumns_AutogenerateRefsOne_JsonBlobEmpty_FrequencyAndJsonSchemaNull()
     {
-        Assert.Equal(50, CountRows("mModule"));
+        AssertDerived("mModule rows checked", ExpectedModuleRows(), CountRows("mModule"));
 
         var notAutogenerate = ScalarLong("SELECT COUNT(*) FROM \"mModule\" WHERE \"AutogenerateRefs\" IS NULL OR \"AutogenerateRefs\" <> 1");
         Assert.Equal(0, notAutogenerate);
@@ -210,11 +272,11 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
 
     // ------------------------------------------------------------------
     // 7 - mConceptualModule: 1:1 mirror of mModule. Internal invariant, WITHOUT looking at the
-    // reference: same ConceptualModuleID = ModuleID, same code, same label, 50 of 50.
+    // reference: same ConceptualModuleID = ModuleID, same code, same label, for every row.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MConceptualModule_IsAnExactMirrorOfMModule_50Of50_WithoutLookingAtTheReference()
+    public void MConceptualModule_IsAnExactMirrorOfMModule_WithoutLookingAtTheReference()
     {
         var rows = QueryHelpers.Rows(
             fixture.GeneratedConnection,
@@ -226,8 +288,8 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
             """,
             7);
 
-        Assert.Equal(50, rows.Count);
-        Assert.Equal(50, CountRows("mConceptualModule")); // no mConceptualModule row is left over
+        AssertDerived("mModule rows joined to mConceptualModule", ExpectedModuleRows(), rows.Count);
+        AssertDerived("mConceptualModule rows (no row is left over)", ExpectedModuleRows(), CountRows("mConceptualModule"));
 
         var mismatches = new List<string>();
         foreach (var row in rows)
@@ -251,16 +313,16 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
             }
         }
 
-        Assert.True(mismatches.Count == 0, $"{mismatches.Count}/50 are not an exact mirror:\n" + string.Join("\n", mismatches));
+        Assert.True(mismatches.Count == 0, $"{mismatches.Count}/{rows.Count} are not an exact mirror:\n" + string.Join("\n", mismatches));
     }
 
     // ------------------------------------------------------------------
     // 8 - mModuleBusinessTemplate.BusinessTemplateID ALWAYS points to Level 1 nodes of type
-    // TableGroup, 127 of 127, over 111 distinct nodes. Internal invariant.
+    // TableGroup, for every row, over a pinned number of distinct nodes. Internal invariant.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MModuleBusinessTemplate_BusinessTemplateID_AlwaysPointsToLevel1TableGroupNodes_127Of127()
+    public void MModuleBusinessTemplate_BusinessTemplateID_AlwaysPointsToLevel1TableGroupNodes()
     {
         var rows = QueryHelpers.Rows(
             fixture.GeneratedConnection,
@@ -271,16 +333,24 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
             """,
             4);
 
-        Assert.Equal(127, rows.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mModuleBusinessTemplate rows joined to mTemplateOrTable",
+            ReleasePins.Dpm20Cutoff42MModuleBusinessTemplateRows,
+            rows.Count);
 
         var wrong = rows.Where(r => r[2] != "TableGroup" || r[3] != "1").ToList();
         Assert.True(
             wrong.Count == 0,
-            $"{wrong.Count}/127 BusinessTemplateID values that are NOT Level 1 / TableGroup:\n"
+            $"{wrong.Count}/{rows.Count} BusinessTemplateID values that are NOT Level 1 / TableGroup:\n"
             + string.Join("\n", wrong.Take(20).Select(r => $"ModuleID={r[0]} BusinessTemplateID={r[1]} Type={r[2]} Level={r[3]}")));
 
         var distinctNodes = rows.Select(r => r[1]).ToHashSet(StringComparer.Ordinal);
-        Assert.Equal(111, distinctNodes.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "distinct BusinessTemplateID nodes of mModuleBusinessTemplate",
+            ReleasePins.Dpm20Cutoff42BusinessTemplateDistinctNodes,
+            distinctNodes.Count);
     }
 
     // ------------------------------------------------------------------
@@ -297,7 +367,11 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
             "SELECT \"ModuleID\", \"Order\" FROM \"mModuleBusinessTemplate\" ORDER BY \"ModuleID\", \"Order\"",
             2);
 
-        Assert.Equal(127, rows.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mModuleBusinessTemplate rows",
+            ReleasePins.Dpm20Cutoff42MModuleBusinessTemplateRows,
+            rows.Count);
 
         var byModule = rows
             .GroupBy(r => r[0]!)

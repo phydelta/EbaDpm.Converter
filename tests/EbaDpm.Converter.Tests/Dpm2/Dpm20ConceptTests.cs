@@ -1,5 +1,7 @@
 using System.Text.RegularExpressions;
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
+using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
 namespace EbaDpm.Converter.Tests.Dpm2;
@@ -41,59 +43,98 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
         ["mModule", "ModuleID", "Module"],
     ];
 
+    private static string Accdb => RepoPaths.AccessDpm20DatabasePath;
+
+    /// <summary>Asserts a figure derived from a named source; the failure message says what and from where.</summary>
+    private static void AssertDerived(string what, string source, long expected, long actual)
+        => Assert.True(expected == actual, $"{what}: expected {expected} (derived from {source}), actual {actual}.");
+
+    /// <summary>Asserts a figure derived from the Access source.</summary>
+    private static void AssertFromAccess(string what, long expected, long actual)
+        => AssertDerived(what, $"'{RepoPaths.AccessDpm20DatabaseFileName}'", expected, actual);
+
     // ------------------------------------------------------------------
-    // 1 - Counts: 57,077 mConcept, 57,070 mConceptTranslation, census by type.
+    // 1 - Counts: mConcept and mConceptTranslation, census by type.
     // ------------------------------------------------------------------
 
     // The sentinel domain 9999 ("", 'Open') carries NO concept - the reference leaves it NULL in
     // mDomain (the only such row of the whole table) while it DOES give a concept to the sentinel
     // member. It is a measured, real asymmetry, not a defect: mConcept is 1 below the sum of the
-    // thirteen tables, and mDomain stays at 150 rows with only 149 concepts.
-    //
-    // After the abstract-closure rule: 57,039 -&gt; 57,077 and 57,032 -&gt; 57,070 (+38 in both, the
-    // same figure: the new mTable/mAxis/mAxisOrdinate rows that the rule adds are translated like any
-    // other, with no extra concepts without a translation). Re-measured against the real output
-    // after the change.
-    // Dated/scoped to "DPM2 Database_v 4_2_1.accdb" converted with cutoff 4.2: 57,077 -> 57,081 (+4:
-    // the release concept 4.2.1 and 3 members introduced by 4.2.1, qTR:qx2065..qx2067; the dictionary tables
-    // are not versioned, so a cutoff-4.2 conversion keeps them). Measured on the Access source.
+    // thirteen tables, and mDomain has one row more than it has concepts.
     [DataFact]
-    public void MConcept_Has57081Rows_57082Minus1ForTheSentinelDomain() => Assert.Equal(57081, Scalar("SELECT COUNT(*) FROM \"mConcept\""));
-
-    [DataFact]
-    // 57,070 -> 57,073 on "DPM2 Database_v 4_2_1.accdb" (cutoff 4.2): +3 labelled members of 4.2.1 (the 4.2.1 release concept has no label).
-    public void MConceptTranslation_Has57073Rows_57081Minus8() =>
-        Assert.Equal(57073, Scalar("SELECT COUNT(*) FROM \"mConceptTranslation\""));
-
-    public static IEnumerable<object[]> ExpectedConceptTypeCounts() =>
-    [
-        ["HierarchyNode", 16538],
-        ["Ordinate", 20712], // 20,679 before the abstract-closure rule (+33: the ordinates of C_34.02.b/if 4.2)
-        ["Member", 12952], // 12,949 before the 4.2.1 file: +3 members (qTR:qx2065..qx2067) of "DPM2 Database_v 4_2_1.accdb"
-        ["Axis", 1993], // 1,990 before the abstract-closure rule (+3: the axes of C_34.02.b/if 4.2)
-        ["Hierarchy", 1154],
-        ["TemplateOrTable", 1530], // 1,529 before the abstract-closure rule (+1: the BusinessTable of C_34.02.b/if 4.2)
-        ["Dimension", 1100],
-        ["Table", 847], // 846 before the abstract-closure rule (+1: the pair (if 4.2, C_34.02.b))
-        ["Domain", 149], // mDomain has 150 rows, but the sentinel 9999 carries no concept.
-        ["Module", 50],
-        ["Taxonomy", 32],
-        ["ReportingFramework", 18],
-        ["Release", 6], // 5 before the 4.2.1 file: [Release] now also declares 4.2.1 ("DPM2 Database_v 4_2_1.accdb")
-    ];
-
-    [DataTheory]
-    [MemberData(nameof(ExpectedConceptTypeCounts))]
-    public void MConcept_ConceptType_HasTheMeasuredCount(string conceptType, int expected)
+    public void MConcept_RowCount_IsTheSumOfTheThirteenSourceTablesMinusTheSentinelDomain()
     {
-        var actual = Scalar($"SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = '{conceptType}'");
-        Assert.Equal(expected, actual);
+        var sum = SourceTables().Sum(t => Scalar($"SELECT COUNT(1) FROM \"{(string)t[0]}\""));
+        AssertDerived(
+            "mConcept rows (sum of the rows of the thirteen source tables minus the sentinel domain)",
+            "the generated source tables",
+            sum - 1,
+            Scalar("SELECT COUNT(1) FROM \"mConcept\""));
     }
 
     [DataFact]
-    public void MConcept_UsesExactlyThirteenConceptTypeValues_ValidationRuleIsOutOfScope()
+    public void MConceptTranslation_RowCount_MatchesThePinnedCensus()
+        => ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mConceptTranslation rows",
+            ReleasePins.Dpm20Cutoff42MConceptTranslationRows,
+            Scalar("SELECT COUNT(1) FROM \"mConceptTranslation\""));
+
+    // Concept types whose count is anchored here. The rest (Domain, Member, Hierarchy, Module) are
+    // anchored to their own source derivation in Dpm20DictionaryLoaderTests / this class's module
+    // counterpart; the 1:1 identity with the source table, for all thirteen, is the theory below.
+    public static IEnumerable<object[]> AnchoredConceptTypes() =>
+    [
+        ["HierarchyNode"],
+        ["Ordinate"],
+        ["Axis"],
+        ["TemplateOrTable"],
+        ["Dimension"],
+        ["Table"],
+        ["Taxonomy"],
+        ["ReportingFramework"],
+        ["Release"],
+    ];
+
+    /// <summary>The anchor of a concept type: the source of the figure, its pin (null when derived) and its value.</summary>
+    private static (string Source, ReleasePin? Pin, long Expected) ConceptTypeAnchor(string conceptType) => conceptType switch
     {
-        Assert.Equal(13, Scalar("SELECT COUNT(DISTINCT \"ConceptType\") FROM \"mConcept\""));
+        "HierarchyNode" => ("mHierarchyNode pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42MHierarchyNodeRows),
+        "Ordinate" => ("mAxisOrdinate pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42MAxisOrdinateRows),
+        "Axis" => ("mAxis pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42MAxisRows),
+        "TemplateOrTable" => ("mTemplateOrTable pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42MTemplateOrTableRows),
+        "Dimension" => ("mDimension pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42MDimensionRows),
+        "Table" => ("closed X axes pin (one X axis per mTable row)", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42ClosedXAxes),
+        "Taxonomy" => ("mTaxonomy pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42MTaxonomyRows),
+        "ReportingFramework" => ("frameworks-with-taxonomies pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42FrameworksWithTaxonomies),
+        "Release" => ("[Release]", null, AccessCensus.Count(Accdb, "Release")),
+        _ => throw new ArgumentOutOfRangeException(nameof(conceptType), conceptType, "No anchor for this concept type."),
+    };
+
+    [DataTheory]
+    [MemberData(nameof(AnchoredConceptTypes))]
+    public void MConcept_ConceptType_MatchesItsAnchor(string conceptType)
+    {
+        var actual = Scalar($"SELECT COUNT(1) FROM \"mConcept\" WHERE \"ConceptType\" = '{conceptType}'");
+        var (source, pin, expected) = ConceptTypeAnchor(conceptType);
+        if (pin is null)
+        {
+            AssertFromAccess($"mConcept rows of type {conceptType} ({source})", expected, actual);
+        }
+        else
+        {
+            ReleasePins.AssertPinned(pin, $"mConcept rows of type {conceptType} ({source})", expected, actual);
+        }
+    }
+
+    [DataFact]
+    public void MConcept_UsesExactlyOneConceptTypePerSourceTable_ValidationRuleIsOutOfScope()
+    {
+        AssertDerived(
+            "distinct mConcept.ConceptType values",
+            "the thirteen source tables",
+            SourceTables().Count(),
+            Scalar("SELECT COUNT(DISTINCT \"ConceptType\") FROM \"mConcept\""));
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'ValidationRule'"));
     }
 
@@ -102,7 +143,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     /// can hide two types that compensate each other. Thirteen assertions, one per source table.
     /// Named exception by business key: <c>mDomain</c> is the only one of the thirteen where table
     /// and concept do NOT match 1:1 - the sentinel domain 9999 ("", 'Open') carries no concept, so
-    /// its 150 rows give 149 concepts of type <c>Domain</c>.
+    /// its rows give one concept fewer of type <c>Domain</c>.
     /// </summary>
     [DataTheory]
     [MemberData(nameof(SourceTables))]
@@ -191,11 +232,11 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     /// it is excluded, just as it is excluded from <c>mMember</c> below.
     /// </summary>
     [DataFact]
-    public void MConceptTranslation_Label_Domain_IsTheAlreadyEmittedLabel_RowByRow_149Of149_ExcludingTheSentinel()
+    public void MConceptTranslation_Label_Domain_IsTheAlreadyEmittedLabel_RowByRow_ExcludingTheSentinel()
     {
         var sentinelDomainId = Scalar("SELECT \"DomainID\" FROM \"mDomain\" WHERE \"DomainCode\" = '' AND \"DomainLabel\" = 'Open'");
         AssertLabelMatchesEmittedValue(
-            "mDomain", "DomainLabel", conceptCountExpected: 150 - 1, extraWhere: $"t.\"DomainID\" <> {sentinelDomainId}");
+            "mDomain", "DomainLabel", conceptCountExpected: CountRows("mDomain") - 1, extraWhere: $"t.\"DomainID\" <> {sentinelDomainId}");
     }
 
     [DataFact]
@@ -203,56 +244,53 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     {
         var sentinelDomainId = Scalar("SELECT \"DomainID\" FROM \"mDomain\" WHERE \"DomainCode\" = '' AND \"DomainLabel\" = 'Open'");
         AssertLabelMatchesEmittedValue(
-            "mMember", "MemberLabel", conceptCountExpected: 12952 - 1, extraWhere: $"t.\"DomainID\" <> {sentinelDomainId}");
+            "mMember", "MemberLabel", conceptCountExpected: CountRows("mMember") - 1, extraWhere: $"t.\"DomainID\" <> {sentinelDomainId}");
     }
 
-    // Axis 1,990 -> 1,993, Table 846 -> 847 after the abstract-closure rule - re-measured after the
-    // change, see the comment of ExpectedConceptTypeCounts above.
     [DataFact]
-    public void MConceptTranslation_Label_Axis_IsTheAlreadyEmittedLabel_RowByRow_1993Of1993()
-        => AssertLabelMatchesEmittedValue("mAxis", "AxisLabel", conceptCountExpected: 1993);
+    public void MConceptTranslation_Label_Axis_IsTheAlreadyEmittedLabel_RowByRow()
+        => AssertLabelMatchesEmittedValue("mAxis", "AxisLabel", conceptCountExpected: CountRows("mAxis"));
 
     [DataFact]
-    public void MConceptTranslation_Label_Table_IsTheAlreadyEmittedLabel_RowByRow_847Of847()
-        => AssertLabelMatchesEmittedValue("mTable", "TableLabel", conceptCountExpected: 847);
+    public void MConceptTranslation_Label_Table_IsTheAlreadyEmittedLabel_RowByRow()
+        => AssertLabelMatchesEmittedValue("mTable", "TableLabel", conceptCountExpected: CountRows("mTable"));
 
     [DataFact]
-    public void MConceptTranslation_Label_Module_IsTheAlreadyEmittedLabel_RowByRow_50Of50()
-        => AssertLabelMatchesEmittedValue("mModule", "ModuleLabel", conceptCountExpected: 50);
+    public void MConceptTranslation_Label_Module_IsTheAlreadyEmittedLabel_RowByRow()
+        => AssertLabelMatchesEmittedValue("mModule", "ModuleLabel", conceptCountExpected: CountRows("mModule"));
 
     [DataFact]
     public void MConceptTranslation_Label_Dimension_IsTheAlreadyEmittedLabel_RowByRow_ExcludingMET()
         => AssertLabelMatchesEmittedValue(
-            "mDimension", "DimensionLabel", conceptCountExpected: 1100 - 1, extraWhere: "t.\"DimensionID\" <> 9999");
+            "mDimension", "DimensionLabel", conceptCountExpected: CountRows("mDimension") - 1, extraWhere: "t.\"DimensionID\" <> 9999");
 
     [DataFact]
-    public void MConceptTranslation_Label_Hierarchy_IsTheAlreadyEmittedLabel_RowByRow_1154Of1154()
-        => AssertLabelMatchesEmittedValue("mHierarchy", "HierarchyLabel", conceptCountExpected: 1154);
+    public void MConceptTranslation_Label_Hierarchy_IsTheAlreadyEmittedLabel_RowByRow()
+        => AssertLabelMatchesEmittedValue("mHierarchy", "HierarchyLabel", conceptCountExpected: CountRows("mHierarchy"));
 
     [DataFact]
-    public void MConceptTranslation_Label_HierarchyNode_IsTheAlreadyEmittedLabel_RowByRow_16538Of16538()
-        => AssertLabelMatchesEmittedValue("mHierarchyNode", "HierarchyNodeLabel", conceptCountExpected: 16538);
-
-    // Ordinate 20,679 -> 20,712, TemplateOrTable 1,529 -> 1,530 after the abstract-closure rule.
-    [DataFact]
-    public void MConceptTranslation_Label_Ordinate_IsTheAlreadyEmittedLabel_RowByRow_20712Of20712()
-        => AssertLabelMatchesEmittedValue("mAxisOrdinate", "OrdinateLabel", conceptCountExpected: 20712);
+    public void MConceptTranslation_Label_HierarchyNode_IsTheAlreadyEmittedLabel_RowByRow()
+        => AssertLabelMatchesEmittedValue("mHierarchyNode", "HierarchyNodeLabel", conceptCountExpected: CountRows("mHierarchyNode"));
 
     [DataFact]
-    public void MConceptTranslation_Label_TemplateOrTable_IsTheAlreadyEmittedLabel_RowByRow_1530Of1530()
-        => AssertLabelMatchesEmittedValue("mTemplateOrTable", "TemplateOrTableLabel", conceptCountExpected: 1530);
+    public void MConceptTranslation_Label_Ordinate_IsTheAlreadyEmittedLabel_RowByRow()
+        => AssertLabelMatchesEmittedValue("mAxisOrdinate", "OrdinateLabel", conceptCountExpected: CountRows("mAxisOrdinate"));
 
     [DataFact]
-    public void MConceptTranslation_Label_ReportingFramework_IsTheAlreadyEmittedLabel_RowByRow_18Of18()
-        => AssertLabelMatchesEmittedValue("mReportingFramework", "FrameworkLabel", conceptCountExpected: 18);
+    public void MConceptTranslation_Label_TemplateOrTable_IsTheAlreadyEmittedLabel_RowByRow()
+        => AssertLabelMatchesEmittedValue("mTemplateOrTable", "TemplateOrTableLabel", conceptCountExpected: CountRows("mTemplateOrTable"));
+
+    [DataFact]
+    public void MConceptTranslation_Label_ReportingFramework_IsTheAlreadyEmittedLabel_RowByRow()
+        => AssertLabelMatchesEmittedValue("mReportingFramework", "FrameworkLabel", conceptCountExpected: CountRows("mReportingFramework"));
 
     private void AssertLabelMatchesEmittedValue(
-        string table, string labelColumn, int conceptCountExpected, string? extraWhere = null)
+        string table, string labelColumn, long conceptCountExpected, string? extraWhere = null)
     {
         var where = extraWhere is null ? string.Empty : $" AND {extraWhere}";
 
         var expectedRowCount = Scalar($"SELECT COUNT(*) FROM \"{table}\" t WHERE 1 = 1{where}");
-        Assert.Equal(conceptCountExpected, expectedRowCount);
+        AssertDerived($"{table} rows to be checked", "the generated table row count", conceptCountExpected, expectedRowCount);
 
         var joinedCount = Scalar(
             $"""
@@ -262,7 +300,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
             """);
         Assert.True(
             joinedCount == expectedRowCount,
-            $"{table}: {expectedRowCount - joinedCount} rows without a 'label'-role translation (beyond the 7 named ones).");
+            $"{table}: {expectedRowCount - joinedCount} rows without a 'label'-role translation (beyond the named ones).");
 
         var mismatches = Scalar(
             $"""
@@ -274,11 +312,11 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     }
 
     // ------------------------------------------------------------------
-    // 4 - The 7 concepts without a translation, NAMED ONE BY ONE, not just counted.
+    // 4 - The concepts without a translation, NAMED ONE BY ONE, not just counted.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MConceptTranslation_TheSevenConceptsWithoutALabel_AreExactlyTheNamedOnes()
+    public void MConceptTranslation_TheConceptsWithoutALabel_AreExactlyTheNamedOnes()
     {
         var unlabeled = QueryHelpers.Rows(
             Connection,
@@ -290,23 +328,22 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
             """,
             2);
 
-        // 8 on "DPM2 Database_v 4_2_1.accdb" (7 before: [Release] now declares 6 releases).
-        Assert.Equal(8, unlabeled.Count);
-
-        // (1) to (6): the 6 releases - mRelease has no label column, there is no row to emit.
+        // The releases (mRelease has no label column, there is no row to emit) plus the MET dimension
+        // and the sentinel member named below.
         var releaseConceptIds = unlabeled.Where(r => r[1] == "Release").Select(r => r[0]).ToHashSet();
-        Assert.Equal(6, releaseConceptIds.Count);
+        AssertFromAccess("Release concepts without a translation (every [Release] row)", AccessCensus.Count(Accdb, "Release"), releaseConceptIds.Count);
+        AssertDerived("concepts without a translation (releases + MET dimension + sentinel member)", "the named ones", releaseConceptIds.Count + 2, unlabeled.Count);
 
         var actualReleaseConceptIdsFromMRelease = QueryHelpers.Rows(Connection, "SELECT \"ConceptID\" FROM \"mRelease\" ORDER BY \"ReleaseID\"", 1)
             .Select(r => r[0]).ToHashSet();
         Assert.Equal(actualReleaseConceptIdsFromMRelease, releaseConceptIds);
 
-        // (6): the MET dimension, DimensionID = 9999.
+        // The MET dimension, DimensionID = 9999.
         var metConceptId = ScalarString("SELECT \"ConceptID\" FROM \"mDimension\" WHERE \"DimensionID\" = 9999");
         Assert.NotNull(metConceptId);
         Assert.Contains(unlabeled, r => r[0] == metConceptId && r[1] == "Dimension");
 
-        // (7): the "Open" sentinel member: DomainCode='', DomainLabel='Open'.
+        // The "Open" sentinel member: DomainCode='', DomainLabel='Open'.
         var sentinelConceptId = ScalarString(
             """
             SELECT m."ConceptID" FROM "mMember" m
@@ -319,11 +356,11 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
         // No other type appears among the 7.
         Assert.All(unlabeled, r => Assert.True(
             r[1] is "Release" or "Dimension" or "Member",
-            $"ConceptID={r[0]} of type {r[1]} has no translation and is NOT one of the 7 named ones."));
+            $"ConceptID={r[0]} of type {r[1]} has no translation and is NOT one of the named ones."));
     }
 
     // ------------------------------------------------------------------
-    // 5 - DD-22: Role='description' in ZERO rows (the 70 of the reference are not emitted).
+    // 5 - DD-22: Role='description' in ZERO rows (those of the reference are not emitted).
     // ------------------------------------------------------------------
 
     [DataFact]
@@ -372,7 +409,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     public void MConcept_ReleaseID_Hierarchy_IsAlwaysNull()
     {
         var total = Scalar("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'Hierarchy'");
-        Assert.Equal(1154, total);
+        AssertDerived("Hierarchy concepts", "the generated mHierarchy", CountRows("mHierarchy"), total);
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'Hierarchy' AND \"ReleaseID\" IS NOT NULL"));
     }
 
@@ -381,7 +418,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     public void MConcept_ReleaseID_Release_IsAlwaysNull()
     {
         var total = Scalar("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'Release'");
-        Assert.Equal(6, total); // 5 before "DPM2 Database_v 4_2_1.accdb" ([Release] now also declares 4.2.1)
+        AssertFromAccess("Release concepts", AccessCensus.Count(Accdb, "Release"), total);
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'Release' AND \"ReleaseID\" IS NOT NULL"));
     }
 
@@ -438,7 +475,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
             """,
             3);
 
-        Assert.Equal(1099, rows.Count);
+        AssertDerived("Dimension concepts joined (mDimension minus the MET dimension)", "the generated mDimension", CountRows("mDimension") - 1, rows.Count);
         AssertReleaseIdMatchesColonSuffixOracle(rows, releaseIdByCode, "DimensionID");
     }
 
@@ -456,7 +493,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
             """,
             3);
 
-        Assert.Equal(12951, rows.Count); // 12,948 before "DPM2 Database_v 4_2_1.accdb" (+3 members of 4.2.1)
+        AssertDerived("Member concepts joined (mMember minus the sentinel domain's member)", "the generated mMember", CountRows("mMember") - 1, rows.Count);
         AssertReleaseIdMatchesColonSuffixOracle(rows, releaseIdByCode, "MemberID");
     }
 
@@ -492,7 +529,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
             """,
             3);
 
-        Assert.Equal(32, rows.Count);
+        AssertDerived("Taxonomy concepts joined", "the generated mTaxonomy", CountRows("mTaxonomy"), rows.Count);
 
         var mismatches = new List<string>();
         foreach (var row in rows)
@@ -521,18 +558,20 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     }
 
     // ------------------------------------------------------------------
-    // 7 - The 32 taxonomies carry exactly one 'label' translation row whose Text is the
+    // 7 - Every taxonomy carries exactly one 'label' translation row whose Text is the
     // mTaxonomy.TaxonomyLabel of the same taxonomy (issue #11 retired the former NULL Text: the
     // label is now derived, and the concept loader passes on whatever label the entity has).
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MConceptTranslation_Taxonomy_All32CarryOneLabelRow_WhoseTextIsTheTaxonomyLabel()
+    public void MConceptTranslation_Taxonomy_AllCarryOneLabelRow_WhoseTextIsTheTaxonomyLabel()
     {
-        Assert.Equal(32, Scalar("SELECT COUNT(1) FROM \"mConcept\" WHERE \"ConceptType\" = 'Taxonomy'"));
+        var taxonomies = CountRows("mTaxonomy");
+        Assert.True(taxonomies > 0, "mTaxonomy is empty: the checks below would be meaningless.");
+        AssertDerived("Taxonomy concepts", "the generated mTaxonomy", taxonomies, Scalar("SELECT COUNT(1) FROM \"mConcept\" WHERE \"ConceptType\" = 'Taxonomy'"));
 
         // Exactly one translation per Taxonomy concept, and it is a 'label'.
-        Assert.Equal(32, Scalar(
+        AssertDerived("Taxonomy 'label' translations", "the generated mTaxonomy", taxonomies, Scalar(
             """
             SELECT COUNT(1) FROM "mConceptTranslation" ct
             JOIN "mConcept" c ON c."ConceptID" = ct."ConceptID"
@@ -552,14 +591,14 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
               WHERE c."ConceptType" = 'Taxonomy' GROUP BY ct."ConceptID" HAVING COUNT(1) <> 1)
             """));
 
-        // Positive control: the join taxonomy -> concept -> translation really examines 32 rows,
+        // Positive control: the join taxonomy -> concept -> translation really examines every taxonomy,
         // so a zero count of mismatches cannot come from an empty join.
         var joined = Scalar(
             """
             SELECT COUNT(1) FROM "mTaxonomy" t
             JOIN "mConceptTranslation" ct ON ct."ConceptID" = t."ConceptID" AND ct."Role" = 'label'
             """);
-        Assert.Equal(32, joined);
+        AssertDerived("Taxonomy rows joined to their label translation", "the generated mTaxonomy", taxonomies, joined);
 
         var mismatches = Scalar(
             """
@@ -570,14 +609,14 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
         Assert.Equal(0, mismatches);
 
         // Positive control of the predicate itself: compared against a deliberately different
-        // text, the same join finds all 32 rows.
+        // text, the same join finds every taxonomy.
         var controlMismatches = Scalar(
             """
             SELECT COUNT(1) FROM "mTaxonomy" t
             JOIN "mConceptTranslation" ct ON ct."ConceptID" = t."ConceptID" AND ct."Role" = 'label'
             WHERE ct."Text" IS NULL OR ct."Text" <> t."TaxonomyLabel" || ' (mutated)'
             """);
-        Assert.Equal(32, controlMismatches);
+        AssertDerived("Taxonomy rows found by the deliberately mutated predicate", "the generated mTaxonomy", taxonomies, controlMismatches);
     }
 
     // ------------------------------------------------------------------
@@ -585,6 +624,8 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     private long Scalar(string sql) => QueryHelpers.Scalar(Connection, sql);
+
+    private long CountRows(string table) => Scalar($"SELECT COUNT(1) FROM \"{table}\"");
 
     private string? ScalarString(string sql)
     {
