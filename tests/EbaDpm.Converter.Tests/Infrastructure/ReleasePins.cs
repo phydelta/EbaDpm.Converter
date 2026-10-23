@@ -130,6 +130,30 @@ internal static class ReleasePins
     /// <summary>Common hierarchy keys whose member code sets are contained one in the other, not equal.</summary>
     public const int Reference42HierarchyContainedKeys = 55;
 
+    // ------------------------------------------------------------------
+    // DPM 2.0 modules and concepts. The business template links and the taxonomy/template
+    // populations are the output of mapping rules (table closure, taxonomy derivation), so they are
+    // pinned; module and concept counts that follow from the source or from a 1:1 mirror are derived.
+    // ------------------------------------------------------------------
+
+    /// <summary><c>COUNT(1)</c> of <c>mModuleBusinessTemplate</c>.</summary>
+    public const int Dpm20Cutoff42MModuleBusinessTemplateRows = 127;
+
+    /// <summary>Distinct <c>BusinessTemplateID</c> nodes referenced by <c>mModuleBusinessTemplate</c>.</summary>
+    public const int Dpm20Cutoff42BusinessTemplateDistinctNodes = 111;
+
+    /// <summary><c>COUNT(1)</c> of <c>mTaxonomy</c> (derived taxonomies, <c>Dpm20TaxonomyDeriver</c>).</summary>
+    public const int Dpm20Cutoff42MTaxonomyRows = 32;
+
+    /// <summary><c>COUNT(1)</c> of <c>mTemplateOrTable</c> (and of its <c>TemplateOrTable</c> concepts).</summary>
+    public const int Dpm20Cutoff42MTemplateOrTableRows = 1530;
+
+    /// <summary><c>COUNT(1)</c> of <c>mConceptTranslation</c>.</summary>
+    public const int Dpm20Cutoff42MConceptTranslationRows = 57073;
+
+    /// <summary><c>COUNT(1)</c> of <c>mModule</c> in the 4.2 reference export (<see cref="Reference42"/>).</summary>
+    public const int Reference42MModuleRows = 50;
+
     /// <summary>Asserts a pinned figure; the failure message prints the scope of the pin.</summary>
     public static void AssertPinned(ReleasePin pin, string what, long expected, long actual)
         => Xunit.Assert.True(expected == actual, Message(pin, what, expected, actual));
