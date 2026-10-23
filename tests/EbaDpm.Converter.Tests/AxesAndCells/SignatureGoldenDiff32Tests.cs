@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 
 namespace EbaDpm.Converter.Tests.AxesAndCells;
 
@@ -76,16 +77,17 @@ public sealed class SignatureGoldenDiff32Tests
     // closed axes (NOT by BusinessCode: the open-axis convention differs between 3.2 and the
     // generated output).
     //
-    // Over the FOUR 3.2 taxonomies (1:1 coverage with the Access), COUNT(*) of "mTableCell" WHERE
-    // "IsShaded"=0 in the 3.2 reference is EXACTLY 69,357, and position matching finds all 69,357
-    // without any collision (matched == unshaded on both sides).
+    // Over the FOUR 3.2 taxonomies (1:1 coverage with the Access), the unshaded cells of the 3.2
+    // reference are a scoped pin (ReleasePins.Reference32UnshadedCells); position matching finds
+    // every cell of the reference (ReleasePins.Reference32MTableCellRows), shaded or not, without
+    // any collision, and the unshaded ones are the ones compared.
     // ------------------------------------------------------------------
 
     [DataFact]
     public void Dps_MatchesReference32_Literally_ForAllUnshadedCells()
     {
         var matched = MatchCellsByPosition();
-        Assert.True(matched.Count > 60000, $"Only {matched.Count} cells were matched: position matching failed wholesale.");
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "cells matched by position (every cell of the reference)", ReleasePins.Reference32MTableCellRows, matched.Count);
 
         var referenceShadedById = QueryHelpers.Rows(_fixture.Reference32Connection, "SELECT \"CellID\", \"IsShaded\" FROM \"mTableCell\"", 2)
             .ToDictionary(r => int.Parse(r[0]!), r => r[1]);
@@ -114,7 +116,7 @@ public sealed class SignatureGoldenDiff32Tests
             }
         }
 
-        Assert.Equal(69357, compared);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "unshaded cells compared", ReleasePins.Reference32UnshadedCells, compared);
         Assert.True(
             failures.Count == 0,
             $"{failures.Count}/{compared} unshaded cells with a DPS different from the 3.2 reference (literal, required at 100%):\n" + string.Join("\n", failures.Take(30)));
@@ -129,7 +131,7 @@ public sealed class SignatureGoldenDiff32Tests
     public void DatapointSignature_MatchesReference32_NormalizingBracketNumericContent_ForAllUnshadedCells()
     {
         var matched = MatchCellsByPosition();
-        Assert.True(matched.Count > 60000);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "cells matched by position (every cell of the reference)", ReleasePins.Reference32MTableCellRows, matched.Count);
 
         var referenceShadedById = QueryHelpers.Rows(_fixture.Reference32Connection, "SELECT \"CellID\", \"IsShaded\" FROM \"mTableCell\"", 2)
             .ToDictionary(r => int.Parse(r[0]!), r => r[1]);
@@ -173,7 +175,7 @@ public sealed class SignatureGoldenDiff32Tests
             }
         }
 
-        Assert.Equal(69357, compared);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "unshaded cells compared", ReleasePins.Reference32UnshadedCells, compared);
         Assert.True(withBracket > 0, "No cell with a bracket was compared: the normalisation would not cover its most delicate case.");
         Assert.True(
             failures.Count == 0,
@@ -182,7 +184,7 @@ public sealed class SignatureGoldenDiff32Tests
 
     // ------------------------------------------------------------------
     // Census of the THREE-part bracket (starting member) on the REFERENCES themselves, not on the
-    // generated output: 12,031/69,357 in 3.2, 0 in 4.0, 0 in 4.2 (the 4.x references never
+    // generated output: a scoped pin in 3.2 (ReleasePins.Reference32ThreePartBracketCells), 0 in 4.0, 0 in 4.2 (the 4.x references never
     // populate HierarchyStartingMemberID). Regression guard for the reference data: if these
     // figures change, the data files were updated and the signature rules must be reviewed
     // before going on.
@@ -196,11 +198,11 @@ public sealed class SignatureGoldenDiff32Tests
     }
 
     [DataFact]
-    public void ThreePartBracket_Census_Reference32_Is12031Of69357()
+    public void ThreePartBracket_Census_Reference32_IsThePinnedCensus()
     {
         var (withSignature, threePart) = CensusThreePartBracket(_fixture.Reference32Connection);
-        Assert.Equal(69357, withSignature);
-        Assert.Equal(12031, threePart);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "cells with a DPS", ReleasePins.Reference32UnshadedCells, withSignature);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "cells with a three-part bracket in the DPS", ReleasePins.Reference32ThreePartBracketCells, threePart);
     }
 
     [DataFact]

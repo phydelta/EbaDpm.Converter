@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 using Microsoft.Data.Sqlite;
 
 namespace EbaDpm.Converter.Tests.AxesAndCells;
@@ -307,7 +308,7 @@ public sealed class OrdinateCategorisationClosureTests
             }
         }
 
-        Assert.True(compared > 6000, $"Only {compared} ordinates with cells were compared: matching failed wholesale (about 6,877 expected).");
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "leaf ordinates with cells compared by path", ReleasePins.Reference32LeafOrdinatesWithCells, compared);
         Assert.True(
             missingInGenerated.Count == 0,
             $"{missingInGenerated.Count}/{compared} ordinates with cells of the 3.2 reference missing from the generated output:\n" + string.Join("\n", missingInGenerated.Take(20)));
@@ -347,7 +348,7 @@ public sealed class OrdinateCategorisationClosureTests
             }
         }
 
-        Assert.True(compared > 0);
+        Assert.True(compared > 0, "No generated ordinate was compared: the closure walk check would be vacuous.");
         Assert.True(
             mismatches.Count == 0,
             $"{mismatches.Count}/{compared} generated ordinates where the own rows do NOT reproduce the closure walked through the tree (bug in BuildSafeFormCategorisations):\n" + string.Join("\n", mismatches.Take(30)));

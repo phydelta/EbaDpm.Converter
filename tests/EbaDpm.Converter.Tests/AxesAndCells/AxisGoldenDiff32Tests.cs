@@ -1,12 +1,13 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 
 namespace EbaDpm.Converter.Tests.AxesAndCells;
 
 /// <summary>
 /// Golden-level comparison of axes against <c>EBA_3.2_phase_1.db</c>, the PRIMARY content
 /// reference, over the FOUR taxonomies of <see cref="AxisAndCellFixture"/> that cover 3.2 fully:
-/// <c>AE 3.2</c>, <c>COREP 3.2</c>, <c>GSII 3.2</c>, <c>IF 3.2</c> (217 tables, 522 axes, 7,615
-/// ordinates, 129,549 cells, 358,946 positions, 58 restrictions).
+/// <c>AE 3.2</c>, <c>COREP 3.2</c>, <c>GSII 3.2</c>, <c>IF 3.2</c> (the figures of the
+/// 3.2 reference are scoped pins, <see cref="ReleasePins.Reference32"/>).
 ///
 /// Because the converted universe is EXACTLY the 3.2 universe, these tests demand EQUALITY, not
 /// mere containment: a shortfall here is a real failure, not a taxonomy-coverage question.
@@ -30,8 +31,9 @@ public sealed class AxisGoldenDiff32Tests
     }
 
     // ------------------------------------------------------------------
-    // Exact census: 522 / 7,615 / 129,549 / 358,946 / 58, ON BOTH SIDES. Double guard: if the
-    // reference changes, it shows here before in any other test.
+    // Exact census, ON BOTH SIDES: the reference is a scoped pin and the generated side must
+    // equal the reference. Double guard: if the reference changes, it shows here before in any
+    // other test.
     // ------------------------------------------------------------------
 
     // <see cref="AxisAndCellFixture"/> converts EIGHT taxonomies (the four of 3.2 PLUS the four of
@@ -71,31 +73,31 @@ public sealed class AxisGoldenDiff32Tests
     }
 
     [DataFact]
-    public void Census_Axes_Is522_OnBothSides()
+    public void Census_Axes_AreEqualOnBothSides()
     {
         var reference = QueryHelpers.Scalar(_fixture.Reference32Connection, "SELECT COUNT(*) FROM \"mAxis\"");
-        Assert.Equal(522, reference);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "mAxis rows", ReleasePins.Reference32MAxisRows, reference);
 
         var generated = GeneratedFilteredCount("a.\"AxisID\"", GeneratedAxisJoin, "t.\"TaxonomyCode\"");
-        Assert.Equal(522, generated);
+        Assert.Equal(reference, generated);
     }
 
     [DataFact]
-    public void Census_Ordinates_Is7615_OnBothSides()
+    public void Census_Ordinates_AreEqualOnBothSides()
     {
         var reference = QueryHelpers.Scalar(_fixture.Reference32Connection, "SELECT COUNT(*) FROM \"mAxisOrdinate\"");
-        Assert.Equal(7615, reference);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "mAxisOrdinate rows", ReleasePins.Reference32MAxisOrdinateRows, reference);
 
         var join = GeneratedAxisJoin + " JOIN \"mAxisOrdinate\" o ON o.\"AxisID\" = a.\"AxisID\"";
         var generated = GeneratedFilteredCount("o.\"OrdinateID\"", join, "t.\"TaxonomyCode\"");
-        Assert.Equal(7615, generated);
+        Assert.Equal(reference, generated);
     }
 
     [DataFact]
-    public void Census_Cells_Is129549_OnBothSides()
+    public void Census_Cells_AreEqualOnBothSides()
     {
         var reference = QueryHelpers.Scalar(_fixture.Reference32Connection, "SELECT COUNT(*) FROM \"mTableCell\"");
-        Assert.Equal(129549, reference);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "mTableCell rows", ReleasePins.Reference32MTableCellRows, reference);
 
         var join =
             """
@@ -105,14 +107,14 @@ public sealed class AxisGoldenDiff32Tests
             JOIN "mTaxonomy" t      ON t."TaxonomyID" = tt."TaxonomyID"
             """;
         var generated = GeneratedFilteredCount("c.\"CellID\"", join, "t.\"TaxonomyCode\"");
-        Assert.Equal(129549, generated);
+        Assert.Equal(reference, generated);
     }
 
     [DataFact]
-    public void Census_Positions_Is358946_OnBothSides()
+    public void Census_Positions_AreEqualOnBothSides()
     {
         var reference = QueryHelpers.Scalar(_fixture.Reference32Connection, "SELECT COUNT(*) FROM \"mCellPosition\"");
-        Assert.Equal(358946, reference);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "mCellPosition rows", ReleasePins.Reference32MCellPositionRows, reference);
 
         var rows = QueryHelpers.Rows(
             _fixture.GeneratedConnection,
@@ -126,14 +128,14 @@ public sealed class AxisGoldenDiff32Tests
             """,
             3);
         var generated = rows.Count(r => TargetTaxonomies.Contains(BusinessKeySupport.NormalizeTaxonomyCode(r[2]!)));
-        Assert.Equal(358946, generated);
+        Assert.Equal(reference, generated);
     }
 
     [DataFact]
-    public void Census_OpenAxisValueRestrictions_Is58_OnBothSides()
+    public void Census_OpenAxisValueRestrictions_AreEqualOnBothSides()
     {
         var reference = QueryHelpers.Scalar(_fixture.Reference32Connection, "SELECT COUNT(*) FROM \"mOpenAxisValueRestriction\"");
-        Assert.Equal(58, reference);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "mOpenAxisValueRestriction rows", ReleasePins.Reference32MOpenAxisValueRestrictionRows, reference);
 
         var join =
             """
@@ -145,12 +147,12 @@ public sealed class AxisGoldenDiff32Tests
             JOIN "mTaxonomy" t       ON t."TaxonomyID" = tt."TaxonomyID"
             """;
         var generated = GeneratedFilteredCount("r.\"AxisID\" || '/' || r.\"HierarchyID\"", join, "t.\"TaxonomyCode\"");
-        Assert.Equal(58, generated);
+        Assert.Equal(reference, generated);
     }
 
     // ------------------------------------------------------------------
     // mTableAxis: CLASS SEQUENCE per table: X < closed Y < closed Z < open Y < open Z, IN ORDER,
-    // for all 217 tables. Reproduced by table business key, without comparing any ID.
+    // for every table of the 3.2 reference. Reproduced by table business key, without comparing any ID.
     // ------------------------------------------------------------------
 
     private static string ClassOf(string orientation, bool isOpenAxis) => (orientation, isOpenAxis) switch
@@ -200,7 +202,7 @@ public sealed class AxisGoldenDiff32Tests
         var generated = ClassSequenceByTable(_fixture.GeneratedConnection);
         var reference = ClassSequenceByTable(_fixture.Reference32Connection);
 
-        Assert.Equal(217, reference.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "tables with a class sequence", ReleasePins.Reference32Tables, reference.Count);
 
         var failures = new List<string>();
         foreach (var (key, refSequence) in reference)
@@ -218,12 +220,12 @@ public sealed class AxisGoldenDiff32Tests
             }
         }
 
-        Assert.True(failures.Count == 0, $"{failures.Count}/217 tables with a class sequence different from the 3.2 reference:\n" + string.Join("\n", failures.Take(20)));
+        Assert.True(failures.Count == 0, $"{failures.Count}/{reference.Count} tables with a class sequence different from the 3.2 reference:\n" + string.Join("\n", failures.Take(20)));
     }
 
     // ------------------------------------------------------------------
     // mAxis.AxisLabel of CLOSED axes: literal from the Access if present, otherwise a constant
-    // per orientation. 433/433 in 3.2, with ONE declared legitimate exception:
+    // per orientation. every closed axis of the 3.2 reference, with ONE declared legitimate exception:
     // COREP_3.2/C_67.00.a = 'Total currencies'.
     // ------------------------------------------------------------------
 
@@ -265,7 +267,7 @@ public sealed class AxisGoldenDiff32Tests
         var generated = ClosedAxisLabelsByTable(_fixture.GeneratedConnection);
         var reference = ClosedAxisLabelsByTable(_fixture.Reference32Connection);
 
-        Assert.Equal(433, reference.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "closed axes with a label", ReleasePins.Reference32ClosedAxisLabels, reference.Count);
 
         var declaredException = (new BusinessKeySupport.TableKey("corep_3.2", "C_67.00.a"), "Z");
 
@@ -308,7 +310,7 @@ public sealed class AxisGoldenDiff32Tests
         var tableIdsGenerated = BusinessKeySupport.BuildTableIdsByBusinessKey(_fixture.GeneratedConnection, normalizedTaxonomies);
         var tableIdsReference = BusinessKeySupport.BuildTableIdsByBusinessKey(_fixture.Reference32Connection, normalizedTaxonomies);
 
-        Assert.Equal(217, tableIdsReference.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "tables with closed ordinate paths", ReleasePins.Reference32Tables, tableIdsReference.Count);
 
         var generatedIndex = BusinessKeySupport.BuildClosedOrdinatePathIndex(_fixture.GeneratedConnection, tableIdsGenerated.Values.ToHashSet());
         var referenceIndex = BusinessKeySupport.BuildClosedOrdinatePathIndex(_fixture.Reference32Connection, tableIdsReference.Values.ToHashSet());
@@ -352,13 +354,13 @@ public sealed class AxisGoldenDiff32Tests
             }
         }
 
-        Assert.True(compared > 7000, $"Only {compared} ordinates were compared: path matching failed wholesale.");
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "closed ordinates compared by path", ReleasePins.Reference32ClosedOrdinatesCompared, compared);
         Assert.True(failures.Count == 0, $"{failures.Count}/{compared} different OrdinateLabel values (whitespace-insensitive):\n" + string.Join("\n", failures.Take(20)));
     }
 
     // ------------------------------------------------------------------
     // mOpenAxisValueRestriction: HierarchyID (normalising case and the _REL_n suffix),
-    // HierarchyStartingMemberID (by MemberCode) and IsStartingMemberIncluded: 58/58, literal
+    // HierarchyStartingMemberID (by MemberCode) and IsStartingMemberIncluded: every row, literal
     // against the primary reference.
     // ------------------------------------------------------------------
 
@@ -413,14 +415,14 @@ public sealed class AxisGoldenDiff32Tests
     }
 
     [DataFact]
-    public void OpenAxisValueRestriction_ContentMatchesReference32_58Rows()
+    public void OpenAxisValueRestriction_ContentMatchesReference32()
     {
         var generated = RestrictionRows(_fixture.GeneratedConnection)
             .ToDictionary(r => (r.Taxonomy, r.TableCode, r.Axis));
         var reference = RestrictionRows(_fixture.Reference32Connection)
             .ToDictionary(r => (r.Taxonomy, r.TableCode, r.Axis));
 
-        Assert.Equal(58, reference.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "open-axis value restrictions keyed by table and axis", ReleasePins.Reference32MOpenAxisValueRestrictionRows, reference.Count);
 
         var hierarchyFailures = new List<string>();
         var memberFailures = new List<string>();
@@ -451,9 +453,9 @@ public sealed class AxisGoldenDiff32Tests
             }
         }
 
-        Assert.True(missing.Count == 0, $"{missing.Count}/58 restrictions missing from the generated output:\n" + string.Join("\n", missing.Take(20)));
-        Assert.True(hierarchyFailures.Count == 0, $"{hierarchyFailures.Count}/58 different HierarchyID values (case and REL normalised):\n" + string.Join("\n", hierarchyFailures.Take(20)));
-        Assert.True(memberFailures.Count == 0, $"{memberFailures.Count}/58 different HierarchyStartingMemberID values (by MemberCode):\n" + string.Join("\n", memberFailures.Take(20)));
-        Assert.True(includedFailures.Count == 0, $"{includedFailures.Count}/58 different IsStartingMemberIncluded values:\n" + string.Join("\n", includedFailures.Take(20)));
+        Assert.True(missing.Count == 0, $"{missing.Count}/{reference.Count} restrictions missing from the generated output:\n" + string.Join("\n", missing.Take(20)));
+        Assert.True(hierarchyFailures.Count == 0, $"{hierarchyFailures.Count}/{reference.Count} different HierarchyID values (case and REL normalised):\n" + string.Join("\n", hierarchyFailures.Take(20)));
+        Assert.True(memberFailures.Count == 0, $"{memberFailures.Count}/{reference.Count} different HierarchyStartingMemberID values (by MemberCode):\n" + string.Join("\n", memberFailures.Take(20)));
+        Assert.True(includedFailures.Count == 0, $"{includedFailures.Count}/{reference.Count} different IsStartingMemberIncluded values:\n" + string.Join("\n", includedFailures.Take(20)));
     }
 }

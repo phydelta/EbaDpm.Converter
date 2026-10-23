@@ -160,7 +160,7 @@ public sealed class ModuleIntegrityTests
     {
         var total = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mModule\"");
         var nonNull = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mModule\" WHERE \"DefaultFrequency\" IS NOT NULL");
-        Assert.True(total > 0);
+        Assert.True(total > 0, "No mModule row was emitted: the DefaultFrequency check would be vacuous.");
         Assert.Equal(0, nonNull);
     }
 
@@ -169,7 +169,7 @@ public sealed class ModuleIntegrityTests
     {
         var total = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mModule\"");
         var nonNull = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mModule\" WHERE \"JSONSchemaRef\" IS NOT NULL");
-        Assert.True(total > 0);
+        Assert.True(total > 0, "No mModule row was emitted: the JSONSchemaRef check would be vacuous.");
         Assert.Equal(0, nonNull);
     }
 
@@ -178,7 +178,7 @@ public sealed class ModuleIntegrityTests
     {
         var total = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mModule\"");
         var notOne = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mModule\" WHERE \"AutogenerateRefs\" IS NOT 1");
-        Assert.True(total > 0);
+        Assert.True(total > 0, "No mModule row was emitted: the AutogenerateRefs check would be vacuous.");
         Assert.Equal(0, notOne);
     }
 
@@ -189,7 +189,7 @@ public sealed class ModuleIntegrityTests
         var nullCount = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mModule\" WHERE \"JsonBlob\" IS NULL");
         var nonEmptyCount = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mModule\" WHERE length(\"JsonBlob\") <> 0");
 
-        Assert.True(total > 0);
+        Assert.True(total > 0, "No mModule row was emitted: the JsonBlob check would be vacuous.");
         Assert.Equal(0, nullCount);
         Assert.Equal(0, nonEmptyCount);
     }
@@ -209,7 +209,7 @@ public sealed class ModuleIntegrityTests
     {
         var total = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mModule\"");
         var nullCount = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mModule\" WHERE \"XBRLSchemaRef\" IS NULL");
-        Assert.True(total > 0);
+        Assert.True(total > 0, "No mModule row was emitted: the XBRLSchemaRef check would be vacuous.");
         Assert.Equal(0, nullCount);
     }
 
@@ -221,7 +221,7 @@ public sealed class ModuleIntegrityTests
             "SELECT \"ModuleCode\", \"XBRLSchemaRef\" FROM \"mModule\"",
             2);
 
-        Assert.True(rows.Count > 0);
+        Assert.True(rows.Count > 0, "No mModule row was emitted: the XBRLSchemaRef content check would be vacuous.");
 
         var failures = new List<string>();
         foreach (var row in rows)

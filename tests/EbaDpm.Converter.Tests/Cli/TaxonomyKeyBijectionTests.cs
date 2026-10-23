@@ -1,13 +1,15 @@
 using EbaDpm.Converter.Core.Mapping;
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
+using EbaDpm.Converter.Tests.Schema;
 
 namespace EbaDpm.Converter.Tests.Cli;
 
 /// <summary>
-/// The <c>TaxonomyKey</c> is BIJECTIVE over the whole Access database: 128 distinct keys for 128
-/// taxonomies, none shared and no taxonomy with two. This is an invariant of the SOURCE; it is
-/// checked WITHOUT looking at any reference: it protects the 115 taxonomies that have no
-/// reference as much as the 13 comparable ones.
+/// The <c>TaxonomyKey</c> is BIJECTIVE over the whole Access database: one distinct key per
+/// taxonomy, none shared and no taxonomy with two. This is an invariant of the SOURCE; it is
+/// checked WITHOUT looking at any reference: it protects the taxonomies that have no
+/// reference as much as the comparable ones.
 ///
 /// It reuses <see cref="DictionaryFixture.AccessReader"/> (already open for the "Dictionary"
 /// collection): <c>ReadTaxonomies()</c> and <c>ReadModules()</c> do not filter by selection, so it
@@ -53,9 +55,14 @@ public sealed class TaxonomyKeyBijectionTests
         var distinctKeys = keyByTaxonomyId.Values.Distinct(StringComparer.Ordinal).Count();
         Assert.Equal(keyByTaxonomyId.Count, distinctKeys); // 0 keys shared by two taxonomies
 
-        // Concrete figure, a regression guard: if the Access database changes its census, it
-        // must be noticed here first.
-        Assert.Equal(128, taxonomies.Count);
-        Assert.Equal(128, distinctKeys);
+        // Derived from the Access source itself (plain COUNT(1) of [Taxonomy]), not from the reader
+        // under test.
+        var sourceTaxonomies = AccessCensus.Count(RepoPaths.AccessDatabasePath, "Taxonomy");
+        Assert.True(
+            sourceTaxonomies == taxonomies.Count,
+            $"Taxonomies read by the reader: expected {sourceTaxonomies} (COUNT(1) of [Taxonomy] in '{RepoPaths.AccessDatabaseFileName}'), actual {taxonomies.Count}.");
+        Assert.True(
+            sourceTaxonomies == distinctKeys,
+            $"Distinct TaxonomyKey values: expected {sourceTaxonomies} (COUNT(1) of [Taxonomy] in '{RepoPaths.AccessDatabaseFileName}'), actual {distinctKeys}.");
     }
 }
