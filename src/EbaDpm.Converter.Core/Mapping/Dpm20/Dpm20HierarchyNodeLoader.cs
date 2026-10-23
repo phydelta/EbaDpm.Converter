@@ -98,7 +98,7 @@ public static class Dpm20HierarchyNodeLoader
         IReadOnlyList<string> AnchoredMembers);
 
     public static Result Load(
-        Dpm20AccessReader reader,
+        IDpm20HierarchyNodeSource reader,
         SqliteConnection destination,
         IReadOnlyDictionary<int, (int HierarchyId, string HierarchyCode, int DomainId)> hierarchyBySubCategoryId)
     {
