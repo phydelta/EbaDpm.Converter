@@ -68,7 +68,7 @@ public static class Dpm20ModuleLoader
         IReadOnlyList<string> UnresolvedCases);
 
     public static Result Load(
-        Dpm20AccessReader reader,
+        IDpm20ModuleSource reader,
         SqliteConnection destination,
         IReadOnlyList<Dpm20ModuleRow> modules,
         IReadOnlyList<Dpm20ModuleVersionRow> currentModuleVersions,
@@ -231,7 +231,7 @@ public static class Dpm20ModuleLoader
 
     private static int LoadModuleBusinessTemplates(
         SqliteConnection destination,
-        Dpm20AccessReader reader,
+        IDpm20ModuleSource reader,
         IReadOnlyList<(int ModuleVId, string ModuleCode, string ModuleLabel, int TaxonomyId)> orderedModules,
         IReadOnlyDictionary<int, int> moduleIdByModuleVId,
         IReadOnlyList<Dpm20ModuleVersionCompositionRow> moduleVersionCompositions,
