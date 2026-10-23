@@ -1,3 +1,4 @@
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -13,38 +14,91 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 ///
 /// <c>mMetric</c> and <c>mDimension</c> are covered elsewhere: this class does NOT touch them.
 ///
-/// The count figures come from the DPM 2.0 SOURCE, not from <c>EBA_4.2_Hotfix.db</c>. The
-/// reference (150, 102, 13,130, 1,572) is NOT the target: comparing against it by census equality
-/// would be wrongly framed. The comparisons against the reference that DO appear here are, without
-/// exception, by BUSINESS KEY and by CONTAINMENT, never by total count.
+/// The expected counts are DERIVED from the DPM 2.0 SOURCE with <see cref="AccessCensus"/> (plain
+/// OLEDB queries on the same <c>.accdb</c>), not hard-coded and not taken from
+/// <c>EBA_4.2_Hotfix.db</c>. The reference is NOT the target: comparing against it by census
+/// equality would be wrongly framed. The comparisons against the reference that DO appear here are
+/// by BUSINESS KEY and by CONTAINMENT; the few reference figures that are asserted are scoped pins
+/// (<see cref="ReleasePins.Reference42"/>), never properties of the format.
 /// </summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
 public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
 {
     // ------------------------------------------------------------------
-    // Counts - figures of the SOURCE, measured, not of the reference.
+    // Counts - derived from the SOURCE (AccessCensus), not measured on the reference.
     // ------------------------------------------------------------------
 
-    [DataFact]
-    public void MDomain_Has150Rows() => Assert.Equal(150, CountRows("mDomain"));
+    private static string Accdb => RepoPaths.AccessDpm20DatabasePath;
+
+    /// <summary>Categories that never produce a domain: <c>SE</c>, <c>_NA</c>, <c>_PR</c>, <c>_TE</c>.</summary>
+    private const string StructuralCategoryCodes = "'SE', '_NA', '_PR', '_TE'";
+
+    /// <summary>Domains the loader synthesizes: <c>MET</c>, <c>INT_NA</c>, <c>STR_NA</c> and the sentinel (code property).</summary>
+    private const int SynthesizedDomains = 4;
+
+    /// <summary>Of the synthesized domains, the typed ones: <c>INT_NA</c> and <c>STR_NA</c> (code property).</summary>
+    private const int SynthesizedTypedDomains = 2;
+
+    /// <summary>Members the loader synthesizes besides the metrics: the sentinel member (code property).</summary>
+    private const int SentinelMembers = 1;
+
+    /// <summary>Asserts a figure derived from the Access source; the failure message says what and from where.</summary>
+    private static void AssertDerived(string what, long expectedFromAccess, long actual)
+        => Assert.True(
+            expectedFromAccess == actual,
+            $"{what}: expected {expectedFromAccess} (derived from '{RepoPaths.AccessDpm20DatabaseFileName}'), actual {actual}.");
+
+    /// <summary><c>Category</c> rows that produce a domain (all but the structural codes).</summary>
+    private static long CategoryDomainsInAccess()
+        => AccessCensus.Scalar(Accdb, $"SELECT COUNT(1) FROM [Category] WHERE [Code] NOT IN ({StructuralCategoryCodes})");
+
+    /// <summary>
+    /// <c>ItemCategory</c> rows (full history, no release filter) of the categories that produce
+    /// members: every category but <c>_PR</c> (properties, which become metrics) and <c>_TE</c>.
+    /// </summary>
+    private static long ItemCategoryMembersInAccess()
+        => AccessCensus.Scalar(
+            Accdb,
+            "SELECT COUNT(1) FROM [ItemCategory] ic INNER JOIN [Category] c ON c.[CategoryID] = ic.[CategoryID] "
+            + "WHERE c.[Code] NOT IN ('_PR', '_TE')");
+
+    private static long DistinctSuperCategoriesInAccess()
+        => AccessCensus.Scalar(Accdb, "SELECT COUNT(1) FROM (SELECT DISTINCT [SuperCategoryID] FROM [SuperCategoryComposition])");
 
     [DataFact]
-    public void MDomainUnion_Has102Rows_And41DistinctUnions()
+    public void MDomain_RowCount_IsTheCategoryDomainsPlusTheSynthesizedOnes()
+        => AssertDerived(
+            "mDomain rows (Category not in SE/_NA/_PR/_TE + synthesized)",
+            CategoryDomainsInAccess() + SynthesizedDomains,
+            CountRows("mDomain"));
+
+    [DataFact]
+    public void MDomainUnion_RowsAndDistinctUnions_MatchSuperCategoryComposition()
     {
-        Assert.Equal(102, CountRows("mDomainUnion"));
-        Assert.Equal(41, ScalarLong("SELECT COUNT(DISTINCT UnionDomainID) FROM mDomainUnion"));
+        AssertDerived(
+            "mDomainUnion rows (SuperCategoryComposition)",
+            AccessCensus.Count(Accdb, "SuperCategoryComposition"),
+            CountRows("mDomainUnion"));
+        AssertDerived(
+            "mDomainUnion distinct UnionDomainID (distinct SuperCategoryID)",
+            DistinctSuperCategoriesInAccess(),
+            ScalarLong("SELECT COUNT(DISTINCT UnionDomainID) FROM mDomainUnion"));
     }
 
     [DataFact]
-    // 12,949 -> 12,952 on "DPM2 Database_v 4_2_1.accdb" (cutoff 4.2): +3 members of 4.2.1 (qTR:qx2065..qx2067), non-versioned dictionary content.
-    public void MMember_Has12952Rows() => Assert.Equal(12952, CountRows("mMember"));
+    public void MMember_RowCount_IsTheItemCategoryMembersPlusTheMetricsPlusTheSentinel()
+        => AssertDerived(
+            "mMember rows (ItemCategory not in _PR/_TE, full history + mMetric rows + sentinel)",
+            ItemCategoryMembersInAccess() + CountRows("mMetric") + SentinelMembers,
+            CountRows("mMember"));
 
     [DataFact]
-    public void MHierarchy_Has1154Rows() => Assert.Equal(1154, CountRows("mHierarchy"));
+    public void MHierarchy_RowCount_IsTheSubCategoryCount()
+        => AssertDerived("mHierarchy rows (SubCategory)", AccessCensus.Count(Accdb, "SubCategory"), CountRows("mHierarchy"));
 
     // ------------------------------------------------------------------
-    // mDomain: 146 from Category + 4 synthesized
+    // mDomain: the Category-derived domains + the synthesized ones
     // ------------------------------------------------------------------
 
     /// <summary><c>SE</c>, <c>_NA</c>, <c>_PR</c> and <c>_TE</c> do NOT produce a row in <c>mDomain</c>.</summary>
@@ -57,9 +111,9 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
         }
     }
 
-    /// <summary>146 "normal" domains (from <c>Category</c>) + 4 synthesized = 150.</summary>
+    /// <summary>The "normal" domains come from <c>Category</c>; the synthesized ones are the rest.</summary>
     [DataFact]
-    public void MDomain_Has146FromCategory_Plus4Synthesized()
+    public void MDomain_HasTheCategoryDerivedRows_Plus4Synthesized()
     {
         var synthesizedOrSentinel = new[] { "MET", "INT_NA", "STR_NA", string.Empty };
         var placeholders = string.Join(", ", synthesizedOrSentinel.Select((_, i) => $"$s{i}"));
@@ -69,7 +123,7 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
             $"SELECT COUNT(*) FROM mDomain WHERE DomainCode NOT IN ({placeholders})",
             parameters);
 
-        Assert.Equal(146, fromCategory);
+        AssertDerived("mDomain rows from Category (not synthesized)", CategoryDomainsInAccess(), fromCategory);
     }
 
     /// <summary>
@@ -132,14 +186,23 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
         Assert.Equal(isTypedDomain, reader.GetInt64(4) != 0);
     }
 
-    /// <summary><c>IsTypedDomain</c> if and only if <c>NOT Category.IsEnumerated</c> - the 17 typed ones.</summary>
+    /// <summary>
+    /// <c>IsTypedDomain</c> if and only if <c>NOT Category.IsEnumerated</c>: the typed domains are the
+    /// non-enumerated categories that produce a domain, plus <c>INT_NA</c> and <c>STR_NA</c>.
+    /// </summary>
     [DataFact]
-    public void MDomain_IsTypedDomain_Has17Rows()
-        => Assert.Equal(17, ScalarLong("SELECT COUNT(*) FROM mDomain WHERE IsTypedDomain = 1"));
+    public void MDomain_IsTypedDomain_MatchesTheNonEnumeratedCategories()
+        => AssertDerived(
+            "mDomain typed rows (Category.IsEnumerated = 0, not structural, + INT_NA, STR_NA)",
+            AccessCensus.Scalar(
+                Accdb,
+                $"SELECT COUNT(1) FROM [Category] WHERE [IsEnumerated] = 0 AND [Code] NOT IN ({StructuralCategoryCodes})")
+            + SynthesizedTypedDomains,
+            ScalarLong("SELECT COUNT(*) FROM mDomain WHERE IsTypedDomain = 1"));
 
     /// <summary>
     /// <c>DomainXBRLCode</c> = <c>eba_typ:&lt;code&gt;</c> if typed, <c>eba_exp:&lt;code&gt;</c>
-    /// otherwise - for the 146 domains from <c>Category</c> (the 4 synthesized ones have their own
+    /// otherwise - for the domains from <c>Category</c> (the 4 synthesized ones have their own
     /// shape, already covered above).
     /// </summary>
     [DataFact]
@@ -155,12 +218,13 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
         Assert.Equal(0, mismatches);
     }
 
-    /// <summary><c>DomainDescription</c> = empty string and <c>IsNillable</c> = 0 in all 150.</summary>
+    /// <summary><c>DomainDescription</c> = empty string and <c>IsNillable</c> = 0 in every row.</summary>
     [DataFact]
-    public void MDomain_DomainDescription_IsEmptyString_AndIsNillable_IsZero_InAll150Rows()
+    public void MDomain_DomainDescription_IsEmptyString_AndIsNillable_IsZero_InAllRows()
     {
-        Assert.Equal(150, ScalarLong("SELECT COUNT(*) FROM mDomain WHERE DomainDescription = ''"));
-        Assert.Equal(150, ScalarLong("SELECT COUNT(*) FROM mDomain WHERE IsNillable = 0"));
+        var total = CountRows("mDomain");
+        Assert.Equal(total, ScalarLong("SELECT COUNT(*) FROM mDomain WHERE DomainDescription = ''"));
+        Assert.Equal(total, ScalarLong("SELECT COUNT(*) FROM mDomain WHERE IsNillable = 0"));
     }
 
     // ------------------------------------------------------------------
@@ -182,15 +246,13 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
             """);
         Assert.Equal(0, outsideMetMismatches);
 
-        // The "10,722 of 10,722" figure from an earlier investigation is NOT pinned here: measured
-        // over the real .db there are 10,841 rows outside MET/sentinel (= 12,949 - 2,107 of MET - 1
-        // sentinel), a count that was not rechecked after later adjustments to the MET domain. What
-        // matters for the CRITICAL layer is the FORMAT (0 mismatches, checked above), not that
-        // specific count; the arithmetic identity is left as documentation of the real measured
-        // figure.
+        // The members outside MET and the sentinel are exactly the ItemCategory rows of the
+        // member-producing categories, counted in the Access source (not as "total minus MET minus
+        // sentinel" over the output itself, which would be circular). The format (0 mismatches,
+        // checked above) is the CRITICAL part; this proves the checked population is the whole one.
         var outsideMetTotal = ScalarLong(
             "SELECT COUNT(*) FROM mMember m JOIN mDomain d ON m.DomainID = d.DomainID WHERE d.DomainCode NOT IN ('MET', '')");
-        Assert.Equal(CountRows("mMember") - 2107 - 1, outsideMetTotal);
+        AssertDerived("mMember rows outside MET and the sentinel (ItemCategory not in _PR/_TE)", ItemCategoryMembersInAccess(), outsideMetTotal);
 
         var metMismatches = ScalarLong(
             """
@@ -203,7 +265,7 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
         // for a release suffix slipping into MemberXBRLCode.
     }
 
-    /// <summary>Zero duplicates by (<c>DomainID</c>, <c>MemberCode</c>) in the 12,949 rows.</summary>
+    /// <summary>Zero duplicates by (<c>DomainID</c>, <c>MemberCode</c>) over all the rows.</summary>
     [DataFact]
     public void MMember_HasNoDuplicates_ByDomainAndMemberCode()
     {
@@ -213,7 +275,7 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
     }
 
     /// <summary>
-    /// Exception E-7: the 109 members of the <c>qIO</c> domain ARE EMITTED - <c>eba_qIO:qx0</c>
+    /// Exception E-7: the members of the <c>qIO</c> domain ARE EMITTED - <c>eba_qIO:qx0</c>
     /// (the "Not applicable", <c>IsDefaultMember</c> = 1) and <c>eba_qIO:qx2000</c> ...
     /// <c>eba_qIO:qx2107</c>, NOT contiguous. The 4.2 reference lacks them: it is the documented
     /// reference defect that we do NOT reproduce, and this test exists so that nobody deletes them
@@ -221,7 +283,7 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
     /// reference is ALWAYS by containment, never by census equality.
     /// </summary>
     [DataFact]
-    public void MMember_EmitsThe109QIOMembers_DespiteTheReferenceHavingZero_E7()
+    public void MMember_EmitsTheQIOMembers_DespiteTheReferenceHavingNone_E7()
     {
         var qioMembers = ReadStringColumn(
             """
@@ -230,20 +292,25 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
             ORDER BY m.MemberCode
             """);
 
-        Assert.Equal(109, qioMembers.Count);
+        AssertDerived(
+            "mMember rows of domain qIO (ItemCategory of category qIO)",
+            AccessCensus.Scalar(
+                Accdb,
+                "SELECT COUNT(1) FROM [ItemCategory] ic INNER JOIN [Category] c ON c.[CategoryID] = ic.[CategoryID] WHERE c.[Code] = 'qIO'"),
+            qioMembers.Count);
         Assert.Contains("qx0", qioMembers);
         Assert.Contains("qx2000", qioMembers);
         Assert.Contains("qx2107", qioMembers);
 
         // "Not contiguous": the statement describes the COMPLETE set (qx0 + qx2000...qx2107), not a
-        // gap inside the qx2xxx block - measured: the 108 qx2xxx codes DO form a contiguous block
-        // (2000..2107, no gaps), but qx0 is 1,999 numbers away from qx2000, so the set of 109 is NOT
+        // gap inside the qx2xxx block - measured: the qx2xxx codes DO form a contiguous block
+        // (no gaps), but qx0 is 1,999 numbers away from qx2000, so the set is NOT
         // a single contiguous numeric sequence.
         var numericSuffixes = qioMembers
             .Select(c => int.Parse(c["qx".Length..]))
             .OrderBy(n => n)
             .ToList();
-        Assert.Equal(109, numericSuffixes.Count);
+        Assert.Equal(qioMembers.Count, numericSuffixes.Count);
 
         var largestGap = numericSuffixes.Zip(numericSuffixes.Skip(1), (a, b) => b - a).Max();
         Assert.True(largestGap > 1, $"A gap was expected (qx0 vs qx2000...), and the largest measured jump is {largestGap}.");
@@ -259,8 +326,8 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
     }
 
     /// <summary>
-    /// The members of the <c>MET</c> domain are 2,107, and against the 2,104 codes of the reference
-    /// EXACTLY three are in excess: <c>old-FGT</c>, <c>old-ei912</c> and <c>old-pi418</c>. Not one
+    /// The members of the <c>MET</c> domain mirror <c>mMetric</c>, and against the codes of the
+    /// reference (<see cref="ReleasePins.Reference42MetMemberCodes"/>) EXACTLY three are in excess: <c>old-FGT</c>, <c>old-ei912</c> and <c>old-pi418</c>. Not one
     /// more, and none is missing - checked by name, not by count.
     /// </summary>
     [DataFact]
@@ -272,7 +339,7 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
             "SELECT m.MemberCode FROM mMember m JOIN mDomain d ON m.DomainID = d.DomainID WHERE d.DomainCode = 'MET'")
             .ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal(2107, generatedMetCodes.Count);
+        Assert.Equal(CountRows("mMetric"), generatedMetCodes.Count);
 
         using var referenceConnection = OpenReadOnly(RepoPaths.ReferenceDatabasePath);
         var referenceMetCodes = ReadStringColumn(
@@ -280,7 +347,8 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
             "SELECT m.MemberCode FROM mMember m JOIN mDomain d ON m.DomainID = d.DomainID WHERE d.DomainCode = 'MET'")
             .ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal(2104, referenceMetCodes.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42, "reference MET member codes", ReleasePins.Reference42MetMemberCodes, referenceMetCodes.Count);
 
         var onlyInReference = referenceMetCodes.Except(generatedMetCodes).ToList();
         Assert.Empty(onlyInReference);
@@ -293,29 +361,27 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
     // mHierarchy
     // ------------------------------------------------------------------
 
-    /// <summary>1,154 = <c>SubCategory</c>, 1 to 1. It is not split by <c>SubCategoryVersion</c>.</summary>
+    /// <summary><c>mHierarchy</c> = <c>SubCategory</c>, 1 to 1. It is not split by <c>SubCategoryVersion</c>.</summary>
     [DataFact]
     public void MHierarchy_MapsOneToOne_WithSourceSubCategory()
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
-        using var reader = new EbaDpm.Converter.Core.Access.Dpm20.Dpm20AccessReader(RepoPaths.AccessDpm20DatabasePath, cutoffReleaseCode: RepoPaths.Cutoff42ReleaseCode);
-        reader.Open();
-        var subCategoryCount = reader.ReadSubCategories().Count();
+        var subCategoryCount = AccessCensus.Count(Accdb, "SubCategory");
 
-        Assert.Equal(1154, subCategoryCount);
-        Assert.Equal(subCategoryCount, CountRows("mHierarchy"));
+        Assert.True(subCategoryCount > 0, "SubCategory is empty in the Access source: the 1:1 comparison would prove nothing.");
+        AssertDerived("mHierarchy rows (SubCategory)", subCategoryCount, CountRows("mHierarchy"));
     }
 
     /// <summary>
-    /// The 16 subcategories hanging from <c>_PR</c> go to the <c>MET</c> domain: they are exactly 16
-    /// of the 21 <c>MET</c> hierarchies of the reference, with perfect containment (0 only in the
-    /// source). The remaining 5 are <c>AT6</c>, <c>AT9</c>, <c>AT11</c>, <c>AT81</c> and
+    /// The subcategories hanging from <c>_PR</c> go to the <c>MET</c> domain: they are a subset of the
+    /// <c>MET</c> hierarchies of the reference (<see cref="ReleasePins.Reference42MetHierarchies"/>),
+    /// with perfect containment (0 only in the source). The remaining ones are <c>AT6</c>, <c>AT9</c>, <c>AT11</c>, <c>AT81</c> and
     /// <c>AT106</c> - named one by one, the DD-16 exception applied by business key, never as a
     /// general rule.
     /// </summary>
     [DataFact]
-    public void MHierarchy_MetDomain_Contains16Of21ReferenceHierarchies_TheFiveMissingAreDD16()
+    public void MHierarchy_MetDomain_IsContainedInTheReferenceHierarchies_TheFiveMissingAreDD16()
     {
         RepoPaths.EnsureReferenceDatabaseExists();
 
@@ -323,7 +389,12 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
             "SELECT h.HierarchyCode FROM mHierarchy h JOIN mDomain d ON h.DomainID = d.DomainID WHERE d.DomainCode = 'MET'")
             .ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal(16, generatedMetHierarchies.Count);
+        AssertDerived(
+            "mHierarchy rows of domain MET (SubCategory of category _PR)",
+            AccessCensus.Scalar(
+                Accdb,
+                "SELECT COUNT(1) FROM [SubCategory] s INNER JOIN [Category] c ON c.[CategoryID] = s.[CategoryID] WHERE c.[Code] = '_PR'"),
+            generatedMetHierarchies.Count);
 
         using var referenceConnection = OpenReadOnly(RepoPaths.ReferenceDatabasePath);
         var referenceMetHierarchies = ReadStringColumn(
@@ -331,7 +402,8 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
             "SELECT h.HierarchyCode FROM mHierarchy h JOIN mDomain d ON h.DomainID = d.DomainID WHERE d.DomainCode = 'MET'")
             .ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal(21, referenceMetHierarchies.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42, "reference MET hierarchies", ReleasePins.Reference42MetHierarchies, referenceMetHierarchies.Count);
 
         // Perfect containment: 0 only in the source.
         var onlyInGenerated = generatedMetHierarchies.Except(referenceMetHierarchies).ToList();
@@ -368,12 +440,12 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// The union is NOT materialized: in NONE of the 41 unions are the members of the union domain
+    /// The union is NOT materialized: in NONE of the unions are the members of the union domain
     /// the sum of those of its components. Internal invariant, without looking at any reference -
     /// it is the one that would detect someone "fixing" <c>mDomainUnion</c> by expanding members.
     /// </summary>
     [DataFact]
-    public void MDomainUnion_NeverMaterializesMembers_ForAnyOfThe41Unions()
+    public void MDomainUnion_NeverMaterializesMembers_ForAnyUnion()
     {
         using var unionsCommand = fixture.GeneratedConnection.CreateCommand();
         unionsCommand.CommandText = "SELECT DISTINCT UnionDomainID FROM mDomainUnion";
@@ -386,7 +458,7 @@ public sealed class Dpm20DictionaryLoaderTests(Dpm20SkeletonFixture fixture)
             }
         }
 
-        Assert.Equal(41, unionDomainIds.Count);
+        AssertDerived("distinct unions in mDomainUnion (distinct SuperCategoryID)", DistinctSuperCategoriesInAccess(), unionDomainIds.Count);
 
         var offendingUnions = new List<string>();
 

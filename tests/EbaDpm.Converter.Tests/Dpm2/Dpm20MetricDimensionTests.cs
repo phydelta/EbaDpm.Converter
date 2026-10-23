@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using EbaDpm.Converter.Core.Access.Dpm20;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -12,14 +13,16 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <c>Dpm2Skeleton</c>): the same <c>--all</c> conversion already loads the six dictionary tables,
 /// so the large DPM 2.0 Access database does not need to be re-read.
 ///
-/// The count figures (2,107 <c>mMetric</c>, 1,100 <c>mDimension</c>) are the ones MEASURED over the
-/// real <c>.db</c>, as they come out of <see cref="Dpm20DictionaryLoaderTests"/>.
+/// The row counts of <c>mMetric</c> and <c>mDimension</c> are scoped pins
+/// (<see cref="ReleasePins.Dpm20Cutoff42MMetricRows"/>, <see cref="ReleasePins.Dpm20Cutoff42MDimensionRows"/>):
+/// metric and dimension identification is a mapping rule, so the figure cannot be derived from the
+/// Access source without re-implementing it. Everything that can be tied to another table of the
+/// same output is asserted as an equality with that table instead.
 ///
-/// <c>mDimension</c> has <b>1,100</b> rows: the row of the <c>MET</c> dimension
-/// (<c>DimensionID</c> 9999) is included, because without it <c>mOrdinateCategorisation</c> would
-/// point to a non-existent dimension -- an inconsistency that must not exist
-/// (<c>Dpm20DictionaryLoader.WriteMetDimension</c>). The expected figure reflects that the missing
-/// row was real; no comparison was relaxed.
+/// <c>mDimension</c> includes the row of the <c>MET</c> dimension (<c>DimensionID</c> 9999),
+/// because without it <c>mOrdinateCategorisation</c> would point to a non-existent dimension -- an
+/// inconsistency that must not exist (<c>Dpm20DictionaryLoader.WriteMetDimension</c>). No
+/// comparison was relaxed.
 /// </summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
@@ -30,15 +33,19 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MMetric_Has2107Rows() => Assert.Equal(2107, CountRows("mMetric"));
+    public void MMetric_RowCount_MatchesThePinnedCensus()
+        => ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42, "mMetric rows", ReleasePins.Dpm20Cutoff42MMetricRows, CountRows("mMetric"));
 
     [DataFact]
-    public void MDimension_Has1100Rows() => Assert.Equal(1100, CountRows("mDimension"));
+    public void MDimension_RowCount_MatchesThePinnedCensus()
+        => ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42, "mDimension rows", ReleasePins.Dpm20Cutoff42MDimensionRows, CountRows("mDimension"));
 
     /// <summary>
     /// <c>mMetric</c> is a 1:1 mirror of the members of the <c>MET</c> domain: every row has a
     /// <c>CorrespondingMemberID</c>, that member exists and belongs to the <c>MET</c> domain, and
-    /// none of the 2,107 <c>MET</c> members is missing or left over.
+    /// none of the <c>MET</c> members is missing or left over.
     /// </summary>
     [DataFact]
     public void MMetric_IsA1To1MirrorOfTheMembersOfTheMetDomain()
@@ -47,12 +54,12 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
 
         var metricMemberIds = ReadLongColumn(
             "SELECT CorrespondingMemberID FROM mMetric").ToHashSet();
-        Assert.Equal(2107, metricMemberIds.Count); // no duplicates: 2,107 distinct for 2,107 rows
+        Assert.Equal(CountRows("mMetric"), metricMemberIds.Count); // no duplicates: as many distinct members as rows
 
         var metMemberIds = ReadLongColumn(
             "SELECT m.MemberID FROM mMember m JOIN mDomain d ON m.DomainID = d.DomainID WHERE d.DomainCode = 'MET'")
             .ToHashSet();
-        Assert.Equal(2107, metMemberIds.Count);
+        Assert.Equal(CountRows("mMetric"), metMemberIds.Count);
 
         // None left over, none missing: the two sets are THE SAME.
         Assert.Empty(metricMemberIds.Except(metMemberIds));
@@ -64,10 +71,10 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Against the reference: 0 discrepancies over the 2,104 common codes. It is the strong test of
+    /// Against the reference: 0 discrepancies over the common codes
+    /// (<see cref="ReleasePins.Reference42MetMemberCodes"/>). It is the strong test of
     /// the string-type rule: if someone "restores" the direct translation <c>s</c> to
-    /// <c>NotEmptyString</c>, <c>es</c> to <c>String</c> (false, 138 measured discrepancies), this
-    /// test catches it.
+    /// <c>NotEmptyString</c>, <c>es</c> to <c>String</c> (false), this test catches it.
     /// </summary>
     [DataFact]
     public void MMetric_DataType_ZeroDiscrepancies_AgainstTheCommonReferenceCodes()
@@ -79,7 +86,8 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
         var reference = ReadDataTypeByMemberCode(referenceConnection);
 
         var common = generated.Keys.Intersect(reference.Keys, StringComparer.Ordinal).ToList();
-        Assert.Equal(2104, common.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42, "metric codes common to the output and the reference", ReleasePins.Reference42MetMemberCodes, common.Count);
 
         var mismatches = common
             .Where(code => generated[code] != reference[code])
@@ -154,9 +162,10 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
     /// <c>DimensionXBRLCode</c> = <c>eba_dim_&lt;release&gt;:&lt;code&gt;</c> -- WITH a suffix,
     /// unlike <c>mDomain</c>/<c>mMember</c>. **Single exception, named by business key**:
     /// <c>MET</c> (<c>DimensionID</c> 9999) carries <c>DimensionXBRLCode = "MET"</c>, WITHOUT a
-    /// prefix -- so the remaining 1,099 rows DO follow the format, and so does the reference
+    /// prefix -- so every other row DOES follow the format, and so does the reference
     /// (measured: <c>EBA_4.2_Hotfix.db</c> has <c>MET</c> -> <c>MET</c>, identical). Against the
-    /// reference it matches by business key: the 1,089 common codes (1,088 + <c>MET</c>) each have
+    /// reference it matches by business key: the common codes
+    /// (<see cref="ReleasePins.Reference42DimensionCommonCodes"/>, <c>MET</c> included) each have
     /// at least one row whose <c>DimensionXBRLCode</c> matches EXACTLY the reference's (domain
     /// duplicates, see the next test, contribute more than one value per code).
     /// </summary>
@@ -165,7 +174,7 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
     {
         var pattern = new Regex(@"^eba_dim_[^:]+:.+$", RegexOptions.Compiled);
         var allRows = ReadCodeXbrlPairs(fixture.GeneratedConnection);
-        Assert.Equal(1100, allRows.Count);
+        Assert.Equal(CountRows("mDimension"), allRows.Count);
 
         // The ONLY exception to the suffixed format is MET, named by code -- not a general
         // relaxation of the pattern. Any other row without a suffix would be a real bug.
@@ -184,7 +193,8 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
         var referenceByCode = ReadXbrlCodesByDimensionCode(referenceConnection);
 
         var commonCodes = generatedByCode.Keys.Intersect(referenceByCode.Keys, StringComparer.Ordinal).ToList();
-        Assert.Equal(1089, commonCodes.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42, "dimension codes common to the output and the reference", ReleasePins.Reference42DimensionCommonCodes, commonCodes.Count);
         Assert.Contains("MET", commonCodes);
 
         var withoutMatch = commonCodes
@@ -280,7 +290,7 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
         }
     }
 
-    /// <summary><c>IsTypedDimension</c> iff its domain is typed: 1,100 of 1,100 in ours (including <c>MET</c>).</summary>
+    /// <summary><c>IsTypedDimension</c> iff its domain is typed, in every row (including <c>MET</c>).</summary>
     [DataFact]
     public void MDimension_IsTypedDimension_MatchesTheIsTypedDomainOfTheDomain_InAllRows()
     {
@@ -324,7 +334,7 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
 
     /// <summary>
     /// <c>MET</c> IS emitted (<c>DimensionID</c> 9999, see
-    /// <see cref="MMetric_And_MDimension_AreNotDisjoint_FortyFiveCodesInBoth"/> and the class header
+    /// <see cref="MMetric_And_MDimension_AreNotDisjoint"/> and the class header
     /// comment), so it is not a gap. <c>TNS</c> remains the ONLY <c>mDimension</c> code that the
     /// reference has and we do not.
     /// </summary>
@@ -423,7 +433,7 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
     /// <c>ReferencedDomainID</c> comes out through two independent paths and they must agree: the
     /// domain of the referenced hierarchy (what <c>mMetric</c> writes), and the
     /// <c>PropertyCategory</c> of the property (read directly from the source Access database).
-    /// Measured: 426 of 427, with the single discrepancy named -- <c>PropertyID=7090</c> (code
+    /// With the single discrepancy named -- <c>PropertyID=7090</c> (code
     /// <c>ei706</c>), whose hierarchy is an <c>AT*</c> inherited from the <c>MET</c> domain while
     /// its <c>PropertyCategory</c> is <c>_NA</c>.
     /// </summary>
@@ -469,7 +479,9 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
             }
         }
 
-        Assert.Equal(427, rows.Count);
+        // The rows with a ReferencedDomainID are exactly the metrics with a ReferencedHierarchyID
+        // (asserted separately: all three or none), a second measurement of the same table.
+        Assert.Equal(ScalarLong("SELECT COUNT(*) FROM mMetric WHERE ReferencedHierarchyID IS NOT NULL"), rows.Count);
 
         var mismatches = new List<string>();
         foreach (var (metricCode, hierarchyDomainCode) in rows)
@@ -516,8 +528,12 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
             "SELECT COUNT(*) FROM mMetric WHERE (IsStartingMemberIncluded = 1) <> (ReferencedHierarchyID IS NOT NULL)");
         Assert.Equal(0, startingMemberMismatch);
 
-        // And it is not an empty case: there are 427 rows with all three present.
-        Assert.Equal(427, ScalarLong("SELECT COUNT(*) FROM mMetric WHERE ReferencedHierarchyID IS NOT NULL"));
+        // And it is not an empty case: the rows with all three present are the pinned census.
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mMetric rows with a ReferencedHierarchyID",
+            ReleasePins.Dpm20Cutoff42MetricsWithHierarchy,
+            ScalarLong("SELECT COUNT(*) FROM mMetric WHERE ReferencedHierarchyID IS NOT NULL"));
     }
 
     /// <summary>
@@ -526,11 +542,12 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
     /// would be wrong -- this one checks exactly the opposite: that the intersection exists and
     /// contains, among others, the cases <c>FGT</c>, <c>CUA</c> and <c>GGA</c>.
     ///
-    /// The measured count is 45: it includes <c>old-FGT</c> and <c>old-ei912</c>, which only start
+    /// The count is a scoped pin (<see cref="ReleasePins.Dpm20Cutoff42CodesInBothMetricAndDimension"/>):
+    /// it includes <c>old-FGT</c> and <c>old-ei912</c>, which only start
     /// to exist in <c>mDimension</c> with the window crossing of property codes.
     /// </summary>
     [DataFact]
-    public void MMetric_And_MDimension_AreNotDisjoint_FortyFiveCodesInBoth()
+    public void MMetric_And_MDimension_AreNotDisjoint()
     {
         var metricCodes = ReadStringColumn(
             fixture.GeneratedConnection,
@@ -544,7 +561,11 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
             .OrderBy(c => c, StringComparer.Ordinal)
             .ToList();
 
-        Assert.Equal(45, both.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "codes in both mMetric and mDimension",
+            ReleasePins.Dpm20Cutoff42CodesInBothMetricAndDimension,
+            both.Count);
         Assert.Contains("FGT", both);
         Assert.Contains("CUA", both);
         Assert.Contains("GGA", both);

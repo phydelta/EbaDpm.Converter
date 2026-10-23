@@ -1,3 +1,4 @@
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -24,23 +25,25 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
 {
     // ------------------------------------------------------------------
-    // Count: 16,538 rows over the population ACTUALLY emitted (current versions + hierarchies whose
-    // last version is used + the union-domain resolution), not the 13,440 "comparable" ones, which
-    // were a narrower population.
+    // Count: the rows over the population ACTUALLY emitted (current versions + hierarchies whose
+    // last version is used + the union-domain resolution), pinned to the release (the population is
+    // the output of the node selection rule, not derivable from Access without re-implementing it).
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void MHierarchyNode_Has16538Rows() => Assert.Equal(16538, CountRows("mHierarchyNode"));
+    public void MHierarchyNode_RowCount_MatchesThePinnedCensus()
+        => ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42, "mHierarchyNode rows", ReleasePins.Dpm20Cutoff42MHierarchyNodeRows, CountRows("mHierarchyNode"));
 
     /// <summary>
-    /// 14 emitted hierarchies are left without nodes, NAMED one by one -- not a loose count, because
-    /// an equal count does not distinguish "the right 14" from "any 14" after a regression. 11 are
+    /// Some emitted hierarchies are left without nodes, NAMED one by one -- not a loose count, because
+    /// an equal count does not distinguish "the right ones" from "any" after a regression. 11 are
     /// <c>EC</c> 1-11 (no current version and no items in their last version either) + 3 with a
     /// current version and ZERO items, genuinely empty in the source (<c>CP:CP3</c>,
     /// <c>IM:test</c>, <c>qOR:new_OR7</c>).
     /// </summary>
     [DataFact]
-    public void ExactlyThe14MeasuredHierarchies_AreEmittedWithoutNodes()
+    public void ExactlyTheNamedHierarchies_AreEmittedWithoutNodes()
     {
         var withoutNodes = ReadPairs(
             """
@@ -64,7 +67,7 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
         .ThenBy(p => p.Item2, StringComparer.Ordinal)
         .ToList();
 
-        Assert.Equal(14, withoutNodes.Count);
+        Assert.Equal(expected.Count, withoutNodes.Count);
         Assert.Equal(expected, withoutNodes.Select(p => (p.A, p.B)).ToList());
     }
 
@@ -245,7 +248,7 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
     /// "No repeated (hierarchy, member) pair" is ONLY true with the key that carries the DOMAIN.
     /// <c>(HierarchyID, MemberID)</c> already carries it implicitly -- <c>mMember</c> is split by
     /// <c>(DomainID, MemberCode)</c>, so two members with the same CODE in different domains have a
-    /// different <c>MemberID</c> -- and with that key the count is 0 over all 16,538 rows. The
+    /// different <c>MemberID</c> -- and with that key the count is 0 over all the rows. The
     /// POSITIVE evidence of the trap is also kept, with the same data: grouping by
     /// <c>(HierarchyID, MemberCode)</c> WITHOUT the domain exactly 8 false duplicates appear --
     /// the same <c>qx*</c> code living in two distinct components of a hierarchy over a union
@@ -368,16 +371,19 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Over what is ACTUALLY emitted (16,538 nodes, not the 13,440 "comparable" ones), the business
-    /// key is (domain, hierarchy code) to match the hierarchy, and the set of <c>MemberCode</c>
-    /// values of its nodes to compare the content. Measured: 993 common keys, 930 exact, 55
-    /// contained (one of the two is a subset of the other, without being exactly equal) and 8 with
-    /// no containment in either direction. The CENSUS of the 8 that do not match is fixed, not just
-    /// their count -- so that a regression that changed WHICH ones they are (instead of how many)
-    /// does not go unnoticed.
+    /// Over what is ACTUALLY emitted, the business key is (domain, hierarchy code) to match the
+    /// hierarchy, and the set of <c>MemberCode</c> values of its nodes to compare the content. The
+    /// common keys split into exact, contained (one of the two is a subset of the other, without
+    /// being exactly equal) and no containment in either direction; the three classes must add up
+    /// to the common keys, and the first three figures are scoped pins
+    /// (<see cref="ReleasePins.Reference42HierarchyCommonKeys"/>,
+    /// <see cref="ReleasePins.Reference42HierarchyExactKeys"/>,
+    /// <see cref="ReleasePins.Reference42HierarchyContainedKeys"/>). The CENSUS of the keys with no
+    /// containment is fixed by NAME, not just by count -- so that a regression that changed WHICH
+    /// ones they are (instead of how many) does not go unnoticed.
     /// </summary>
     [DataFact]
-    public void HierarchyMemberSets_ByBusinessKey_MatchTheMeasuredCensus_993Common_932Exact_55Contained_6NoContainment()
+    public void HierarchyMemberSets_ByBusinessKey_MatchTheMeasuredCensus()
     {
         RepoPaths.EnsureReferenceDatabaseExists();
 
@@ -387,7 +393,8 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
         var referenceMap = ReadHierarchyMemberSets(referenceConnection);
 
         var commonKeys = generatedMap.Keys.Intersect(referenceMap.Keys).OrderBy(k => k.Domain, StringComparer.Ordinal).ThenBy(k => k.Hierarchy, StringComparer.Ordinal).ToList();
-        Assert.Equal(993, commonKeys.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42, "hierarchy keys common to the output and the reference", ReleasePins.Reference42HierarchyCommonKeys, commonKeys.Count);
 
         var exact = new List<(string Domain, string Hierarchy)>();
         var contained = new List<(string Domain, string Hierarchy)>();
@@ -412,18 +419,23 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
             }
         }
 
-        // 930 -> 932 on "DPM2 Database_v 4_2_1.accdb" (cutoff 4.2): the EBA edited in place the items of
+        // On "DPM2 Database_v 4_2_1.accdb" (cutoff 4.2) the exact class went from 930 to 932: the EBA edited in place the items of
         // two in-force subcategory versions, and both hierarchies now equal the reference exactly.
         // qTR_5 (SubCategoryVID 20598, Start 5, same version in both editions), ItemCategory codes of
         // its SubCategoryItem rows, measured on the Access sources:
         //   previous edition: qx2001, qx2035, qx2040, qx2042, qx2052, qx2053, qx2054
         //   4.2.1 edition:    qx2035, qx2040, qx2042, qx2065, qx2066, qx2067, qx2068
         // new_IG1 (SubCategoryVID 20534): member GA:XK became GA:qx2000 in the generated output.
-        Assert.Equal(932, exact.Count);
-        Assert.Equal(55, contained.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42, "hierarchy keys with an exact member set", ReleasePins.Reference42HierarchyExactKeys, exact.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42, "hierarchy keys with contained member sets", ReleasePins.Reference42HierarchyContainedKeys, contained.Count);
 
-        // The fixed CENSUS of the 8 with no containment in either direction: the ItemID is resolved
-        // in the release of the subcategory version that is emitted, not in a fixed cutoff. Those 8
+        // Identity: every common key falls in exactly one class.
+        Assert.Equal(commonKeys.Count, exact.Count + contained.Count + noContainment.Count);
+
+        // The fixed CENSUS of the keys with no containment in either direction: the ItemID is resolved
+        // in the release of the subcategory version that is emitted, not in a fixed cutoff. Those
         // are the pure remainder where the ItemID has more than one code: we emit the current one,
         // the reference kept an old one.
         var expectedNoContainment = new[]
@@ -438,7 +450,7 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
 
         var actualNoContainment = noContainment.OrderBy(k => k.Domain, StringComparer.Ordinal).ThenBy(k => k.Hierarchy, StringComparer.Ordinal).ToList();
 
-        Assert.Equal(6, actualNoContainment.Count);
+        Assert.Equal(expectedNoContainment.Count, actualNoContainment.Count);
         Assert.Equal(expectedNoContainment, actualNoContainment.Select(k => (k.Domain, k.Hierarchy)).ToList());
     }
 
@@ -461,7 +473,7 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
     /// If someone "fixes" this months from now by seeding the citations by hand, they should reread
     /// this reasoning first -- that is why this test EXISTS and why the comment is so long.
     ///
-    /// Positive control: there are 16,538 <c>mHierarchyNode</c> rows (a real, non-empty candidate
+    /// Positive control: there are <c>mHierarchyNode</c> rows (a real, non-empty candidate
     /// population) and, of them, one <c>HierarchyNode</c> concept per row -- if the check below gave
     /// 0 because there is NOTHING to look at, this positive control would catch it.
     /// </summary>
@@ -470,7 +482,7 @@ public sealed class Dpm20HierarchyNodeTests(Dpm20SkeletonFixture fixture)
     {
         var hierarchyNodeConceptCount = ScalarLong("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'HierarchyNode'");
         Assert.True(hierarchyNodeConceptCount > 0, "0 HierarchyNode concepts: the check below would be empty for lack of population, not because of the decision.");
-        Assert.Equal(16538, hierarchyNodeConceptCount); // unchanged: neither mHierarchyNode nor mConcept is touched by the description decision.
+        Assert.Equal(CountRows("mHierarchyNode"), hierarchyNodeConceptCount); // one concept per node: neither mHierarchyNode nor mConcept is touched by the description decision.
 
         var descriptionRowsForHierarchyNode = ScalarLong(
             """

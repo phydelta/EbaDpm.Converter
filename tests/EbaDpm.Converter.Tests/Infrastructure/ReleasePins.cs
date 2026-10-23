@@ -88,6 +88,48 @@ internal static class ReleasePins
     /// </summary>
     public const int Reference42OpenAxisRestrictionKeys = 199;
 
+    // ------------------------------------------------------------------
+    // DPM 2.0 dictionary (mMetric, mDimension, mHierarchyNode and the comparison against the
+    // 4.2 reference export). Metric/dimension identification and the hierarchy node population are
+    // rules, so they are pinned rather than derived.
+    // ------------------------------------------------------------------
+
+    /// <summary><c>COUNT(1)</c> of <c>mMetric</c>.</summary>
+    public const int Dpm20Cutoff42MMetricRows = 2107;
+
+    /// <summary><c>COUNT(1)</c> of <c>mDimension</c> (includes the <c>MET</c> dimension, <c>DimensionID</c> 9999).</summary>
+    public const int Dpm20Cutoff42MDimensionRows = 1100;
+
+    /// <summary>Metrics of <c>mMetric</c> with a non-NULL <c>ReferencedHierarchyID</c>.</summary>
+    public const int Dpm20Cutoff42MetricsWithHierarchy = 427;
+
+    /// <summary>Distinct codes present in both <c>mMetric</c> (member code) and <c>mDimension</c>.</summary>
+    public const int Dpm20Cutoff42CodesInBothMetricAndDimension = 45;
+
+    /// <summary><c>COUNT(1)</c> of <c>mHierarchyNode</c> (and of its <c>HierarchyNode</c> concepts).</summary>
+    public const int Dpm20Cutoff42MHierarchyNodeRows = 16538;
+
+    /// <summary>Distinct <c>MemberCode</c> values of the <c>MET</c> domain in the 4.2 reference export.</summary>
+    public const int Reference42MetMemberCodes = 2104;
+
+    /// <summary>Hierarchies of the <c>MET</c> domain in the 4.2 reference export.</summary>
+    public const int Reference42MetHierarchies = 21;
+
+    /// <summary>Dimension codes present in both the generated <c>mDimension</c> and the 4.2 reference export.</summary>
+    public const int Reference42DimensionCommonCodes = 1089;
+
+    /// <summary>
+    /// (domain, hierarchy code) keys present, with nodes, in both the generated output and the 4.2
+    /// reference export.
+    /// </summary>
+    public const int Reference42HierarchyCommonKeys = 993;
+
+    /// <summary>Common hierarchy keys whose member code sets are exactly equal to the reference's.</summary>
+    public const int Reference42HierarchyExactKeys = 932;
+
+    /// <summary>Common hierarchy keys whose member code sets are contained one in the other, not equal.</summary>
+    public const int Reference42HierarchyContainedKeys = 55;
+
     /// <summary>Asserts a pinned figure; the failure message prints the scope of the pin.</summary>
     public static void AssertPinned(ReleasePin pin, string what, long expected, long actual)
         => Xunit.Assert.True(expected == actual, Message(pin, what, expected, actual));
