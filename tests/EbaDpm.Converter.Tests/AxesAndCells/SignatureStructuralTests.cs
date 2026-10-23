@@ -190,7 +190,7 @@ public sealed class SignatureStructuralTests
         var parentByOrdinateId = BuildClosedParentByOrdinateId(_fixture.GeneratedConnection);
 
         var cellRows = QueryHelpers.Rows(_fixture.GeneratedConnection, "SELECT \"CellID\", \"DPS\" FROM \"mTableCell\" WHERE \"DPS\" IS NOT NULL", 2);
-        Assert.True(cellRows.Count > 0);
+        Assert.True(cellRows.Count > 0, "The generated output has no cell with a DPS: the recomposition would be vacuous.");
 
         var positionRows = QueryHelpers.Rows(_fixture.GeneratedConnection, "SELECT \"CellID\", \"OrdinateID\" FROM \"mCellPosition\"", 2);
         var ordinateIdsByCell = new Dictionary<int, List<int>>();
@@ -230,7 +230,9 @@ public sealed class SignatureStructuralTests
             }
         }
 
-        Assert.True(compared > 60000, $"Only {compared} cells were recomposed: matching failed wholesale.");
+        Assert.True(
+            compared == cellRows.Count,
+            $"Cells recomposed: expected {cellRows.Count} (every mTableCell row with a DPS of the generated output), actual {compared}.");
         Assert.True(
             failures.Count == 0,
             $"{failures.Count}/{compared} cells whose DPS is NOT the inherited composition of mOrdinateCategorisation.DPS (critical layer):\n" + string.Join("\n", failures.Take(30)));
@@ -379,7 +381,7 @@ public sealed class SignatureStructuralTests
             _fixture.GeneratedConnection,
             "SELECT \"CellID\", \"DPS\", \"DatapointSignature\" FROM \"mTableCell\" WHERE \"DPS\" IS NOT NULL",
             3);
-        Assert.True(rows.Count > 0);
+        Assert.True(rows.Count > 0, "No cell with a DPS was emitted: the DPS/DatapointSignature equality would be vacuous.");
 
         var withoutBracket = 0;
         var failures = new List<string>();

@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 
 namespace EbaDpm.Converter.Tests.All;
 
@@ -8,7 +9,7 @@ namespace EbaDpm.Converter.Tests.All;
 /// <see cref="BusinessCode_ReconstructedFromCellPosition_MatchesTheEmittedOne_Exactly"/> is, together
 /// with <c>mAxisOrdinate.OrdinateCode</c>, THE most sensitive invariant: an error in the cell
 /// coordinates silently shifts ALL the data of a table. A one-off investigation measured it at
-/// 100.000000 % over 904,204 cells of <c>--all</c>, but only once -- never as a test run on every
+/// 100.000000 % over the cells of <c>--all</c> (pinned: <see cref="ReleasePins.Dpm10All41"/>), but only once -- never as a test run on every
 /// pass of the suite. This file closes that gap.
 /// </summary>
 [Collection("All")]
@@ -105,7 +106,7 @@ public sealed class CellInvariantTests
             }
         }
 
-        Assert.True(compared > 900_000, $"Only {compared} cells were compared (about 904,204 expected over --all): the comparison universe is suspiciously small.");
+        ReleasePins.AssertPinned(ReleasePins.Dpm10All41, "cells compared (BusinessCode reconstruction)", ReleasePins.Dpm10All41CellsCompared, compared);
         Assert.True(
             mismatches.Count == 0,
             $"{mismatches.Count}/{compared} BusinessCode values reconstructed from mCellPosition do NOT match the " +

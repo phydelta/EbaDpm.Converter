@@ -37,7 +37,7 @@ public sealed class AxisStructuralIntegrityTests
     {
         var axisCount = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mAxis\"");
         var tableAxisCount = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mTableAxis\"");
-        Assert.True(axisCount > 0);
+        Assert.True(axisCount > 0, "No axis was emitted: the axis/table-axis count equality would be vacuous.");
         Assert.Equal(axisCount, tableAxisCount);
 
         var duplicated = QueryHelpers.Scalar(
@@ -140,7 +140,7 @@ public sealed class AxisStructuralIntegrityTests
             _fixture.GeneratedConnection,
             "SELECT \"TableID\", \"Order\" FROM \"mTableAxis\" ORDER BY \"TableID\", \"Order\"",
             2);
-        Assert.True(rows.Count > 0);
+        Assert.True(rows.Count > 0, "No mTableAxis row was emitted: the per-table Order permutation check would be vacuous.");
 
         var failures = new List<string>();
         foreach (var group in rows.Select(r => (TableId: int.Parse(r[0]!), Order: int.Parse(r[1]!))).GroupBy(r => r.TableId))
@@ -173,7 +173,7 @@ public sealed class AxisStructuralIntegrityTests
             ORDER BY o."AxisID", o."Order"
             """,
             2);
-        Assert.True(rows.Count > 0);
+        Assert.True(rows.Count > 0, "No ordinate of a closed axis was emitted: the Order check would be vacuous.");
 
         var failures = new List<string>();
         foreach (var group in rows.Select(r => (AxisId: int.Parse(r[0]!), Order: int.Parse(r[1]!))).GroupBy(r => r.AxisId))
@@ -245,7 +245,7 @@ public sealed class AxisStructuralIntegrityTests
             _fixture.GeneratedConnection,
             "SELECT \"OrdinateID\", \"ParentOrdinateID\" FROM \"mAxisOrdinate\"",
             2);
-        Assert.True(rows.Count > 0);
+        Assert.True(rows.Count > 0, "No mAxisOrdinate row was emitted: the cycle check would be vacuous.");
 
         var parentOf = rows.ToDictionary(
             r => int.Parse(r[0]!),
@@ -309,7 +309,7 @@ public sealed class AxisStructuralIntegrityTests
             SELECT COUNT(*) FROM "mAxisOrdinate" o JOIN "mAxis" a ON a."AxisID" = o."AxisID"
             WHERE a."IsOpenAxis" = 0 AND o."ParentOrdinateID" IS NULL
             """);
-        Assert.True(rootCount > 0);
+        Assert.True(rootCount > 0, "No root ordinate of a closed axis exists: the tree checks would be vacuous.");
     }
 
     [DataFact]
@@ -354,7 +354,7 @@ public sealed class AxisStructuralIntegrityTests
             WHERE a."IsOpenAxis" = 0
             """,
             4);
-        Assert.True(rows.Count > 0);
+        Assert.True(rows.Count > 0, "No ordinate of a closed axis was emitted: the tree check would be vacuous.");
 
         var byAxis = rows
             .Select(r => (AxisId: int.Parse(r[0]!), OrdinateId: int.Parse(r[1]!), ParentId: r[2] is null ? (int?)null : int.Parse(r[2]!), Order: int.Parse(r[3]!)))
@@ -456,7 +456,7 @@ public sealed class AxisStructuralIntegrityTests
     {
         var total = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mAxisOrdinate\"");
         var notZero = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mAxisOrdinate\" WHERE \"IsDisplayBeforeChildren\" IS NOT 0");
-        Assert.True(total > 0);
+        Assert.True(total > 0, "No mAxisOrdinate row was emitted: the IsDisplayBeforeChildren check would be vacuous.");
         Assert.Equal(0, notZero);
     }
 

@@ -1,4 +1,6 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
+using EbaDpm.Converter.Tests.Schema;
 
 namespace EbaDpm.Converter.Tests.Modules;
 
@@ -8,9 +10,8 @@ namespace EbaDpm.Converter.Tests.Modules;
 /// <c>MICA 4.0</c>.
 ///
 /// Unlike 3.2 (<see cref="ModuleGoldenDiff32Tests"/>), this reference does NOT cover the Access
-/// database 1:1: the Access v4.1 has 12 modules for these four taxonomies (verified against the
-/// run of <see cref="ModulesFixture"/> itself: 6 in <c>corep 4.0</c>, 1 in <c>dora 4.0</c>, 4 in
-/// <c>if 4.0</c> and 1 in <c>mica 4.0</c>) and the 4.0 reference only has **5 of those 12**
+/// database 1:1: the Access v4.1 has its own modules for these four taxonomies (derived from the
+/// Access source in the census test) and the 4.0 reference only has a part of them (scoped pin, <see cref="ReleasePins.Reference40"/>)
 /// (module coverage is partial by design of the reference). The comparison is therefore one of
 /// CONTAINMENT (the generated output contains the reference, never less), not of set equality,
 /// unlike 3.2.
@@ -71,7 +72,7 @@ public sealed class ModuleGoldenDiff40Tests
         .Where(r => TargetTaxonomies.Contains(NormalizeTaxonomyCode(r[0]!)))
         .ToList();
 
-    /// <summary>4.0 reference: NOT filtered by taxonomy; it only contains its own (5 modules, 4 taxonomies).</summary>
+    /// <summary>4.0 reference: NOT filtered by taxonomy; it only contains its own (a scoped pin of modules, 4 taxonomies).</summary>
     private List<string?[]> ReferenceRows(string columns) => QueryHelpers.Rows(
         _fixture.Reference40Connection, "SELECT " + columns + " " + ModuleJoin, ColumnCount(columns));
 
@@ -84,8 +85,8 @@ public sealed class ModuleGoldenDiff40Tests
         _fixture.Reference40Connection, "SELECT " + columns + " " + BusinessTemplateJoin, ColumnCount(columns));
 
     // ------------------------------------------------------------------
-    // 1) Module census: the 4.0 reference (5) is CONTAINED in the generated output for those
-    //    four taxonomies (12).
+    // 1) Module census: the 4.0 reference is CONTAINED in the generated output for those
+    //    four taxonomies.
     // ------------------------------------------------------------------
 
     [DataFact]
@@ -101,8 +102,17 @@ public sealed class ModuleGoldenDiff40Tests
             .Select(r => (Taxonomy: NormalizeTaxonomyCode(r[0]!), Module: r[1]!))
             .ToHashSet();
 
-        Assert.Equal(5, reference.Count); // guard on the reference itself
-        Assert.Equal(12, generated.Count); // guard: 12 Access modules for these 4 taxonomies
+        ReleasePins.AssertPinned(ReleasePins.Reference40, "modules of the 4.0 reference", ReleasePins.Reference40Modules, reference.Count); // guard on the reference itself
+
+        // Derived from the Access source: [Module] rows of the four taxonomies.
+        var codes = string.Join(", ", TargetTaxonomies.Select(c => "'" + c.Replace('_', ' ') + "'"));
+        var accessModules = AccessCensus.Scalar(
+            RepoPaths.AccessDatabasePath,
+            "SELECT COUNT(1) FROM [Module] m INNER JOIN [Taxonomy] t ON t.[TaxonomyID] = m.[TaxonomyID] " +
+            $"WHERE t.[TaxonomyCode] IN ({codes})");
+        Assert.True(
+            accessModules == generated.Count,
+            $"Generated modules of the four 4.0 taxonomies: expected {accessModules} ([Module] rows of those taxonomies in '{RepoPaths.AccessDatabaseFileName}'), actual {generated.Count}.");
 
         var missing = reference.Except(generated).ToList();
         Assert.True(
@@ -112,11 +122,11 @@ public sealed class ModuleGoldenDiff40Tests
     }
 
     // ------------------------------------------------------------------
-    // 2) ModuleLabel literal 5/5.
+    // 2) ModuleLabel literal, every reference module.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void ModuleLabel_IsLiteral_FiveOfFive()
+    public void ModuleLabel_IsLiteral_ForEveryReference40Module()
     {
         var columns = string.Join(", ", Col("t", "TaxonomyCode"), Col("m", "ModuleCode"), Col("m", "ModuleLabel"));
 
@@ -126,7 +136,7 @@ public sealed class ModuleGoldenDiff40Tests
         var reference = ReferenceRows(columns)
             .ToDictionary(r => (Taxonomy: NormalizeTaxonomyCode(r[0]!), Module: r[1]!), r => r[2]!);
 
-        Assert.Equal(5, reference.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference40, "modules of the 4.0 reference", ReleasePins.Reference40Modules, reference.Count);
 
         var mismatches = new List<string>();
         foreach (var (key, refLabel) in reference)
@@ -141,16 +151,16 @@ public sealed class ModuleGoldenDiff40Tests
             }
         }
 
-        Assert.True(mismatches.Count == 0, "ModuleLabel is not literal 5/5:\n" + string.Join("\n", mismatches));
+        Assert.True(mismatches.Count == 0, $"ModuleLabel is not literal in {mismatches.Count}/{reference.Count} modules:\n" + string.Join("\n", mismatches));
     }
 
     // ------------------------------------------------------------------
-    // 3) XBRLSchemaRef literal 5/5 (100% match with 4.0, with no declared divergence here: the
+    // 3) XBRLSchemaRef literal, every reference module (100% match with 4.0, with no declared divergence here: the
     //    declared divergences are specific to 3.2).
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void XBRLSchemaRef_IsLiteral_FiveOfFive()
+    public void XBRLSchemaRef_IsLiteral_ForEveryReference40Module()
     {
         var columns = string.Join(", ", Col("t", "TaxonomyCode"), Col("m", "ModuleCode"), Col("m", "XBRLSchemaRef"));
 
@@ -160,7 +170,7 @@ public sealed class ModuleGoldenDiff40Tests
         var reference = ReferenceRows(columns)
             .ToDictionary(r => (Taxonomy: NormalizeTaxonomyCode(r[0]!), Module: r[1]!), r => r[2]!);
 
-        Assert.Equal(5, reference.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference40, "modules of the 4.0 reference", ReleasePins.Reference40Modules, reference.Count);
 
         var mismatches = new List<string>();
         foreach (var (key, refValue) in reference)
@@ -172,17 +182,17 @@ public sealed class ModuleGoldenDiff40Tests
             }
         }
 
-        Assert.True(mismatches.Count == 0, "XBRLSchemaRef is not literal 5/5 against 4.0:\n" + string.Join("\n", mismatches));
+        Assert.True(mismatches.Count == 0, $"XBRLSchemaRef is not literal in {mismatches.Count}/{reference.Count} modules against 4.0:\n" + string.Join("\n", mismatches));
     }
 
     // ------------------------------------------------------------------
-    // 4) mModuleBusinessTemplate: relative order (L1 node code, both numeric bases 0) for the 5
+    // 4) mModuleBusinessTemplate: relative order (L1 node code, both numeric bases 0) for the
     //    modules of the 4.0 reference, EXCLUDING BY NAME the misattributed object (a single row,
     //    in COREP_OF/corep 4.0).
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void ModuleBusinessTemplate_Order_MatchesRelativeSequence_ForTheFiveReference40Modules_ExcludingMisattributedNode()
+    public void ModuleBusinessTemplate_Order_MatchesRelativeSequence_ForTheReference40Modules_ExcludingMisattributedNode()
     {
         var columns = string.Join(
             ", ", Col("t", "TaxonomyCode"), Col("m", "ModuleCode"), Col("mbt", "Order"), Col("tot", "TemplateOrTableCode"));
@@ -200,7 +210,7 @@ public sealed class ModuleGoldenDiff40Tests
                 g => g.Key,
                 g => g.OrderBy(r => int.Parse(r[2]!)).Select(r => r[3]!).ToList());
 
-        Assert.Equal(5, referenceByModule.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference40, "modules with business templates in the 4.0 reference", ReleasePins.Reference40Modules, referenceByModule.Count);
 
         var failures = new List<string>();
         foreach (var (key, refSequence) in referenceByModule)

@@ -1,12 +1,13 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 
 namespace EbaDpm.Converter.Tests.AxesAndCells;
 
 /// <summary>
 /// Golden-level comparison of axes against <c>EBA_4.0_ERRATA_5.db</c>, the SUBSIDIARY reference
 /// (3.2 takes precedence; 4.0 is used where 3.2 does not reach), over the four comparable 4.0
-/// taxonomies: <c>COREP 4.0</c>, <c>DORA 4.0</c>, <c>IF 4.0</c>, <c>MICA 4.0</c> (150/151 tables,
-/// 368 axes, 4,220 ordinates; <c>corep 3.4</c> is missing because the Access v4.1 does not contain
+/// taxonomies: <c>COREP 4.0</c>, <c>DORA 4.0</c>, <c>IF 4.0</c>, <c>MICA 4.0</c> (the figures of the
+/// 4.0 reference are scoped pins, <see cref="ReleasePins.Reference40"/>; <c>corep 3.4</c> is missing because the Access v4.1 does not contain
 /// it, which is not a failure).
 ///
 /// Unlike <see cref="AxisGoldenDiff32Tests"/>, CONTAINMENT is demanded here, not equality: 4.0
@@ -36,8 +37,8 @@ public sealed class AxisGoldenDiff40Tests
 
     // ------------------------------------------------------------------
     // Table coverage by business key (taxonomy, TableCode): EVERYTHING that 4.0 has in these four
-    // taxonomies must exist in the generated output. 150/151 in the reference because
-    // 'corep 3.4' is not in the Access v4.1; the generated output is not required to contain it.
+    // taxonomies must exist in the generated output. The reference lacks one table of the
+    // Access source because 'corep 3.4' is not in the Access v4.1; the generated output is not required to contain it.
     // ------------------------------------------------------------------
 
     [DataFact]
@@ -46,7 +47,7 @@ public sealed class AxisGoldenDiff40Tests
         var generated = BusinessKeySupport.BuildTableIdsByBusinessKey(_fixture.GeneratedConnection, TargetTaxonomies).Keys.ToHashSet();
         var reference = BusinessKeySupport.BuildTableIdsByBusinessKey(_fixture.Reference40Connection, TargetTaxonomies).Keys.ToHashSet();
 
-        Assert.True(reference.Count >= 150, $"The 4.0 reference only has {reference.Count} comparable tables; at least 150 were expected.");
+        ReleasePins.AssertPinned(ReleasePins.Reference40, "comparable tables of the 4.0 reference", ReleasePins.Reference40ComparableTables, reference.Count);
 
         var missing = reference.Except(generated).ToList();
         Assert.True(
@@ -56,7 +57,7 @@ public sealed class AxisGoldenDiff40Tests
     }
 
     // ------------------------------------------------------------------
-    // mAxis.AxisCode of OPEN axes: literal, 100% (95/95 open Y+Z axes of 4.0). Open axes are
+    // mAxis.AxisCode of OPEN axes: literal, 100% (every open Y+Z axis of 4.0). Open axes are
     // matched by the XBRL code of their dimension, not by AxisCode (it would be circular) nor by
     // AxisLabel (it differs on purpose on key Y axes between generations).
     // ------------------------------------------------------------------
@@ -101,7 +102,7 @@ public sealed class AxisGoldenDiff40Tests
         var generated = OpenAxisCodesByDimension(_fixture.GeneratedConnection);
         var reference = OpenAxisCodesByDimension(_fixture.Reference40Connection);
 
-        Assert.True(reference.Count > 0);
+        Assert.True(reference.Count > 0, "The 4.0 reference has no open axis code: the comparison would be vacuous.");
 
         var failures = new List<string>();
         foreach (var (key, refCode) in reference)
@@ -123,8 +124,8 @@ public sealed class AxisGoldenDiff40Tests
 
     // ------------------------------------------------------------------
     // mOpenAxisValueRestriction: presence and HierarchyID (case and REL normalised) by
-    // CONTAINMENT against 4.0 (95/95 presence, 45/45 HierarchyID after normalisation).
-    // HierarchyStartingMemberID is NOT compared: 4.0 NEVER populates it (0/45); that is a loss in
+    // CONTAINMENT against 4.0 (presence, and HierarchyID after normalisation).
+    // HierarchyStartingMemberID is NOT compared: 4.0 NEVER populates it (none of the restrictions); that is a loss in
     // the reference generator, not a rival convention. Comparing it would be a relaxation
     // disguised as an assertion, so it is explicitly omitted.
     // ------------------------------------------------------------------
@@ -177,7 +178,7 @@ public sealed class AxisGoldenDiff40Tests
         var generated = RestrictionHierarchyByDimension(_fixture.GeneratedConnection);
         var reference = RestrictionHierarchyByDimension(_fixture.Reference40Connection);
 
-        Assert.True(reference.Count > 0);
+        Assert.True(reference.Count > 0, "The 4.0 reference has no open-axis value restriction: the comparison would be vacuous.");
 
         var missing = new List<string>();
         var hierarchyFailures = new List<string>();
@@ -228,7 +229,7 @@ public sealed class AxisGoldenDiff40Tests
     };
 
     [DataFact]
-    public void IsShaded_MatchesReference40_Literally_ExceptTheTenDeclaredDD6ToDD15()
+    public void IsShaded_MatchesReference40_Literally_ExceptTheDeclaredDivergences()
     {
         // Cells are NOT matched by BusinessCode: its open-axis convention differs on purpose
         // between the output (which follows 3.2) and 4.0 (which expands the coordinate), so the
@@ -299,7 +300,7 @@ public sealed class AxisGoldenDiff40Tests
 
         var missingDeclaredDivergences = DeclaredIsShadedDivergences.Except(foundDeclaredDivergences).ToList();
 
-        Assert.True(compared > 50000, $"Only {compared} cells were compared: position matching failed wholesale.");
+        ReleasePins.AssertPinned(ReleasePins.Reference40, "cells compared by position (IsShaded)", ReleasePins.Reference40CellsCompared, compared);
         Assert.True(missing.Count == 0, $"{missing.Count}/{compared} cells of the 4.0 reference missing from the generated output:\n" + string.Join("\n", missing.Take(20)));
 
         Assert.True(
@@ -313,6 +314,8 @@ public sealed class AxisGoldenDiff40Tests
             "the exception has expired and must be removed from the list of known divergences:\n" +
             string.Join("\n", missingDeclaredDivergences));
 
-        Assert.Equal(10, foundDeclaredDivergences.Count);
+        Assert.True(
+            foundDeclaredDivergences.Count == DeclaredIsShadedDivergences.Count,
+            $"Declared IsShaded divergences seen: expected {DeclaredIsShadedDivergences.Count} (the declared list), actual {foundDeclaredDivergences.Count}.");
     }
 }

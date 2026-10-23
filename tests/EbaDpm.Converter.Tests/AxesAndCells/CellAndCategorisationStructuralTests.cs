@@ -1,5 +1,6 @@
 using EbaDpm.Converter.Core.Mapping;
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 
 namespace EbaDpm.Converter.Tests.AxesAndCells;
 
@@ -9,7 +10,7 @@ namespace EbaDpm.Converter.Tests.AxesAndCells;
 /// any reference database.
 ///
 /// Critical acceptance layer. Includes the "free" invariant: abstract header => every cell that
-/// touches it is shaded (89,930/89,930 in the four official references).
+/// touches it is shaded (in the four official references).
 /// </summary>
 [Collection("AxesAndCells")]
 [Trait("Tier", "RealData")]
@@ -124,7 +125,7 @@ public sealed class CellAndCategorisationStructuralTests
 
     // ------------------------------------------------------------------
     // "Free" invariant: abstract header => every cell that touches it is shaded
-    // (89,930/89,930 in the four official references; here, over the generated output).
+    // (in the four official references; here, over the generated output).
     // ------------------------------------------------------------------
 
     [DataFact]
@@ -153,7 +154,7 @@ public sealed class CellAndCategorisationStructuralTests
 
     // ------------------------------------------------------------------
     // BusinessCode <=> mCellPosition: this cross-check is EXACT over the whole Access universe
-    // (904,204/904,204). Here it is reproduced ONLY with the generated output, without any
+    // (over the whole Access universe). Here it is reproduced ONLY with the generated output, without any
     // reference: both paths must coincide byte for byte.
     // ------------------------------------------------------------------
 
@@ -164,7 +165,7 @@ public sealed class CellAndCategorisationStructuralTests
             _fixture.GeneratedConnection,
             "SELECT c.\"CellID\", c.\"TableID\", c.\"BusinessCode\", tab.\"TableCode\" FROM \"mTableCell\" c JOIN \"mTable\" tab ON tab.\"TableID\" = c.\"TableID\"",
             4);
-        Assert.True(cells.Count > 0);
+        Assert.True(cells.Count > 0, "No mTableCell row was emitted: the BusinessCode reconstruction would be vacuous.");
 
         var positions = QueryHelpers.Rows(
             _fixture.GeneratedConnection,
@@ -236,7 +237,7 @@ public sealed class CellAndCategorisationStructuralTests
         // checked here WITHOUT looking at any reference, over the generated output, for both
         // signature columns of mTableCell.
         var total = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mTableCell\"");
-        Assert.True(total > 0);
+        Assert.True(total > 0, "No mTableCell row was emitted: the DPS/IsShaded invariant would be vacuous.");
 
         var violatingDps = QueryHelpers.Scalar(
             _fixture.GeneratedConnection,
@@ -284,7 +285,7 @@ public sealed class CellAndCategorisationStructuralTests
     {
         var total = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mOrdinateCategorisation\"");
         var populated = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mOrdinateCategorisation\" WHERE \"Source\" IS NOT NULL");
-        Assert.True(total > 0);
+        Assert.True(total > 0, "No mOrdinateCategorisation row was emitted: the Source check would be vacuous.");
         Assert.Equal(0, populated);
     }
 
@@ -293,7 +294,7 @@ public sealed class CellAndCategorisationStructuralTests
     {
         var openAxisCount = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mAxis\" WHERE \"IsOpenAxis\" = 1");
         var sentinelRows = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mOrdinateCategorisation\" WHERE \"MemberID\" = 9999");
-        Assert.True(openAxisCount > 0);
+        Assert.True(openAxisCount > 0, "No open axis was emitted: the sentinel categorisation check would be vacuous.");
         Assert.Equal(openAxisCount, sentinelRows);
 
         var openWithoutSentinel = QueryHelpers.Scalar(
@@ -370,7 +371,7 @@ public sealed class CellAndCategorisationStructuralTests
     [DataFact]
     public void OpenAxisRestriction_ExistsIfAndOnlyIfTheOpenDimensionIsUntyped()
     {
-        // Restriction <=> UNTYPED domain (1,405/1,405 over the whole Access database). Reproduced
+        // Restriction <=> UNTYPED domain (over the whole Access database). Reproduced
         // here over the generated output, via the open dimension of each open axis (the one in
         // the categorisation with MemberID = 9999).
         var rows = QueryHelpers.Rows(
@@ -386,7 +387,7 @@ public sealed class CellAndCategorisationStructuralTests
             WHERE a."IsOpenAxis" = 1
             """,
             3);
-        Assert.True(rows.Count > 0);
+        Assert.True(rows.Count > 0, "No open axis with a sentinel categorisation was found: the restriction/typed-domain check would be vacuous.");
 
         var failures = rows
             .Select(r => (AxisId: r[0], IsTyped: r[1] == "1", HasRestriction: r[2] == "1"))
@@ -409,22 +410,42 @@ public sealed class CellAndCategorisationStructuralTests
     }
 
     // ------------------------------------------------------------------
-    // Type guard (compiles against the result record, to detect signature changes of
-    // AxisAndCellLoader.Result at build time).
+    // Counters of AxisAndCellLoader.Result (compiles against the record, so a change of its
+    // signature is detected at build time). Each row counter must equal the COUNT(1) of its table
+    // in the output of the same run; the two counters that are not a row count of any table are
+    // scoped pins of the eight-taxonomy selection.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void Result_ExposesAllExpectedCounters()
+    public void Result_RowCounters_EqualTheRowCountsOfTheirTables()
     {
         AxisAndCellLoader.Result result = _fixture.AxisAndCellResult;
-        Assert.True(result.AxisRows >= 0);
-        Assert.True(result.TableAxisRows >= 0);
-        Assert.True(result.AxisOrdinateRows >= 0);
-        Assert.True(result.OrdinateCategorisationRows >= 0);
-        Assert.True(result.TableCellRows >= 0);
-        Assert.True(result.CellPositionRows >= 0);
-        Assert.True(result.OpenAxisValueRestrictionRows >= 0);
-        Assert.True(result.SkippedDefaultMemberResets >= 0);
-        Assert.True(result.MetricInheritedFromAncestorCellCount >= 0);
+
+        AssertCounter("AxisRows", result.AxisRows, "mAxis");
+        AssertCounter("TableAxisRows", result.TableAxisRows, "mTableAxis");
+        AssertCounter("AxisOrdinateRows", result.AxisOrdinateRows, "mAxisOrdinate");
+        AssertCounter("OrdinateCategorisationRows", result.OrdinateCategorisationRows, "mOrdinateCategorisation");
+        AssertCounter("TableCellRows", result.TableCellRows, "mTableCell");
+        AssertCounter("CellPositionRows", result.CellPositionRows, "mCellPosition");
+        AssertCounter("OpenAxisValueRestrictionRows", result.OpenAxisValueRestrictionRows, "mOpenAxisValueRestriction");
+    }
+
+    [DataFact]
+    public void Result_CountersWithoutATable_ArePinnedForTheSelection()
+    {
+        AxisAndCellLoader.Result result = _fixture.AxisAndCellResult;
+
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm10Selected8Of41, "SkippedDefaultMemberResets", ReleasePins.Dpm10Selected8SkippedDefaultMemberResets, result.SkippedDefaultMemberResets);
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm10Selected8Of41, "MetricInheritedFromAncestorCellCount", ReleasePins.Dpm10Selected8MetricInheritedFromAncestorCells, result.MetricInheritedFromAncestorCellCount);
+    }
+
+    private void AssertCounter(string counter, int value, string table)
+    {
+        var rows = QueryHelpers.Scalar(_fixture.GeneratedConnection, $"SELECT COUNT(1) FROM \"{table}\"");
+        Assert.True(
+            rows == value,
+            $"AxisAndCellLoader.Result.{counter}: expected {rows} (COUNT(1) of {table} in the generated output), actual {value}.");
     }
 }

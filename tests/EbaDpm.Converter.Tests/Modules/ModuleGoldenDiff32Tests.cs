@@ -1,11 +1,13 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 
 namespace EbaDpm.Converter.Tests.Modules;
 
 /// <summary>
 /// "Golden" level for modules against <c>EBA_3.2_phase_1.db</c>, the PRIMARY content reference,
 /// over the complete working universe: the four taxonomies <c>AE 3.2</c>, <c>COREP 3.2</c>,
-/// <c>GSII 3.2</c> and <c>IF 3.2</c> (13 modules, 35 <c>mModuleBusinessTemplate</c> rows).
+/// <c>GSII 3.2</c> and <c>IF 3.2</c> (the figures of the 3.2 reference are scoped
+/// pins, <see cref="ReleasePins.Reference32"/>).
 ///
 /// Unlike <see cref="Dictionary.DictionaryFixture"/> (which only converts COREP 3.2),
 /// <see cref="ModulesFixture"/> converts the four complete taxonomies, so EXACT SET EQUALITY is
@@ -20,9 +22,9 @@ namespace EbaDpm.Converter.Tests.Modules;
 ///
 /// CRITICAL layer: module census, <c>ModuleLabel</c>, relative <c>Order</c> (template
 /// coordinates). The only place where the test does NOT require literal equality is
-/// <c>XBRLSchemaRef</c>: there the EXACT divergence pattern is required (8 literal matches + 5
-/// named divergences), which in practice is as demanding as comparing everything: a sixth module
-/// that diverged, or one of the five that stopped diverging, makes the test fail.
+/// <c>XBRLSchemaRef</c>: there the EXACT divergence pattern is required (the literal matches + the
+/// named divergences), which in practice is as demanding as comparing everything: one more module
+/// that diverged, or one of the declared ones that stopped diverging, makes the test fail.
 /// </summary>
 [Collection("Modules")]
 public sealed class ModuleGoldenDiff32Tests
@@ -104,11 +106,11 @@ public sealed class ModuleGoldenDiff32Tests
         .ToList();
 
     // ------------------------------------------------------------------
-    // 1) Exact census: 13 modules.
+    // 1) Exact census of the modules.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void ModuleCensus_IsExactlyThirteen_MatchingReference32ByBusinessKey()
+    public void ModuleCensus_IsExactlyTheReference32_ByBusinessKey()
     {
         var columns = string.Join(", ", Col("t", "TaxonomyCode"), Col("m", "ModuleCode"));
 
@@ -120,8 +122,8 @@ public sealed class ModuleGoldenDiff32Tests
             .Select(r => (Taxonomy: NormalizeTaxonomyCode(r[0]!), Module: r[1]!))
             .ToHashSet();
 
-        Assert.Equal(13, reference.Count); // guard: if the reference changes, it must be noticed here first
-        Assert.Equal(13, generated.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "modules of the 3.2 reference", ReleasePins.Reference32Modules, reference.Count); // guard: if the reference changes, it must be noticed here first
+        Assert.Equal(reference.Count, generated.Count);
 
         var missing = reference.Except(generated).ToList();
         var extra = generated.Except(reference).ToList();
@@ -134,11 +136,11 @@ public sealed class ModuleGoldenDiff32Tests
     }
 
     // ------------------------------------------------------------------
-    // 2) ModuleLabel literal 13/13.
+    // 2) ModuleLabel literal, every module.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void ModuleLabel_IsLiteral_ThirteenOfThirteen()
+    public void ModuleLabel_IsLiteral_ForEveryModule()
     {
         var columns = string.Join(", ", Col("t", "TaxonomyCode"), Col("m", "ModuleCode"), Col("m", "ModuleLabel"));
 
@@ -148,7 +150,7 @@ public sealed class ModuleGoldenDiff32Tests
         var reference = ReferenceRows(columns)
             .ToDictionary(r => (Taxonomy: NormalizeTaxonomyCode(r[0]!), Module: r[1]!), r => r[2]!);
 
-        Assert.Equal(13, reference.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "modules of the 3.2 reference", ReleasePins.Reference32Modules, reference.Count);
 
         var mismatches = new List<string>();
         foreach (var (key, refLabel) in reference)
@@ -163,28 +165,28 @@ public sealed class ModuleGoldenDiff32Tests
             }
         }
 
-        Assert.True(mismatches.Count == 0, $"ModuleLabel is not literal 13/13:\n" + string.Join("\n", mismatches));
+        Assert.True(mismatches.Count == 0, $"ModuleLabel is not literal in {mismatches.Count}/{reference.Count} modules:\n" + string.Join("\n", mismatches));
     }
 
     // ------------------------------------------------------------------
-    // 3) mModuleBusinessTemplate: exact census of 35 rows and exact RELATIVE ORDER per module:
+    // 3) mModuleBusinessTemplate: exact census of rows and exact RELATIVE ORDER per module:
     //    sequence of L1 node codes, normalising the eba_tg/tg prefix, ordinal comparison. The
     //    numeric base (0 generated, 1 in 3.2) is NOT compared literally, only the relative
     //    position.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void ModuleBusinessTemplate_RowCount_IsExactlyThirtyFive()
+    public void ModuleBusinessTemplate_RowCount_IsTheReference32Census()
     {
         var generatedCount = GeneratedBusinessTemplateRows(Col("t", "TaxonomyCode")).Count;
         var referenceCount = ReferenceBusinessTemplateRows(Col("t", "TaxonomyCode")).Count;
 
-        Assert.Equal(35, referenceCount); // guard on the reference itself
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "mModuleBusinessTemplate rows of the 3.2 reference", ReleasePins.Reference32ModuleBusinessTemplateRows, referenceCount); // guard on the reference itself
         Assert.Equal(referenceCount, generatedCount);
     }
 
     [DataFact]
-    public void ModuleBusinessTemplate_Order_MatchesRelativeSequence_ForAllThirteenModules()
+    public void ModuleBusinessTemplate_Order_MatchesRelativeSequence_ForEveryModule()
     {
         var columns = string.Join(
             ", ", Col("t", "TaxonomyCode"), Col("m", "ModuleCode"), Col("mbt", "Order"), Col("tot", "TemplateOrTableCode"));
@@ -201,7 +203,7 @@ public sealed class ModuleGoldenDiff32Tests
                 g => g.Key,
                 g => g.OrderBy(r => int.Parse(r[2]!)).Select(r => StripPrefix(r[3]!, ReferencePrefix)).ToList());
 
-        Assert.Equal(13, referenceByModule.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "modules with business templates in the 3.2 reference", ReleasePins.Reference32Modules, referenceByModule.Count);
 
         var failures = new List<string>();
         foreach (var (key, refSequence) in referenceByModule)
@@ -223,18 +225,18 @@ public sealed class ModuleGoldenDiff32Tests
 
         Assert.True(
             failures.Count == 0,
-            $"{failures.Count}/13 modules with an Order sequence different from the 3.2 reference:\n" + string.Join("\n", failures));
+            $"{failures.Count}/{referenceByModule.Count} modules with an Order sequence different from the 3.2 reference:\n" + string.Join("\n", failures));
     }
 
     // ------------------------------------------------------------------
-    // 4) XBRLSchemaRef: 8/13 literal, 5/13 declared divergence. Full strictness: if any of the 8
-    //    "good" ones diverged, or if the pattern of 5 divergent ones grew or changed identity,
-    //    the test fails. The "IF/GSII" category is not excluded; the five objects are named one
+    // 4) XBRLSchemaRef: literal except the declared divergences. Full strictness: if any of the
+    //    "good" ones diverged, or if the pattern of divergent ones grew or changed identity,
+    //    the test fails. The "IF/GSII" category is not excluded; the objects are named one
     //    by one.
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void XBRLSchemaRef_MatchesLiteralOnEightOfThirteen_AndDivergesOnlyOnTheFiveDeclaredModules()
+    public void XBRLSchemaRef_MatchesLiteral_AndDivergesOnlyOnTheDeclaredModules()
     {
         var columns = string.Join(", ", Col("t", "TaxonomyCode"), Col("m", "ModuleCode"), Col("m", "XBRLSchemaRef"));
 
@@ -244,10 +246,10 @@ public sealed class ModuleGoldenDiff32Tests
         var reference = ReferenceRows(columns)
             .ToDictionary(r => (Taxonomy: NormalizeTaxonomyCode(r[0]!), Module: r[1]!), r => r[2]!);
 
-        Assert.Equal(13, reference.Count);
+        ReleasePins.AssertPinned(ReleasePins.Reference32, "modules of the 3.2 reference", ReleasePins.Reference32Modules, reference.Count);
 
-        var unexpectedMatches = new List<string>();   // one of the 5 declared that now DOES match (stale exception)
-        var unexpectedDivergences = new List<string>(); // one of the 8 "good" ones that now diverges (bug or changed reference)
+        var unexpectedMatches = new List<string>();   // one of the declared that now DOES match (stale exception)
+        var unexpectedDivergences = new List<string>(); // one of the "good" ones that now diverges (bug or changed reference)
         var literalMatches = 0;
         var declaredDivergences = 0;
 
@@ -277,22 +279,26 @@ public sealed class ModuleGoldenDiff32Tests
                 }
                 else
                 {
-                    unexpectedDivergences.Add($"{key.Taxonomy}/{key.Module}: generated='{genValue}' reference='{refValue}' (NOT among the five declared divergences)");
+                    unexpectedDivergences.Add($"{key.Taxonomy}/{key.Module}: generated='{genValue}' reference='{refValue}' (NOT among the declared divergences)");
                 }
             }
         }
 
         Assert.True(
             unexpectedDivergences.Count == 0,
-            $"{unexpectedDivergences.Count} modules diverge in XBRLSchemaRef WITHOUT being among the five declared divergences " +
-            $"(a sixth/seventh divergent object, not declared):\n" + string.Join("\n", unexpectedDivergences));
+            $"{unexpectedDivergences.Count} modules diverge in XBRLSchemaRef WITHOUT being among the declared divergences " +
+            $"(an undeclared divergent object):\n" + string.Join("\n", unexpectedDivergences));
 
         Assert.True(
             unexpectedMatches.Count == 0,
-            $"{unexpectedMatches.Count} of the five declared divergences no longer diverge: " +
+            $"{unexpectedMatches.Count} of the declared divergences no longer diverge: " +
             $"the exception is stale and must be removed:\n" + string.Join("\n", unexpectedMatches));
 
-        Assert.Equal(8, literalMatches);
-        Assert.Equal(5, declaredDivergences);
+        Assert.True(
+            declaredDivergences == DeclaredXbrlSchemaRefDivergences.Count,
+            $"Declared XBRLSchemaRef divergences seen: expected {DeclaredXbrlSchemaRefDivergences.Count} (the declared list), actual {declaredDivergences}.");
+        Assert.True(
+            literalMatches == reference.Count - DeclaredXbrlSchemaRefDivergences.Count,
+            $"XBRLSchemaRef literal matches: expected {reference.Count - DeclaredXbrlSchemaRefDivergences.Count} (reference modules {reference.Count} minus declared divergences {DeclaredXbrlSchemaRefDivergences.Count}), actual {literalMatches}.");
     }
 }

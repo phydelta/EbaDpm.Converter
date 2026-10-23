@@ -215,6 +215,91 @@ internal static class ReleasePins
     /// <summary>The DPM 1.0 release 4.1 taxonomies listed by <c>--list-taxonomies</c> (<see cref="Dpm10All41"/>).</summary>
     public const int Dpm10All41ListedTaxonomies = 128;
 
+    // ------------------------------------------------------------------
+    // DPM 1.0 (release 4.1 is the last one: no new DPM 1.0 release is published) axes, cells and
+    // modules. Figures of the reference exports are measurements of those files; figures of the
+    // converted selections are scoped to the selection.
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// The 3.2 reference export <c>EBA_3.2_phase_1.db</c> (information only, never an authority): a
+    /// figure pinned here is a measurement of that file, not a property of the format.
+    /// </summary>
+    public static readonly ReleasePin Reference32 = new(
+        "3.2", Schema.RepoPaths.Reference32FileName, "2026-10-23");
+
+    /// <summary>
+    /// The 4.0 reference export <c>EBA_4.0_ERRATA_5.db</c> (information only, never an authority): a
+    /// figure pinned here is a measurement of that file, not a property of the format.
+    /// </summary>
+    public static readonly ReleasePin Reference40 = new(
+        "4.0", Schema.RepoPaths.Reference40FileName, "2026-10-23");
+
+    /// <summary>
+    /// The DPM 1.0 database of release 4.1 converted for the eight taxonomies of the AxesAndCells and
+    /// Modules fixtures: <c>AE 3.2</c>, <c>COREP 3.2</c>, <c>GSII 3.2</c>, <c>IF 3.2</c>, <c>COREP 4.0</c>,
+    /// <c>DORA 4.0</c>, <c>IF 4.0</c> and <c>MICA 4.0</c>.
+    /// </summary>
+    public static readonly ReleasePin Dpm10Selected8Of41 = new(
+        "4.1", Schema.RepoPaths.AccessDatabaseFileName + " (eight taxonomies of the AxesAndCells/Modules fixtures)", "2026-10-23");
+
+    /// <summary><c>COUNT(1)</c> of <c>mAxis</c> in the 3.2 reference export.</summary>
+    public const int Reference32MAxisRows = 522;
+
+    /// <summary><c>COUNT(1)</c> of <c>mAxisOrdinate</c> in the 3.2 reference export.</summary>
+    public const int Reference32MAxisOrdinateRows = 7615;
+
+    /// <summary><c>COUNT(1)</c> of <c>mTableCell</c> in the 3.2 reference export.</summary>
+    public const int Reference32MTableCellRows = 129549;
+
+    /// <summary><c>COUNT(1)</c> of <c>mCellPosition</c> in the 3.2 reference export.</summary>
+    public const int Reference32MCellPositionRows = 358946;
+
+    /// <summary><c>COUNT(1)</c> of <c>mOpenAxisValueRestriction</c> in the 3.2 reference export.</summary>
+    public const int Reference32MOpenAxisValueRestrictionRows = 58;
+
+    /// <summary>Distinct (taxonomy, table code) keys in the 3.2 reference export.</summary>
+    public const int Reference32Tables = 217;
+
+    /// <summary>Closed axes, keyed by (taxonomy, table code, orientation), in the 3.2 reference export.</summary>
+    public const int Reference32ClosedAxisLabels = 433;
+
+    /// <summary>Closed ordinates of the 3.2 reference export matched by path in the generated output.</summary>
+    public const int Reference32ClosedOrdinatesCompared = 7526;
+
+    /// <summary>Cells of the 3.2 reference export with <c>IsShaded</c> = 0 (equivalently, with a <c>DPS</c>).</summary>
+    public const int Reference32UnshadedCells = 69357;
+
+    /// <summary>Cells of the 3.2 reference export whose <c>DPS</c> has a three-part bracket (starting member).</summary>
+    public const int Reference32ThreePartBracketCells = 12031;
+
+    /// <summary>Leaf ordinates (those that carry cells) of the 3.2 reference export compared by path.</summary>
+    public const int Reference32LeafOrdinatesWithCells = 6877;
+
+    /// <summary>Modules (distinct taxonomy and module code) in the 3.2 reference export.</summary>
+    public const int Reference32Modules = 13;
+
+    /// <summary><c>COUNT(1)</c> of <c>mModuleBusinessTemplate</c> in the 3.2 reference export.</summary>
+    public const int Reference32ModuleBusinessTemplateRows = 35;
+
+    /// <summary>Comparable tables of the 4.0 reference export (<c>corep 3.4</c> is not in the Access source).</summary>
+    public const int Reference40ComparableTables = 150;
+
+    /// <summary>Cells of the 4.0 reference export matched by position in the generated output.</summary>
+    public const int Reference40CellsCompared = 59025;
+
+    /// <summary>Modules in the 4.0 reference export.</summary>
+    public const int Reference40Modules = 5;
+
+    /// <summary>Cells compared by the <c>BusinessCode</c> reconstruction over <c>--all</c> of the 4.1 database.</summary>
+    public const int Dpm10All41CellsCompared = 904204;
+
+    /// <summary><c>SkippedDefaultMemberResets</c> of <c>AxisAndCellLoader.Result</c> (no table holds it).</summary>
+    public const int Dpm10Selected8SkippedDefaultMemberResets = 0;
+
+    /// <summary><c>MetricInheritedFromAncestorCellCount</c> of <c>AxisAndCellLoader.Result</c> (no table holds it).</summary>
+    public const int Dpm10Selected8MetricInheritedFromAncestorCells = 0;
+
     /// <summary>Asserts a pinned figure; the failure message prints the scope of the pin.</summary>
     public static void AssertPinned(ReleasePin pin, string what, long expected, long actual)
         => Xunit.Assert.True(expected == actual, Message(pin, what, expected, actual));
