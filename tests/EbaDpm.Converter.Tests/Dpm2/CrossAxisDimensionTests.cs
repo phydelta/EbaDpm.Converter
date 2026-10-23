@@ -235,9 +235,8 @@ public sealed class CrossAxisDimensionTests
             "SELECT a.\"AxisOrientation\" FROM \"mTableAxis\" t JOIN \"mAxis\" a ON a.\"AxisID\" = t.\"AxisID\" ORDER BY t.\"Order\" LIMIT 1",
             1).Single()[0]);
         const string expected = "MET(eba_met1)|eba_dA(eba_a2)";
-        foreach (var businessCode in new[] { "{T_01,Y1,X1}", "{T_01,Y2,X1}" })
+        foreach (var cell in new[] { "{T_01,Y1,X1}", "{T_01,Y2,X1}" }.Select(businessCode => outcome.Cell(businessCode)))
         {
-            var cell = outcome.Cell(businessCode);
             Assert.Equal(0, cell.IsShaded);
             Assert.Equal(expected, cell.Dps);
             Assert.Equal(expected, cell.DatapointSignature);

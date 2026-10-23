@@ -94,7 +94,7 @@ public sealed class Dpm20StructureLoaderSyntheticTests : IDisposable
                 reader.IsDBNull(2) ? null : reader.GetString(2)));
         }
 
-        Assert.Equal([("T_01.00.a", (string?)"eba_tgT_01.00", (string?)"eba_tgG_ONE")], chains);
+        Assert.Equal([("T_01.00.a", "eba_tgT_01.00", "eba_tgG_ONE")], chains);
     }
 
     private static void Execute(SqliteConnection connection, string sql)
