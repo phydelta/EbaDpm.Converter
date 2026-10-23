@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -44,23 +45,20 @@ public sealed class HierarchyInvariantTests
     }
 
     /// <summary>
-    /// A-HIE-07. An earlier reading of "18,390 rows / 18,198 concepts -> 192 shared" interpreted the
-    /// subtraction as "concepts shared by several rows". That reading was wrong: the subtraction
-    /// measures rows with a NULL <c>ConceptID</c>, not sharing. Verified independently against
-    /// <c>Access.HierarchyNode</c> with ACE OLEDB: 18,390 rows, 192 with a NULL <c>ConceptID</c>,
-    /// 18,198 DISTINCT concepts, and ZERO groups of duplicated <c>ConceptID</c>.
+    /// A-HIE-07. <c>mHierarchyNode</c> has no group of duplicated <c>ConceptID</c>, and its rows
+    /// with a NULL <c>ConceptID</c> are pinned (<see cref="ReleasePins.Dpm10All41"/>): rows with a
+    /// NULL <c>ConceptID</c> are not a sharing of concepts.
     /// <c>DictionaryLoader.LoadHierarchyNodes</c> emits <c>node.ConceptId</c> verbatim from the
-    /// Access, without synthesising anything, so the same absence of sharing carries over entirely
-    /// to <c>mHierarchyNode</c>.
+    /// Access, without synthesising anything.
     ///
     /// The REAL case where several rows share a ConceptID (accepted and declared, no new concepts
     /// are synthesised) is <c>mTemplateOrTable</c> (genuine reuse of templates between
     /// taxonomies), not <c>mHierarchyNode</c>. See
-    /// <see cref="TemplateOrTable_ConceptId_HasTheMeasuredCensus_1692Groups_9200Rows"/> and
+    /// <see cref="TemplateOrTable_ConceptId_HasTheMeasuredCensus_AndItsDecomposition"/> and
     /// <see cref="TemplateOrTable_DistinctConceptId_EqualsTableGroupPlusTemplatePlusTableVersionCensus"/>.
     /// </summary>
     [DataFact]
-    public void HierarchyNode_ConceptId_HasZeroDuplicates_And192NullRows_MeasuredIndependently()
+    public void HierarchyNode_ConceptId_HasZeroDuplicates_AndThePinnedNullRows()
     {
         var duplicateGroups = QueryHelpers.Scalar(
             _fixture.GeneratedConnection,
@@ -74,31 +72,26 @@ public sealed class HierarchyInvariantTests
         Assert.True(duplicateGroups == 0, $"{duplicateGroups} groups of duplicated ConceptID in mHierarchyNode (0 expected, A-HIE-07).");
 
         var nullConceptIdRows = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mHierarchyNode\" WHERE \"ConceptID\" IS NULL");
-        Assert.True(
-            nullConceptIdRows == 192,
-            $"{nullConceptIdRows} mHierarchyNode rows with a NULL ConceptID (exactly 192 expected, " +
-            "verbatim from the Access -- Access.HierarchyNode also has 192 rows with a NULL ConceptID, verified with ACE OLEDB).");
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm10All41, "mHierarchyNode rows with a NULL ConceptID", ReleasePins.Dpm10All41HierarchyNodeNullConceptIdRows, nullConceptIdRows);
     }
 
     /// <summary>
     /// Census of shared <c>ConceptID</c> groups in <c>mTemplateOrTable</c>. Some groups are purely
-    /// L1/L2 (<c>TableGroup</c> reused between taxonomies through a shared <c>Template</c>): 549
-    /// groups, 4,482 rows. The <c>BusinessTable</c> node is not deduplicated: one node is emitted for
-    /// every <c>(TaxonomyID, TableVID)</c> association, and all the nodes of the same
-    /// <c>TableVID</c> share the <c>ConceptID</c> of <c>TableVersion</c>. That adds exactly the
-    /// 1,143 <c>TableVID</c> shared by 2-21 taxonomies as NEW groups of repeated
-    /// <c>ConceptID</c>, with 4,718 rows spread among them (of the 6,136 <c>BusinessTable</c> nodes
-    /// over <c>--all</c>, 2,561-1,143=1,418 do not share a TableVID -- 1 row each -- and the
-    /// remaining 4,718 do).
+    /// L1/L2 (<c>TableGroup</c> reused between taxonomies through a shared <c>Template</c>). The
+    /// <c>BusinessTable</c> node is not deduplicated: one node is emitted for every
+    /// <c>(TaxonomyID, TableVID)</c> association, and all the nodes of the same <c>TableVID</c>
+    /// share the <c>ConceptID</c> of <c>TableVersion</c>. That adds one group of repeated
+    /// <c>ConceptID</c> for every <c>TableVID</c> shared by several taxonomies.
     ///
-    /// Total, measured independently over <c>--all</c> (128 taxonomies) against
-    /// <see cref="AllFixture"/>: 549+1,143 = <b>1,692</b> shared groups, 4,482+4,718 =
-    /// <b>9,200</b> rows in those groups. The decomposition is checked separately below (critical
-    /// layer): it isolates the BusinessTable half so that a regression there is not masked by
-    /// chance with the total, nor with the L1/L2 half.
+    /// Asserted over <see cref="AllFixture"/>: the BusinessTable groups equal the <c>TableVID</c>
+    /// shared by more than one taxonomy in <c>Access.TaxonomyTableVersion</c> (derived); the L1/L2
+    /// groups and rows and the totals are pinned (<see cref="ReleasePins.Dpm10All41"/>); and the
+    /// total equals the L1/L2 half plus the BusinessTable half, so the halves cannot drift apart
+    /// from the total by chance.
     /// </summary>
     [DataFact]
-    public void TemplateOrTable_ConceptId_HasTheMeasuredCensus_1692Groups_9200Rows()
+    public void TemplateOrTable_ConceptId_HasTheMeasuredCensus_AndItsDecomposition()
     {
         var sharedConcepts = QueryHelpers.Scalar(
             _fixture.GeneratedConnection,
@@ -121,12 +114,13 @@ public sealed class HierarchyInvariantTests
             """);
         var nullConceptIdRows = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mTemplateOrTable\" WHERE \"ConceptID\" IS NULL");
 
-        Assert.True(sharedConcepts == 1692, $"{sharedConcepts} groups of shared ConceptID in mTemplateOrTable (1,692 expected = 549 from L1/L2 + 1,143 shared TableVID, measured independently).");
-        Assert.True(rowsInSharedGroups == 9200, $"{rowsInSharedGroups} rows in shared groups (9,200 expected = 4,482 from L1/L2 + 4,718 from shared TableVID, measured independently).");
+        var pin = ReleasePins.Dpm10All41;
+        ReleasePins.AssertPinned(pin, "mTemplateOrTable groups of shared ConceptID", ReleasePins.Dpm10All41TemplateOrTableSharedConceptGroups, sharedConcepts);
+        ReleasePins.AssertPinned(pin, "mTemplateOrTable rows in shared ConceptID groups", ReleasePins.Dpm10All41TemplateOrTableRowsInSharedGroups, rowsInSharedGroups);
         Assert.True(nullConceptIdRows == 0, $"{nullConceptIdRows} mTemplateOrTable rows with a NULL ConceptID (0 expected).");
 
-        // Decomposition: isolates the BusinessTable half so that a regression there is not
-        // masked by chance with the total.
+        // Decomposition: isolates each half so that a regression there is not masked by chance
+        // with the total.
         var sharedConceptsBusinessTableOnly = QueryHelpers.Scalar(
             _fixture.GeneratedConnection,
             """
@@ -146,13 +140,44 @@ public sealed class HierarchyInvariantTests
                 GROUP BY "ConceptID" HAVING COUNT(*) > 1
             )
             """);
+        var sharedConceptsLevels12Only = QueryHelpers.Scalar(
+            _fixture.GeneratedConnection,
+            """
+            SELECT COUNT(*) FROM (
+                SELECT "ConceptID" FROM "mTemplateOrTable"
+                WHERE "TemplateOrTableType" <> 'BusinessTable' AND "ConceptID" IS NOT NULL
+                GROUP BY "ConceptID" HAVING COUNT(*) > 1
+            )
+            """);
+        var rowsInSharedGroupsLevels12Only = QueryHelpers.Scalar(
+            _fixture.GeneratedConnection,
+            """
+            SELECT COUNT(*) FROM "mTemplateOrTable"
+            WHERE "TemplateOrTableType" <> 'BusinessTable' AND "ConceptID" IN (
+                SELECT "ConceptID" FROM "mTemplateOrTable"
+                WHERE "TemplateOrTableType" <> 'BusinessTable' AND "ConceptID" IS NOT NULL
+                GROUP BY "ConceptID" HAVING COUNT(*) > 1
+            )
+            """);
 
+        // The BusinessTable groups are the TableVID shared by several taxonomies in the Access.
+        var accessSharedTableVidCount = AccessSharedTableVidCount();
         Assert.True(
-            sharedConceptsBusinessTableOnly == 1143,
-            $"{sharedConceptsBusinessTableOnly} TableVID shared between BusinessTable nodes (1,143 expected, the figure measured in the Access over the 128 taxonomies).");
+            sharedConceptsBusinessTableOnly == accessSharedTableVidCount,
+            $"{sharedConceptsBusinessTableOnly} BusinessTable ConceptID groups shared in mTemplateOrTable versus " +
+            $"{accessSharedTableVidCount} TableVID shared by more than one taxonomy in Access.TaxonomyTableVersion " +
+            $"(derived from '{RepoPaths.AccessDatabaseFileName}').");
+        ReleasePins.AssertPinned(pin, "BusinessTable rows in shared ConceptID groups", ReleasePins.Dpm10All41BusinessTableRowsInSharedGroups, rowsInSharedGroupsBusinessTableOnly);
+        ReleasePins.AssertPinned(pin, "L1/L2 groups of shared ConceptID", ReleasePins.Dpm10All41Level12SharedConceptGroups, sharedConceptsLevels12Only);
+        ReleasePins.AssertPinned(pin, "L1/L2 rows in shared ConceptID groups", ReleasePins.Dpm10All41Level12RowsInSharedGroups, rowsInSharedGroupsLevels12Only);
+
+        // Identities between the halves and the total (a second measurement of the same census).
         Assert.True(
-            rowsInSharedGroupsBusinessTableOnly == 4718,
-            $"{rowsInSharedGroupsBusinessTableOnly} BusinessTable rows in shared TableVID (4,718 expected).");
+            sharedConcepts == sharedConceptsLevels12Only + sharedConceptsBusinessTableOnly,
+            $"Shared ConceptID groups: total {sharedConcepts} versus L1/L2 {sharedConceptsLevels12Only} + BusinessTable {sharedConceptsBusinessTableOnly}.");
+        Assert.True(
+            rowsInSharedGroups == rowsInSharedGroupsLevels12Only + rowsInSharedGroupsBusinessTableOnly,
+            $"Rows in shared ConceptID groups: total {rowsInSharedGroups} versus L1/L2 {rowsInSharedGroupsLevels12Only} + BusinessTable {rowsInSharedGroupsBusinessTableOnly}.");
     }
 
     /// <summary>
@@ -204,6 +229,17 @@ public sealed class HierarchyInvariantTests
         Assert.True(shared42 == 0, $"{shared42} TableID shared between taxonomies in EBA_4.2_Hotfix.db (0 expected, over {totalRows42} mTaxonomyTable rows).");
     }
 
+    /// <summary><c>TableVID</c> of <c>Access.TaxonomyTableVersion</c> shared by more than one of the selected taxonomies.</summary>
+    private int AccessSharedTableVidCount()
+    {
+        var selectedTaxonomyIds = _fixture.SelectedTaxonomies.Select(t => t.TaxonomyId).ToHashSet();
+
+        return _fixture.AccessReader.ReadTaxonomyTableVersions()
+            .Where(v => selectedTaxonomyIds.Contains(v.TaxonomyId))
+            .GroupBy(v => v.TableVId)
+            .Count(g => g.Select(v => v.TaxonomyId).Distinct().Count() > 1);
+    }
+
     private static SqliteConnection OpenReadOnly(string path)
     {
         var connectionString = new SqliteConnectionStringBuilder
@@ -225,28 +261,16 @@ public sealed class HierarchyInvariantTests
     /// appear in several rows of <c>mTaxonomyTable</c> when several taxonomies share that Access
     /// table version.
     ///
-    /// What can be verified is not "0 shared" (that describes the reference, not the format): it is
-    /// that the CENSUS of shared <c>TableID</c> in our output MATCHES EXACTLY the census, computed
-    /// LIVE against the Access (not as a constant), of <c>TableVID</c> of
-    /// <c>TaxonomyTableVersion</c> shared by more than one of the selected taxonomies. It is the
-    /// right consistency check for this reuse: "everything the Access says is shared, and only
-    /// that, appears shared in the output" -- without looking at any reference, measured over the
-    /// 128 taxonomies of <c>--all</c>.
-    ///
-    /// The figure was once measured at 1,143 (of 2,561 table versions, shared by 2 to 21
-    /// taxonomies); it stays as context, NEVER as an expected constant in the assertion -- the
-    /// assertion compares the two independently computed sides, so that a regression on either
-    /// is detected, not just a change of a published figure.
+    /// What can be verified is that the CENSUS of shared <c>TableID</c> in our output MATCHES
+    /// EXACTLY the census, computed LIVE against the Access (not as a constant), of
+    /// <c>TableVID</c> of <c>TaxonomyTableVersion</c> shared by more than one of the selected
+    /// taxonomies: "everything the Access says is shared, and only that, appears shared in the
+    /// output" -- without looking at any reference.
     /// </summary>
     [DataFact]
     public void TaxonomyTable_SharedTableIdCensus_MatchesAccessSharedTableVidCensus_InOurOutput()
     {
-        var selectedTaxonomyIds = _fixture.SelectedTaxonomies.Select(t => t.TaxonomyId).ToHashSet();
-
-        var accessSharedTableVidCount = _fixture.AccessReader.ReadTaxonomyTableVersions()
-            .Where(v => selectedTaxonomyIds.Contains(v.TaxonomyId))
-            .GroupBy(v => v.TableVId)
-            .Count(g => g.Select(v => v.TaxonomyId).Distinct().Count() > 1);
+        var accessSharedTableVidCount = AccessSharedTableVidCount();
 
         var outputSharedTableIdCount = QueryHelpers.Scalar(
             _fixture.GeneratedConnection,
@@ -272,31 +296,20 @@ public sealed class HierarchyInvariantTests
     }
 
     /// <summary>
-    /// The drop from 1,227 to 549 shared concepts (before the BusinessTable nodes stopped being
-    /// deduplicated) is NOT a discrepancy, it is the correct effect of removing the 950
-    /// <c>Access.Table</c> concepts. Previously, the <c>BusinessTable</c> rows hung from the
-    /// <c>ConceptID</c> of <c>Access.Table</c> (950 concepts for 2,561 table versions: forced
-    /// sharing). Those 950 concepts were removed; now the rows hang from
-    /// <c>TableVersion.ConceptID</c>, one per version, and the sharing drops to its real value.
+    /// <c>COUNT(DISTINCT ConceptID)</c> in <c>mTemplateOrTable</c> must be EXACTLY the sum of the
+    /// three SOURCE censuses -- <c>TableGroup</c> (L1, one concept per row, no sharing) + the
+    /// DISTINCT <c>Template</c> actually referenced (L2, shared between several taxonomies/groups)
+    /// + the DISTINCT <c>TableVersion</c> emitted (L3, deduplicated by <c>TableVID</c>) -- not one
+    /// invented, not one lost. It is checked WITHOUT looking at any reference and detects both
+    /// extra and missing concepts.
     ///
-    /// The cleanest confirmation: <c>COUNT(DISTINCT ConceptID)</c> in <c>mTemplateOrTable</c> must
-    /// be EXACTLY the sum of the three SOURCE censuses -- <c>TableGroup</c> (L1, one concept per
-    /// row, no sharing) + the DISTINCT <c>Template</c> actually referenced (L2, shared between
-    /// several taxonomies/groups) + the DISTINCT <c>TableVersion</c> emitted (L3, deduplicated by
-    /// <c>TableVID</c>) -- not one invented, not one lost. It is checked WITHOUT looking at any
-    /// reference and detects both extra and missing concepts.
+    /// The BusinessTable nodes are not deduplicated: that changes HOW MANY ROWS of
+    /// mTemplateOrTable share each ConceptID (the test above), not HOW MANY DISTINCT ConceptIDs
+    /// there are -- the duplicated nodes keep pointing to the SAME TableVersion ConceptID.
     ///
-    /// Not deduplicating the BusinessTable nodes does not change this test nor its figure: it
-    /// changes HOW MANY ROWS of mTemplateOrTable share each ConceptID (the test above), not HOW
-    /// MANY DISTINCT ConceptIDs there are in total -- the duplicated BusinessTable nodes keep
-    /// pointing to the SAME TableVersion ConceptID, so <c>COUNT(DISTINCT ConceptID)</c> does not
-    /// move (it stays at 3,908).
-    ///
-    /// The three censuses on the right-hand side are recomputed here independently against the
-    /// Access itself (reproducing the SAME selection filter used by
-    /// <c>TemplateOrTableLoader</c>: taxonomy in <see cref="AllFixture.SelectedTaxonomies"/>),
-    /// never as hand-written constants -- so that, if the source changes, the test stays correct
-    /// instead of becoming obsolete.
+    /// The censuses on the right-hand side are recomputed here against the Access itself
+    /// (reproducing the SAME selection filter used by <c>TemplateOrTableLoader</c>: taxonomy in
+    /// <see cref="AllFixture.SelectedTaxonomies"/>), never as hand-written constants.
     /// </summary>
     [DataFact]
     public void TemplateOrTable_DistinctConceptId_EqualsTableGroupPlusTemplatePlusTableVersionCensus()

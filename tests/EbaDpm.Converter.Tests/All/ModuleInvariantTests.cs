@@ -18,7 +18,7 @@ public sealed class ModuleInvariantTests
     /// A-MOD-04: no <c>XBRLSchemaRef</c> has the form <c>{framework}_{version}</c> (e.g.
     /// <c>if_3.2</c>, <c>gsii_3.2</c>) -- that form is an exception found in the 3.2 reference
     /// compared with our output, not something our own output produces: no converter rule
-    /// produces it (0/415 in the Access).
+    /// produces it.
     /// </summary>
     [DataFact]
     public void NoXbrlSchemaRef_HasTheFrameworkUnderscoreVersionForm()
