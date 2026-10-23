@@ -214,19 +214,13 @@ public sealed class AxisGoldenDiff40Tests
     // never relaxed).
     // ------------------------------------------------------------------
 
-    private static readonly HashSet<string> DeclaredIsShadedDivergences = new(StringComparer.Ordinal)
-    {
-        "{C_07.00.d,0300,0230,0010}",
-        "{C_07.00.d,0320,0230,0010}",
-        "{C_09.04,0110,0030,0010}",
-        "{C_09.04,0120,0030,0010}",
-        "{C_09.04,0130,0030,0010}",
-        "{C_09.04,0140,0030,0010}",
-        "{C_09.04,0150,0020,0010}",
-        "{C_09.04,0160,0020,0010}",
-        "{C_02.00.b,0035,0020}",
-        "{C_02.00.b,0036,0020}",
-    };
+    // Read from the registry (DD-6..DD-15, check B-CEL-02), keyed by the BusinessCode of the
+    // reference cell: this class keeps no copy.
+    private static readonly IReadOnlyDictionary<string, string> DeclaredIsShadedDivergenceReasons =
+        RegistryExceptions.ByKey("B-CEL-02", "DD-6", "DD-7", "DD-8", "DD-9", "DD-10", "DD-11", "DD-12", "DD-13", "DD-14", "DD-15");
+
+    private static readonly HashSet<string> DeclaredIsShadedDivergences =
+        new(DeclaredIsShadedDivergenceReasons.Keys, StringComparer.Ordinal);
 
     [DataFact]
     public void IsShaded_MatchesReference40_Literally_ExceptTheDeclaredDivergences()

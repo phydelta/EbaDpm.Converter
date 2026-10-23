@@ -113,6 +113,10 @@ Never modify the data files; tests treat them as read-only.
   check code (`A-XXX-nn`) and a clear statement.
 - A known exception must name **one object by its exact business key**, for one specific check,
   with the reason and the evidence. Never relax a threshold or exclude by pattern.
+- Tests that compare against a reference read known exceptions from the registry
+  (`KnownExceptions.All`, filtered by `Id` and `Check`); they do not keep a copy. A test keeps its
+  own named list only when no validation check compares that object, and then states why. When a
+  check is added for it, the list moves to the registry in the same pull request.
 - For a new EBA release, regenerate the plane C known-divergences file for that release instead of
   editing the existing one. See [docs/validation.md](docs/validation.md#plane-c-known-divergences).
 
