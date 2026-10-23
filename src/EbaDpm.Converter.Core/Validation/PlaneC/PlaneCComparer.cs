@@ -566,48 +566,68 @@ public static class PlaneCComparer
     }
 
     private static bool IsContained(IReadOnlyList<string> layoutTerms, Dictionary<string, List<int>> termIndex)
+        => HasCommonCandidate(layoutTerms, termIndex);
+
+    private static bool HasCommonCandidate(IEnumerable<string> keys, Dictionary<string, List<int>> index)
     {
-        List<int>? current = null;
-        foreach (var term in layoutTerms)
+        // Resolve every posting list first: a missing key means no candidate at all.
+        var lists = new List<List<int>>();
+        foreach (var key in keys)
         {
-            if (!termIndex.TryGetValue(term, out var candidates))
+            if (!index.TryGetValue(key, out var candidates))
             {
                 return false;
             }
 
-            current = current is null ? candidates : Intersect(current, candidates);
-            if (current.Count == 0)
-            {
-                return false;
-            }
+            lists.Add(candidates);
         }
 
-        return current is { Count: > 0 };
-    }
-
-    private static bool HasCommonCandidate(IEnumerable<string> dims, Dictionary<string, List<int>> dimIndex)
-    {
-        List<int>? current = null;
-        foreach (var dim in dims)
+        if (lists.Count == 0)
         {
-            if (!dimIndex.TryGetValue(dim, out var candidates))
-            {
-                return false;
-            }
-
-            current = current is null ? candidates : Intersect(current, candidates);
-            if (current.Count == 0)
-            {
-                return false;
-            }
+            return false;
         }
 
-        return current is { Count: > 0 };
+        // Start from the shortest list so the running intersection shrinks as early as possible.
+        lists.Sort(static (x, y) => x.Count.CompareTo(y.Count));
+        var current = lists[0];
+        for (var k = 1; k < lists.Count && current.Count > 0; k++)
+        {
+            current = Intersect(current, lists[k]);
+        }
+
+        return current.Count > 0;
     }
 
+    // The posting lists are ascending because they are filled with increasing indexes; the result is
+    // ascending and free of repeated values.
     private static List<int> Intersect(List<int> a, List<int> b)
     {
-        var setB = new HashSet<int>(b);
-        return a.Where(setB.Contains).ToList();
+        var result = new List<int>(Math.Min(a.Count, b.Count));
+        int i = 0, j = 0;
+        while (i < a.Count && j < b.Count)
+        {
+            var x = a[i];
+            var y = b[j];
+            if (x < y)
+            {
+                i++;
+            }
+            else if (x > y)
+            {
+                j++;
+            }
+            else
+            {
+                if (result.Count == 0 || result[^1] != x)
+                {
+                    result.Add(x);
+                }
+
+                i++;
+                j++;
+            }
+        }
+
+        return result;
     }
 }

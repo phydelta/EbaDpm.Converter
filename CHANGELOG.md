@@ -25,6 +25,10 @@ All notable changes to this project are documented in this file. The format is b
 - DPM 2.0 conversions are about 2.5 times faster (database 4.2.1: 39 s → 16 s). Most of the
   time went into binding the parameters of the chunked `IN` queries against Access; the
   parameters of a chunk are now bound once and reused. The output is unchanged.
+- `--validate --layouts` is faster: the plane C signature comparison of the 4.2.1 output
+  against the 4.2 layouts takes about 2.6 s instead of 5.6 s (whole validation: 19 s → 16.5 s).
+  The candidate lists are now intersected in order instead of through a set built on every
+  call. The report is unchanged.
 
 ### Fixed
 
