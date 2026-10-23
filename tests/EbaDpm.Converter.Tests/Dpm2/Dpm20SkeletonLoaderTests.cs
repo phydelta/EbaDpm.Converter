@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
+using System.Globalization;
 using EbaDpm.Converter.Cli;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -19,14 +21,28 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     [DataFact]
-    // 6 on "DPM2 Database_v 4_2_1.accdb" (5 before): the output lists the releases the database declares, 4.2.1 included.
-    public void MRelease_Has6Rows() => Assert.Equal(6, CountRows("mRelease"));
+    // The output lists the releases the database declares, the publication release (4.2.1) included.
+    public void MRelease_HasOneRowPerAccessRelease()
+    {
+        var expected = AccessCensus.Count(RepoPaths.AccessDpm20DatabasePath, "Release");
+        var actual = CountRows("mRelease");
+        Assert.True(
+            expected == actual,
+            $"mRelease rows: expected {expected} (COUNT(1) of [Release] in '{RepoPaths.AccessDpm20DatabaseFileName}'), actual {actual}.");
+    }
 
     [DataFact]
-    public void MReportingFramework_Has18Rows() => Assert.Equal(18, CountRows("mReportingFramework"));
+    public void MReportingFramework_RowCount_IsThePinnedCensus()
+        => ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mReportingFramework rows",
+            ReleasePins.Dpm20Cutoff42FrameworksWithTaxonomies,
+            CountRows("mReportingFramework"));
 
     [DataFact]
-    public void MTaxonomy_Has32Rows() => Assert.Equal(32, CountRows("mTaxonomy"));
+    public void MTaxonomy_RowCount_IsThePinnedCensus()
+        => ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42, "mTaxonomy rows", ReleasePins.Dpm20Cutoff42MTaxonomyRows, CountRows("mTaxonomy"));
 
     [DataFact]
     public void MOwner_MOwnerParent_MLanguage_HaveTheExpectedCounts()
@@ -67,45 +83,70 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Expected complete row (ReleaseID, ReleaseCode, Status, PublicationDate, IsCurrent).
-    /// <c>PublicationDate</c> is compared as an exact STRING, never as a parsed
-    /// <see cref="DateTime"/>: a roundtrip through <c>DateTime</c> would bring in the culture and
-    /// time zone of the machine running the test, and the test would stop being deterministic.
+    /// Every <c>[Release]</c> row of the Access source (ReleaseID, Code, Status, Date) against the
+    /// <c>mRelease</c> row with the same <c>ReleaseID</c> (ReleaseCode, Status, PublicationDate,
+    /// IsCurrent). <c>PublicationDate</c> is compared as an exact STRING, never as a parsed
+    /// <see cref="DateTime"/> on the output side: a roundtrip through <c>DateTime</c> would bring in
+    /// the culture and time zone of the machine running the test. The Access date is formatted
+    /// <c>yyyy-MM-dd</c> invariantly. <c>IsCurrent</c> is 1 exactly for the CUTOFF release
+    /// (<see cref="RepoPaths.Cutoff42ReleaseCode"/>), not for the release Access marks as current
+    /// (mapping rule of <c>mRelease</c>, <c>docs/mapping-dpm2.md</c>).
     /// </summary>
-    public static IEnumerable<object[]> ExpectedReleaseRows()
+    [DataFact]
+    public void MRelease_MatchesAccessReleases_ColumnByColumn()
     {
-        yield return [1, "3.4", "released", "2024-02-06", 0L];
-        yield return [2, "3.5", "released", "2024-07-11", 0L];
-        yield return [3, "4.0", "released", "2024-12-19", 0L];
-        yield return [4, "4.1", "released", "2025-04-28", 0L];
-        // Status of 4.2 is "released" in "DPM2 Database_v 4_2_1.accdb" ("validation" in the file published before): EBA data.
-        yield return [5, "4.2", "released", "2025-10-31", 1L];
-        yield return [1010000003, "4.2.1", "validation", "2026-02-15", 0L];
-    }
+        var accessRows = AccessCensus.Rows(
+            RepoPaths.AccessDpm20DatabasePath, "SELECT [ReleaseID], [Code], [Status], [Date] FROM [Release]");
+        Assert.True(accessRows.Count > 0, $"[Release] of '{RepoPaths.AccessDpm20DatabaseFileName}' returned no rows: nothing to compare.");
 
-    [DataTheory]
-    [MemberData(nameof(ExpectedReleaseRows))]
-    public void MRelease_MatchesExactly_ColumnByColumn(
-        long releaseId, string releaseCode, string status, string publicationDate, long isCurrent)
-    {
-        using var command = fixture.GeneratedConnection.CreateCommand();
-        command.CommandText =
-            "SELECT ReleaseCode, Status, PublicationDate, IsCurrent FROM mRelease WHERE ReleaseID = $id";
-        command.Parameters.AddWithValue("$id", releaseId);
+        var problems = new List<string>();
+        foreach (var row in accessRows)
+        {
+            var releaseId = Convert.ToInt64(row[0], CultureInfo.InvariantCulture);
+            var code = Convert.ToString(row[1], CultureInfo.InvariantCulture)!;
+            var status = Convert.ToString(row[2], CultureInfo.InvariantCulture)!;
+            var date = Convert.ToDateTime(row[3], CultureInfo.InvariantCulture).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var isCurrent = code == RepoPaths.Cutoff42ReleaseCode ? 1L : 0L;
 
-        using var reader = command.ExecuteReader();
-        Assert.True(reader.Read(), $"There is no mRelease row with ReleaseID={releaseId}.");
+            using var command = fixture.GeneratedConnection.CreateCommand();
+            command.CommandText =
+                "SELECT ReleaseCode, Status, PublicationDate, IsCurrent FROM mRelease WHERE ReleaseID = $id";
+            command.Parameters.AddWithValue("$id", releaseId);
 
-        Assert.Equal(releaseCode, reader.GetString(0));
-        Assert.Equal(status, reader.GetString(1));
+            using var reader = command.ExecuteReader();
+            if (!reader.Read())
+            {
+                problems.Add($"{code}: no mRelease row with ReleaseID={releaseId}");
+                continue;
+            }
 
-        // Exact STRING, not a parsed date -- it is the only test that would detect a regression
-        // that introduced a roundtrip through DateTime.
-        var actualPublicationDate = reader.GetString(2);
-        Assert.Equal(publicationDate, actualPublicationDate);
-        Assert.IsType<string>(actualPublicationDate);
+            if (reader.GetString(0) != code)
+            {
+                problems.Add($"{code}: ReleaseCode expected '{code}', actual '{reader.GetString(0)}'");
+            }
 
-        Assert.Equal(isCurrent, reader.GetInt64(3));
+            if (reader.GetString(1) != status)
+            {
+                problems.Add($"{code}: Status expected '{status}', actual '{reader.GetString(1)}'");
+            }
+
+            // Exact STRING, not a parsed date -- it is the only check that would detect a regression
+            // that introduced a roundtrip through DateTime.
+            if (reader.GetFieldType(2) != typeof(string) || reader.GetString(2) != date)
+            {
+                problems.Add($"{code}: PublicationDate expected '{date}', actual '{reader.GetValue(2)}'");
+            }
+
+            if (reader.GetInt64(3) != isCurrent)
+            {
+                problems.Add($"{code}: IsCurrent expected {isCurrent}, actual {reader.GetInt64(3)}");
+            }
+        }
+
+        Assert.True(
+            problems.Count == 0,
+            $"mRelease differs from [Release] in '{RepoPaths.AccessDpm20DatabaseFileName}' (cutoff {RepoPaths.Cutoff42ReleaseCode}): "
+            + string.Join(" | ", problems));
     }
 
     /// <summary>
@@ -161,14 +202,14 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Issue #11 retired the former rule "<c>TaxonomyLabel</c> is NULL in all 32 rows": the label,
+    /// Issue #11 retired the former rule "<c>TaxonomyLabel</c> is NULL in every row": the label,
     /// <c>Version</c>, <c>PublicationDate</c>, <c>FromDate</c> and <c>ToDate</c> are now derived
     /// from the <c>ModuleVersion</c> history (<c>docs/mapping-dpm2.md</c>). They are non-NULL TEXT in
-    /// all 32 rows; <c>ExcelTemplate</c> stays NULL (no source). The exact values are checked in
+    /// every row; <c>ExcelTemplate</c> stays NULL (no source). The exact values are checked in
     /// <c>Dpm2042CutoffTaxonomyMetadataTests</c>.
     /// </summary>
     [DataFact]
-    public void MTaxonomy_MetadataColumns_AreNonNullTextInAll32Rows_AndExcelTemplateStaysNull()
+    public void MTaxonomy_MetadataColumns_AreNonNullTextInEveryRow_AndExcelTemplateStaysNull()
     {
         using var command = fixture.GeneratedConnection.CreateCommand();
         command.CommandText = """
@@ -181,28 +222,33 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
 
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
-        Assert.Equal(32L, reader.GetInt64(0));
-        Assert.Equal(32L, reader.GetInt64(1));
-        Assert.Equal(32L, reader.GetInt64(2));
+        var rows = reader.GetInt64(0);
+        ReleasePins.AssertPinned(ReleasePins.Dpm20Cutoff42, "mTaxonomy rows", ReleasePins.Dpm20Cutoff42MTaxonomyRows, rows);
+        Assert.True(reader.GetInt64(1) == rows, $"mTaxonomy rows with all five metadata columns as TEXT: expected {rows} (every row), actual {reader.GetInt64(1)}.");
+        Assert.True(reader.GetInt64(2) == rows, $"mTaxonomy rows with ExcelTemplate NULL: expected {rows} (every row), actual {reader.GetInt64(2)}.");
     }
 
-    /// <summary><c>TechnicalStandard</c>: 18 distinct values for the 32 rows, each one the lowercase code of its framework.</summary>
+    /// <summary><c>TechnicalStandard</c>: one distinct value per framework of <c>mReportingFramework</c>, each one the lowercase code of its framework.</summary>
     [DataFact]
-    public void MTaxonomy_TechnicalStandard_Has18DistinctValues_OneLowercaseCodePerFramework()
+    public void MTaxonomy_TechnicalStandard_HasOneDistinctValuePerFramework_OneLowercaseCodePerFramework()
     {
         var values = ReadStringColumn("SELECT TechnicalStandard FROM mTaxonomy");
 
-        Assert.Equal(32, values.Count);
+        var taxonomyRows = CountRows("mTaxonomy");
+        Assert.True(taxonomyRows == values.Count, $"TechnicalStandard values read from mTaxonomy: expected {taxonomyRows} (mTaxonomy rows), actual {values.Count}.");
         Assert.All(values, v => Assert.NotNull(v));
 
         var distinct = values.Where(v => v is not null).Select(v => v!).Distinct(StringComparer.Ordinal).ToList();
-        Assert.Equal(18, distinct.Count);
+        var frameworkRows = CountRows("mReportingFramework");
+        Assert.True(
+            frameworkRows == distinct.Count,
+            $"Distinct TechnicalStandard values of mTaxonomy: expected {frameworkRows} (mReportingFramework rows), actual {distinct.Count}.");
         Assert.All(distinct, code => Assert.Equal(code, code.ToLowerInvariant()));
     }
 
     /// <summary>
-    /// Against <c>EBA_4.2_Hotfix.db</c>, by CONTAINMENT: the 31 <c>TaxonomyCode</c> values of the
-    /// reference must ALL be among our 32, and NONE only in the reference. Never by equality of
+    /// Against <c>EBA_4.2_Hotfix.db</c>, by CONTAINMENT: the <c>TaxonomyCode</c> values of the
+    /// reference must ALL be among ours, and NONE only in the reference. Never by equality of
     /// censuses -- the extra one is <c>pay 4.1</c>.
     /// </summary>
     [DataFact]
@@ -217,21 +263,24 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
 
         var referenceCodes = ReadReferenceTaxonomyCodes();
 
-        Assert.Equal(31, referenceCodes.Count);
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42, "reference mTaxonomy codes", ReleasePins.Reference42MTaxonomyRows, referenceCodes.Count);
 
         var onlyInReference = referenceCodes.Except(generatedCodes).ToList();
-        Assert.Empty(onlyInReference);
-        Assert.True(referenceCodes.IsSubsetOf(generatedCodes));
+        Assert.True(
+            onlyInReference.Count == 0,
+            $"Reference taxonomy codes missing from the generated mTaxonomy: {string.Join(", ", onlyInReference)}.");
+        Assert.True(referenceCodes.IsSubsetOf(generatedCodes), "The reference taxonomy codes are not a subset of the generated ones.");
     }
 
     /// <summary>
-    /// <c>mReportingFramework</c>: 18, with <c>FrameworkCode</c> and <c>FrameworkLabel</c> identical
-    /// to those of the reference, 18 of 18 -- CRITICAL layer (dictionary by code). The 2 that drop
-    /// out of the 20 in the source are <c>DORA</c> and <c>FINREPCOVID19</c>, named in case they ever
+    /// <c>mReportingFramework</c>: <c>FrameworkCode</c> and <c>FrameworkLabel</c> identical to those
+    /// of the reference, every framework -- CRITICAL layer (dictionary by code). The two that drop
+    /// out of the source are <c>DORA</c> and <c>FINREPCOVID19</c>, named in case they ever
     /// reappear and it has to be reviewed why.
     /// </summary>
     [DataFact]
-    public void MReportingFramework_MatchesReference_18Of18_CodeAndLabel()
+    public void MReportingFramework_MatchesReference_CodeAndLabel()
     {
         RepoPaths.EnsureReferenceDatabaseExists();
 
@@ -240,8 +289,10 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
         using var referenceConnection = OpenReadOnly(RepoPaths.ReferenceDatabasePath);
         var reference = ReadFrameworkCodeAndLabel(referenceConnection);
 
-        Assert.Equal(18, generated.Count);
-        Assert.Equal(18, reference.Count);
+        var frameworkRows = CountRows("mReportingFramework");
+        Assert.True(frameworkRows == generated.Count, $"Frameworks read from the generated mReportingFramework: expected {frameworkRows}, actual {generated.Count}.");
+        ReleasePins.AssertPinned(
+            ReleasePins.Reference42, "reference mReportingFramework rows", ReleasePins.Reference42MReportingFrameworkRows, reference.Count);
 
         var generatedByCode = generated.ToDictionary(r => r.Code, r => r.Label, StringComparer.Ordinal);
         var referenceByCode = reference.ToDictionary(r => r.Code, r => r.Label, StringComparer.Ordinal);
@@ -309,7 +360,16 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
         Assert.Equal("4.2.0.0", reader.GetString(4));
         Assert.Equal("European Banking Authority", reader.GetString(5));
         Assert.Equal("http://www.eba.europa.eu/", reader.GetString(6));
-        Assert.Equal("2025-10-31", reader.GetString(7));
+        var cutoffDate = Convert.ToDateTime(
+                AccessCensus.Rows(
+                    RepoPaths.AccessDpm20DatabasePath,
+                    $"SELECT [Date] FROM [Release] WHERE [Code] = '{RepoPaths.Cutoff42ReleaseCode}'").Single()[0],
+                CultureInfo.InvariantCulture)
+            .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var publicationDate = reader.GetString(7);
+        Assert.True(
+            cutoffDate == publicationDate,
+            $"mTaxonomyPackage.PublicationDate: expected '{cutoffDate}' ([Release].[Date] of release {RepoPaths.Cutoff42ReleaseCode} in '{RepoPaths.AccessDpm20DatabaseFileName}'), actual '{publicationDate}'.");
 
         // EMPTY string, not NULL -- it is the difference that Assert.True(string.IsNullOrEmpty(...))
         // would swallow without noticing.
@@ -407,15 +467,15 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     {
         Assert.Equal(CliRunner.ExitOk, fixture.ExitCode);
 
-        Assert.True(CountRows("mRelease") > 0);
-        Assert.True(CountRows("mReportingFramework") > 0);
-        Assert.True(CountRows("mTaxonomy") > 0);
-        Assert.True(CountRows("mOwner") > 0);
-        Assert.True(CountRows("mOwnerParent") > 0);
-        Assert.True(CountRows("mLanguage") > 0);
-        Assert.True(CountRows("mRewriteURI") > 0);
-        Assert.True(CountRows("mTaxonomyPackage") > 0);
-        Assert.True(CountRows("aDatabaseProperties") > 0);
+        Assert.True(CountRows("mRelease") > 0, "mRelease is empty after --all.");
+        Assert.True(CountRows("mReportingFramework") > 0, "mReportingFramework is empty after --all.");
+        Assert.True(CountRows("mTaxonomy") > 0, "mTaxonomy is empty after --all.");
+        Assert.True(CountRows("mOwner") > 0, "mOwner is empty after --all.");
+        Assert.True(CountRows("mOwnerParent") > 0, "mOwnerParent is empty after --all.");
+        Assert.True(CountRows("mLanguage") > 0, "mLanguage is empty after --all.");
+        Assert.True(CountRows("mRewriteURI") > 0, "mRewriteURI is empty after --all.");
+        Assert.True(CountRows("mTaxonomyPackage") > 0, "mTaxonomyPackage is empty after --all.");
+        Assert.True(CountRows("aDatabaseProperties") > 0, "aDatabaseProperties is empty after --all.");
     }
 
     /// <summary>
