@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Core.Layouts;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -14,22 +15,23 @@ namespace EbaDpm.Converter.Tests.Layouts;
 public sealed class LayoutValueOrdinateLinkingTests(LayoutRepositoryFixture fixture)
 {
     [DataFact]
-    public void RealData_MostLayoutValues_LinkToAnOrdinate_WithExplicitRateAndDenominator()
+    public void RealData_LayoutValues_LinkToAnOrdinate_WithPinnedLinkedAndUnlinkedCounts()
     {
-        // The property, not a snapshot: link RATE, with the whole universe declared. Measured
-        // independently over the 4.2 corpus: 99,398 of 99,636 (99.8 %).
+        // The link, with the whole universe declared: the linked values and the unlinked ones,
+        // pinned to the 4.2 extraction, and the identity that they make up all the values.
         var con = fixture.Repository42WithDictionary;
 
         var total = Scalar(con, "SELECT COUNT(*) FROM LayoutValue");
         var linked = Scalar(con, "SELECT COUNT(*) FROM LayoutValue WHERE OrdinateId IS NOT NULL");
 
-        Assert.True(total > 50000, $"Only {total} LayoutValue rows in the 4.2 corpus: review the extraction.");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "LayoutValue rows", ReleasePins.LayoutExtraction42ValueRows, total);
 
-        var rate = (double)linked / total;
-        Assert.True(rate >= 0.99,
-            $"Only {rate:P1} of LayoutValue rows link to an ordinate ({linked}/{total}); 99.8 % is " +
-            "measured over the real corpus -- a large drop here is a regression of the link, not " +
-            "noise from a new release.");
+        // A change in the linked count is a regression of the link (or a re-measure of the release).
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "LayoutValue rows linked to an ordinate", ReleasePins.LayoutExtraction42LinkedValues, linked);
+        var unlinked = Scalar(con, "SELECT COUNT(*) FROM LayoutValue WHERE OrdinateId IS NULL");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "LayoutValue rows without an ordinate", ReleasePins.LayoutExtraction42UnlinkedValues, unlinked);
+        Assert.True(linked + unlinked == total,
+            $"Linked ({linked}) plus unlinked ({unlinked}) values must equal the LayoutValue rows ({total}).");
     }
 
     [DataFact]
@@ -46,7 +48,7 @@ public sealed class LayoutValueOrdinateLinkingTests(LayoutRepositoryFixture fixt
         var unlinkedValues = Scalar(con, "SELECT COUNT(*) FROM LayoutValue WHERE OrdinateId IS NULL");
         var unparsedUnlinked = Scalar(con, "SELECT COUNT(*) FROM LayoutUnparsed WHERE Kind = 'UnlinkedValue'");
 
-        Assert.True(unlinkedValues > 0, "There is no unlinked LayoutValue to measure: check whether the corpus changed.");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "unlinked LayoutValue rows", ReleasePins.LayoutExtraction42UnlinkedValues, unlinkedValues);
         Assert.Equal(unlinkedValues, unparsedUnlinked);
     }
 
@@ -56,7 +58,7 @@ public sealed class LayoutValueOrdinateLinkingTests(LayoutRepositoryFixture fixt
         // There are two causes for "does not link", with reasons DISTINGUISHABLE by text without a
         // forensic query: Z axis by design (Region=Header, no ordinate to link) vs a real
         // extraction gap (the code exists as a value but not as an ordinate of its axis).
-        // Measured over the 4.2 corpus: the whole residue (238/238) is by design -- 0 gaps.
+        // Over the 4.2 extraction the whole residue is by design -- 0 gaps.
         var con = fixture.Repository42WithDictionary;
 
         using var cmd = con.CreateCommand();
@@ -72,7 +74,7 @@ public sealed class LayoutValueOrdinateLinkingTests(LayoutRepositoryFixture fixt
         var total = byReason.Values.Sum();
         var gaps = total - byDesign;
 
-        Assert.True(total > 0, "There is no UnlinkedValue row to measure.");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "UnlinkedValue rows in LayoutUnparsed", ReleasePins.LayoutExtraction42UnlinkedValues, total);
         Assert.Equal(0L, gaps);
         Assert.Equal(total, byDesign);
     }

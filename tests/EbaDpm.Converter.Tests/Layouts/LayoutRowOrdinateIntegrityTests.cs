@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Core.Layouts;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -23,24 +24,23 @@ public sealed class LayoutRowOrdinateIntegrityTests(LayoutRepositoryFixture fixt
     [DataFact]
     public void RealData_RowOrdinateIdNull_OnlyInSheetsWithoutAnyYOrdinate_ZeroExceptions()
     {
-        // The business property, with an explicit RATE and denominator -- not a snapshot. Over the
-        // real 4.2 corpus: 141,550 of 143,427 LayoutCell rows have RowOrdinateId populated; the
-        // rest (1,877) belong to open-row-axis sheets (such as C_106.00) -- 0 exceptions to that rule.
+        // The business property, with its numerator and denominator pinned to the 4.2 extraction:
+        // the LayoutCell rows with RowOrdinateId populated, of all of them; the rest belong to
+        // open-row-axis sheets (such as C_106.00) -- 0 exceptions to that rule.
         var con = fixture.Repository42WithDictionary;
 
         using var totalCmd = con.CreateCommand();
         totalCmd.CommandText = "SELECT COUNT(*) FROM LayoutCell";
         var total = Convert.ToInt64(totalCmd.ExecuteScalar());
-        Assert.True(total > 100000, $"Only {total} LayoutCell rows in the 4.2 corpus; review the extraction.");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "LayoutCell rows", ReleasePins.LayoutExtraction42CellRows, total);
 
         using var populatedCmd = con.CreateCommand();
         populatedCmd.CommandText = "SELECT COUNT(*) FROM LayoutCell WHERE RowOrdinateId IS NOT NULL";
         var populated = Convert.ToInt64(populatedCmd.ExecuteScalar());
 
-        var populatedRate = (double)populated / total;
-        Assert.True(populatedRate >= 0.95,
-            $"Only {populatedRate:P1} of the LayoutCell rows have RowOrdinateId ({populated}/{total}); " +
-            "check whether a new, uncharacterised cause of an open row axis has appeared.");
+        // A change here means a new, uncharacterised cause of an open row axis may have appeared.
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "LayoutCell rows with RowOrdinateId",
+            ReleasePins.LayoutExtraction42CellsWithRowOrdinate, populated);
 
         // The exact invariant (0 exceptions, not a rate): every LayoutCell with a NULL RowOrdinateId
         // must belong to a sheet that has NO Y ordinate at all -- never to a sheet that does have
@@ -56,7 +56,9 @@ public sealed class LayoutRowOrdinateIntegrityTests(LayoutRepositoryFixture fixt
         var exceptions = Convert.ToInt64(exceptionsCmd.ExecuteScalar());
         var nullCount = total - populated;
         Assert.Equal(0L, exceptions);
-        Assert.True(nullCount > 0, "There is no LayoutCell with a NULL RowOrdinateId to measure: review the extraction.");
+        Assert.True(nullCount == ReleasePins.LayoutExtraction42CellRows - ReleasePins.LayoutExtraction42CellsWithRowOrdinate,
+            $"LayoutCell rows with a NULL RowOrdinateId: expected {ReleasePins.LayoutExtraction42CellRows - ReleasePins.LayoutExtraction42CellsWithRowOrdinate} " +
+            $"(rows minus rows with RowOrdinateId), actual {nullCount} ({ReleasePins.LayoutExtraction42}).");
     }
 
     [DataFact]

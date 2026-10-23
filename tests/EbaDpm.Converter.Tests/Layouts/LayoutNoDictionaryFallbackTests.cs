@@ -1,21 +1,22 @@
+using EbaDpm.Converter.Tests.Infrastructure;
 namespace EbaDpm.Converter.Tests.Layouts;
 
 /// <summary>
-/// Without <c>--dictionary</c>, what happens to the 251 "(dimension) without domain" cells (151
-/// distinct codes)?
+/// Without <c>--dictionary</c>, what happens to the "(dimension) without domain" cells?
 ///
-/// Measured: they are silently lost INSIDE a wrong category. The 251 cells are recorded as
-/// <c>LayoutValue</c> with <c>DomainCode = 'MET'</c> (as if they were the column's metric), mixed
-/// indistinguishably with the 1,055 real MET values. The only warning is ONE global CLI line ("open
-/// axis key dimensions may be undetected"); there is no per-cell or per-row mark that would allow,
-/// by querying only the resulting SQLite repository, to later tell which of those 1,206 "MET" rows
-/// are real and which are mislabelled dimensions.
+/// Measured on the 4.2 layouts (<see cref="ReleasePins.LayoutExtraction42NoDictionary"/>): they are
+/// silently lost INSIDE a wrong category. The cells are recorded as <c>LayoutValue</c> with
+/// <c>DomainCode = 'MET'</c> (as if they were the column's metric), mixed indistinguishably with
+/// the real MET values. The only warning is ONE global CLI line ("open axis key dimensions may be
+/// undetected"); there is no per-cell or per-row mark that would allow, by querying only the
+/// resulting SQLite repository, to later tell which of the "MET" rows are real and which are
+/// mislabelled dimensions.
 /// </summary>
 [Collection("LayoutsRealData")]
 public sealed class LayoutNoDictionaryFallbackTests(LayoutRepositoryFixture fixture)
 {
     [DataFact]
-    public void WithoutDictionary_The251AmbiguousCells_AreSilentlyMisfiledAsMetricValues()
+    public void WithoutDictionary_TheAmbiguousCells_AreSilentlyMisfiledAsMetricValues()
     {
         var withDict = fixture.Repository42WithDictionary;
         var noDict = fixture.Repository42NoDictionary;
@@ -23,10 +24,11 @@ public sealed class LayoutNoDictionaryFallbackTests(LayoutRepositoryFixture fixt
         var metMembersWithDict = QueryDistinctMetMembers(withDict);
         var metMembersNoDict = QueryDistinctMetMembers(noDict);
 
-        // Without a dictionary 151 extra "MET" codes appear -- exactly those that, WITH a
+        // Without a dictionary extra "MET" codes appear -- exactly those that, WITH a
         // dictionary, are correctly resolved as dimensions.
         var onlyWithoutDictionary = metMembersNoDict.Except(metMembersWithDict).ToHashSet();
-        Assert.Equal(151, onlyWithoutDictionary.Count);
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42NoDictionary, "MET codes that appear only without a dictionary",
+            ReleasePins.LayoutExtraction42NoDictionaryExtraMetCodes, onlyWithoutDictionary.Count);
 
         using var cmd = noDict.CreateCommand();
         var placeholders = string.Join(",", onlyWithoutDictionary.Select((_, i) => $"$p{i}"));
@@ -38,9 +40,10 @@ public sealed class LayoutNoDictionaryFallbackTests(LayoutRepositoryFixture fixt
             i++;
         }
 
-        Assert.Equal(251L, Convert.ToInt64(cmd.ExecuteScalar()));
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42NoDictionary, "LayoutValue rows misfiled as MET",
+            ReleasePins.LayoutExtraction42NoDictionaryExtraMetValues, Convert.ToInt64(cmd.ExecuteScalar()));
 
-        // And there is NO per-cell mark that distinguishes these 251 rows from the rest of the real
+        // And there is NO per-cell mark that distinguishes these rows from the rest of the real
         // MET rows: the repository schema (LayoutValue) has no column for it.
         using var schemaCheck = noDict.CreateCommand();
         schemaCheck.CommandText = "PRAGMA table_info(LayoutValue)";

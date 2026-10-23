@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Core.Layouts;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -18,7 +19,7 @@ namespace EbaDpm.Converter.Tests.Layouts;
 public sealed class LayoutDimensionSingleAxisTests(LayoutRepositoryFixture fixture)
 {
     [DataFact]
-    public void RealData_NoSheetDeclaresTheSameDimensionOnTwoDifferentAxes_ZeroOf10147()
+    public void RealData_NoSheetDeclaresTheSameDimensionOnTwoDifferentAxes_Zero()
     {
         var con = fixture.Repository42WithDictionary;
 
@@ -44,7 +45,7 @@ public sealed class LayoutDimensionSingleAxisTests(LayoutRepositoryFixture fixtu
             axes.Add(reader.GetString(2));
         }
 
-        Assert.True(axesByPair.Count > 5000, $"Only {axesByPair.Count} (sheet, dimension) pairs: review the extraction.");
+        ReleasePins.AssertPinned(ReleasePins.LayoutExtraction42, "(sheet, dimension) pairs examined", ReleasePins.LayoutExtraction42SheetDimensionPairs, axesByPair.Count);
 
         var multiAxis = axesByPair.Where(kv => kv.Value.Count > 1).ToList();
         Assert.True(multiAxis.Count == 0,
@@ -59,7 +60,7 @@ public sealed class LayoutDimensionSingleAxisTests(LayoutRepositoryFixture fixtu
         // dimension ("qLHL") is declared once in the grid (Region=Rows -> X axis) and once in the
         // header-paired-in-the-grid (Region=Columns -> Y axis). The query of the property above,
         // applied ONLY to this fabricated sheet, must find 1 pair on more than one axis -- not 0:
-        // if it found 0, the real property (0 of 10,147) would be indistinguishable from a query
+        // if it found 0, the real property (0 pairs on two axes) would be indistinguishable from a query
         // that never looks at anything.
         var tempDir = Path.Join(Path.GetTempPath(), $"EbaDpm.SingleAxisGate_{Environment.ProcessId}_{Guid.NewGuid():N}");
         try
