@@ -85,7 +85,7 @@ public sealed class Dpm20HierarchyNodeLoaderSyntheticTests : IDisposable
             nodes.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1)));
         }
 
-        Assert.Equal([("a", (string?)"Alpha item")], nodes);
+        Assert.Equal([("a", "Alpha item")], nodes);
     }
 
     private static void Execute(SqliteConnection connection, string sql)

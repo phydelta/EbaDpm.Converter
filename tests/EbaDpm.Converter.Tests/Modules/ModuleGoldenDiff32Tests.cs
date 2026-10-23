@@ -256,14 +256,14 @@ public sealed class ModuleGoldenDiff32Tests
         {
             Assert.True(generated.TryGetValue(key, out var genValue), $"{key.Taxonomy}/{key.Module} missing from the generated output");
 
-            var isDeclaredDivergence = RegisteredXbrlSchemaRefDivergences.ContainsKey(DivergenceKey(key));
+            var isDeclaredDivergence = RegisteredXbrlSchemaRefDivergences.TryGetValue(DivergenceKey(key), out var declaredReason);
             var literalMatch = string.Equals(genValue, refValue, StringComparison.Ordinal);
 
             if (isDeclaredDivergence)
             {
                 if (literalMatch)
                 {
-                    unexpectedMatches.Add($"{key.Taxonomy}/{key.Module}: declared divergence {RegisteredXbrlSchemaRefDivergences[DivergenceKey(key)]} but it now matches ('{genValue}'): stale exception");
+                    unexpectedMatches.Add($"{key.Taxonomy}/{key.Module}: declared divergence {declaredReason} but it now matches ('{genValue}'): stale exception");
                 }
                 else
                 {
