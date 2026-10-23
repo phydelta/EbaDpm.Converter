@@ -294,6 +294,49 @@ internal static class ReleasePins
     /// <summary>Cells compared by the <c>BusinessCode</c> reconstruction over <c>--all</c> of the 4.1 database.</summary>
     public const int Dpm10All41CellsCompared = 904204;
 
+    /// <summary>Tables of <c>mTable</c> with several open Y axes over <c>--all</c> (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41TablesWithSeveralOpenYAxes = 188;
+
+    /// <summary>Tables of <c>mTable</c> without a closed Y axis over <c>--all</c> (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41TablesWithoutClosedYAxis = 441;
+
+    /// <summary><c>mConcept</c> rows with <c>ConceptType</c> 'Table' over <c>--all</c> (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41TableConcepts = 2561;
+
+    /// <summary><c>mConcept</c> rows with <c>ConceptType</c> 'TemplateOrTable' over <c>--all</c> (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41TemplateOrTableConcepts = 1347;
+
+    /// <summary><c>COUNT(1)</c> of <c>mConcept</c> over <c>--all</c> (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41MConceptRows = 121571;
+
+    /// <summary><c>mHierarchyNode</c> rows with a NULL <c>ConceptID</c> over <c>--all</c> (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41HierarchyNodeNullConceptIdRows = 192;
+
+    /// <summary>Groups of shared <c>ConceptID</c> in <c>mTemplateOrTable</c> over <c>--all</c> (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41TemplateOrTableSharedConceptGroups = 1692;
+
+    /// <summary>Rows of <c>mTemplateOrTable</c> in those shared <c>ConceptID</c> groups (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41TemplateOrTableRowsInSharedGroups = 9200;
+
+    /// <summary>Shared <c>ConceptID</c> groups made only of L1/L2 (non-<c>BusinessTable</c>) rows (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41Level12SharedConceptGroups = 549;
+
+    /// <summary>Rows in the L1/L2 shared <c>ConceptID</c> groups (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41Level12RowsInSharedGroups = 4482;
+
+    /// <summary><c>BusinessTable</c> rows in shared <c>ConceptID</c> groups (<see cref="Dpm10All41"/>).</summary>
+    public const int Dpm10All41BusinessTableRowsInSharedGroups = 4718;
+
+    /// <summary>
+    /// The DPM 1.0 dictionary of release 4.1 as the Dictionary fixture converts it. The dictionary is
+    /// not filtered by taxonomy, so the figures hold whichever taxonomy the fixture selects.
+    /// </summary>
+    public static readonly ReleasePin Dpm10Dictionary41 = new(
+        "4.1", Schema.RepoPaths.AccessDatabaseFileName + " (dictionary, not filtered by taxonomy)", "2026-10-23");
+
+    /// <summary>Hierarchy nodes whose <c>Path</c>, <c>Level</c> or <c>ParentMemberID</c> the dictionary normalisation changes (<see cref="Dpm10Dictionary41"/>).</summary>
+    public const int Dpm10Dictionary41NormalisedNodes = 202;
+
     /// <summary><c>SkippedDefaultMemberResets</c> of <c>AxisAndCellLoader.Result</c> (no table holds it).</summary>
     public const int Dpm10Selected8SkippedDefaultMemberResets = 0;
 

@@ -1,5 +1,6 @@
 using System.Globalization;
 using EbaDpm.Converter.Core.Mapping;
+using EbaDpm.Converter.Tests.Infrastructure;
 using Microsoft.Data.Sqlite;
 
 namespace EbaDpm.Converter.Tests.Dictionary;
@@ -38,7 +39,7 @@ public sealed class IntegrityTests
     // mMember: -1 for member 999 (x999), which is consumed without being emitted, +1 for the
     // "Open" 9999 sentinel: the net is 0, although the set of IDs changes.
     [InlineData("mMember", "Member", 0)]
-    // mDimension: EXACTLY 864 = 864 (MET is not synthesised, the Access ATY dimension is
+    // mDimension: EXACTLY the Access count (MET is not synthesised, the Access ATY dimension is
     // RENAMED -same row, same DimensionID- so it adds nothing to the census).
     [InlineData("mDimension", "Dimension", 0)]
     [InlineData("mMetric", "Metric", 0)]
@@ -111,7 +112,7 @@ public sealed class IntegrityTests
     // 3. Hierarchy trees: no cycles, coherent Path/Level/ParentMemberID
     //
     // DictionaryLoader does NOT copy Path/Level/ParentMemberID verbatim from the Access. The
-    // Access has 202 nodes out of 18,390 (7 hierarchies) where those three columns contradict
+    // Access has nodes (a pinned census, see the control figure below) where those three columns contradict
     // each other -and none is reliable in every case-, so the converter normalises: Path wins (it
     // is rebuilt from ParentMemberID only if it is malformed, that is, if it does not end in the
     // MemberID itself), and Level/ParentMemberID are ALWAYS DERIVED from the final Path (Level =
@@ -351,9 +352,10 @@ public sealed class IntegrityTests
     }
 
     /// <summary>
-    /// Control figure of the normalisation: it must touch exactly 202 of the 18,390 nodes of the
-    /// Access, spread over the 7 hierarchies 39178, 39179, 39180, 39181, 39183, 39186 and 47002.
-    /// A node counts as "touched" if its generated <c>Path</c>, <c>Level</c> or
+    /// Control figure of the normalisation: the number of nodes it touches is pinned
+    /// (<see cref="ReleasePins.Dpm10Dictionary41"/>) and the touched hierarchies are named by
+    /// business key (<c>DomainCode</c>, <c>HierarchyCode</c>), never by surrogate
+    /// <c>HierarchyID</c>. A node counts as "touched" if its generated <c>Path</c>, <c>Level</c> or
     /// <c>ParentMemberID</c> differ from those in the Access, AFTER applying the MemberID
     /// renumbering to it (<see cref="DictionaryFixture.DictionaryResult"/>.<c>MemberIdRenumbering</c>):
     /// the only affected occupant (<c>C27_12</c>, Access <c>MemberID</c> 9999) changes ID in the
@@ -363,7 +365,7 @@ public sealed class IntegrityTests
     /// rule must be reviewed.
     /// </summary>
     [DataFact]
-    public void HierarchyTree_Normalization_TouchesExactly202NodesInSevenHierarchies()
+    public void HierarchyTree_Normalization_TouchesThePinnedNodesInTheNamedHierarchies()
     {
         var renumbering = _fixture.DictionaryResult.MemberIdRenumbering;
 
@@ -413,17 +415,31 @@ public sealed class IntegrityTests
             }
         }
 
-        var expectedHierarchyIds = new SortedSet<int> { 39178, 39179, 39180, 39181, 39183, 39186, 47002 };
+        var expectedHierarchyKeys = new SortedSet<string>(StringComparer.Ordinal)
+        {
+            "GA/GA5_6", "qAE/QAE0", "qAE/QAE1", "qEC/QEC2", "qEC/QEC3", "AP/AP29_QAP31", "CU/CU4_CU4_REL_4",
+        };
+
+        // Business key (DomainCode/HierarchyCode) of each touched hierarchy, resolved through the output.
+        var keyByHierarchyId = QueryHelpers.Rows(
+                _fixture.GeneratedConnection,
+                """
+                SELECT h."HierarchyID", d."DomainCode", h."HierarchyCode"
+                FROM "mHierarchy" h JOIN "mDomain" d ON d."DomainID" = h."DomainID"
+                """,
+                3)
+            .ToDictionary(r => int.Parse(r[0]!, CultureInfo.InvariantCulture), r => $"{r[1]}/{r[2]}");
+        var touchedHierarchyKeys = new SortedSet<string>(
+            touchedHierarchyIds.Select(id => keyByHierarchyId.TryGetValue(id, out var key) ? key : $"<no hierarchy with HierarchyID {id}>"),
+            StringComparer.Ordinal);
+
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm10Dictionary41, "nodes touched by the hierarchy normalisation", ReleasePins.Dpm10Dictionary41NormalisedNodes, touchedCount);
 
         Assert.True(
-            touchedCount == 202,
-            $"The normalisation touches {touchedCount} nodes (of {generatedRows.Count}); exactly " +
-            $"202 were expected. Affected HierarchyID: [{string.Join(",", touchedHierarchyIds)}].");
-
-        Assert.True(
-            touchedHierarchyIds.SetEquals(expectedHierarchyIds),
-            $"Hierarchies touched by the normalisation: [{string.Join(",", touchedHierarchyIds)}] " +
-            $"versus the expected [{string.Join(",", expectedHierarchyIds)}].");
+            touchedHierarchyKeys.SetEquals(expectedHierarchyKeys),
+            $"Hierarchies (DomainCode/HierarchyCode) touched by the normalisation: [{string.Join(", ", touchedHierarchyKeys)}] " +
+            $"versus the expected [{string.Join(", ", expectedHierarchyKeys)}] ({ReleasePins.Dpm10Dictionary41}).");
     }
 
     [DataFact]

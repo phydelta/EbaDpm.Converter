@@ -1,13 +1,14 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
 
 namespace EbaDpm.Converter.Tests.All;
 
 /// <summary>
 /// Concept invariants A-CPT-01/02/04/05, A-DIC-14 and A-INT-07, plus the coverage of the
 /// mConcept/mConceptTranslation/JsonBlob rules. These defects stayed hidden because the rest of
-/// the suite only converted 1 or 8 of the 128 taxonomies.
+/// the suite only converted a few taxonomies.
 ///
-/// Figures pinned for <c>--all</c> (128 taxonomies), CRITICAL layer unless stated otherwise.
+/// Figures pinned for <c>--all</c> (<see cref="ReleasePins.Dpm10All41"/>), CRITICAL layer unless stated otherwise.
 /// </summary>
 [Collection("All")]
 [Trait("Tier", "RealData")]
@@ -54,39 +55,35 @@ public sealed class ConceptVocabularyTests
     }
 
     /// <summary>
-    /// Exact census measured over --all: 0 <c>TableVersion</c>/<c>TableGroup</c>/<c>Template</c>
-    /// (they must have been translated), exactly 2,561 <c>Table</c> and 1,347 <c>TemplateOrTable</c>.
+    /// Census of <c>mConcept</c> by type over <c>--all</c>: no <c>TableVersion</c>/<c>TableGroup</c>/
+    /// <c>Template</c> (they must have been translated); the <c>Table</c> and <c>TemplateOrTable</c>
+    /// populations are pinned (<see cref="ReleasePins.Dpm10All41"/>).
     /// </summary>
     [DataTheory]
     [InlineData("TableVersion", 0)]
     [InlineData("TableGroup", 0)]
     [InlineData("Template", 0)]
-    [InlineData("Table", 2561)]
-    [InlineData("TemplateOrTable", 1347)]
-    public void ConceptType_HasTheExactCensus_MeasuredOnAll(string conceptType, long expected)
+    [InlineData("Table", ReleasePins.Dpm10All41TableConcepts)]
+    [InlineData("TemplateOrTable", ReleasePins.Dpm10All41TemplateOrTableConcepts)]
+    public void ConceptType_HasTheExactCensus(string conceptType, long expected)
     {
         var actual = QueryHelpers.Scalar(
             _fixture.GeneratedConnection, $"SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = '{conceptType}'");
 
-        Assert.True(
-            actual == expected,
-            $"mConcept with ConceptType='{conceptType}': {actual} rows ({expected} expected, measured over --all).");
+        ReleasePins.AssertPinned(ReleasePins.Dpm10All41, $"mConcept rows with ConceptType='{conceptType}'", expected, actual);
     }
 
     /// <summary>
-    /// The 950 concepts of the <c>Access.Table</c> entity are NOT emitted (that entity produces no
-    /// destination row, so its concept would describe nothing). The total of <c>mConcept</c>
-    /// drops from 122,521 to exactly 121,571.
+    /// The concepts of the <c>Access.Table</c> entity are NOT emitted (that entity produces no
+    /// destination row, so its concept would describe nothing); the total of <c>mConcept</c> is
+    /// pinned after dropping them.
     /// </summary>
     [DataFact]
-    public void MConcept_TotalRowCount_Is121571_AfterDroppingTheAccessTableEntity()
+    public void MConcept_TotalRowCount_IsPinned_AfterDroppingTheAccessTableEntity()
     {
         var total = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mConcept\"");
 
-        Assert.True(
-            total == 121_571,
-            $"mConcept has {total} rows (exactly 121,571 expected over --all: " +
-            "122,521 before dropping the concepts of the Access.Table entity, minus those 950).");
+        ReleasePins.AssertPinned(ReleasePins.Dpm10All41, "mConcept total row count", ReleasePins.Dpm10All41MConceptRows, total);
     }
 
     /// <summary>
@@ -180,18 +177,17 @@ public sealed class ConceptVocabularyTests
             $"NULL: {accessHierarchies.Count(h => h.HierarchyLabel is null)}.");
     }
 
-    /// <summary>Global census: only 3 concepts are left without a 'label' translation (it used to be 109,552 before the fix).</summary>
+    /// <summary>Global census: only 3 concepts (the named hierarchies above) are left without a 'label' translation.</summary>
     [DataFact]
     public void ConceptTranslation_LabelCount_EqualsConceptCountMinusThree()
     {
         var translationRows = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mConceptTranslation\" WHERE \"Role\" = 'label'");
         var conceptRows = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mConcept\"");
 
-        // 121,571 concepts, 3 without a label => exactly 121,568 'label' translations.
         Assert.True(
             translationRows == conceptRows - 3,
             $"mConceptTranslation with Role='label': {translationRows} rows versus mConcept: {conceptRows} " +
-            "(exactly concepts - 3 expected).");
+            "(exactly concepts - 3 expected: the three hierarchies without a label).");
     }
 
     // ------------------------------------------------------------------
@@ -250,7 +246,6 @@ public sealed class ConceptVocabularyTests
         Assert.True(nullCount == 0, $"mTable.JsonBlob NULL: {nullCount} rows (0 expected).");
         Assert.True(
             zeroLengthCount == totalCount,
-            $"mTable.JsonBlob of length 0: {zeroLengthCount} of {totalCount} rows (ALL expected). " +
-            "2,561 expected over --all.");
+            $"mTable.JsonBlob of length 0: {zeroLengthCount} of {totalCount} rows (ALL expected).");
     }
 }

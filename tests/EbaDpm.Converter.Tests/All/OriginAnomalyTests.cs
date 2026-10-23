@@ -1,4 +1,6 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
+using EbaDpm.Converter.Tests.Schema;
 
 namespace EbaDpm.Converter.Tests.All;
 
@@ -7,8 +9,9 @@ namespace EbaDpm.Converter.Tests.All;
 /// destination format and that are faithfully reproduced (verbatim). They are not defects of a
 /// reference database (there is no evidence that the EBA is wrong) nor declared divergences
 /// (there is no comparison to make): the problem lives INSIDE the source, and the census is
-/// exact and must be pinned. If the census changes tomorrow, the test fails on its own -- this
-/// is what replaces a nominal exception list for this kind of anomaly.
+/// derived from the source with an independent OLEDB query (<see cref="AccessCensus"/>). If the
+/// census changes tomorrow, the test fails on its own -- this is what replaces a nominal
+/// exception list for this kind of anomaly.
 /// </summary>
 [Collection("All")]
 [Trait("Tier", "RealData")]
@@ -16,35 +19,48 @@ public sealed class OriginAnomalyTests
 {
     private readonly AllFixture _fixture;
 
+    private const string MembersWithDuplicatedXbrlCode =
+        "SELECT [MemberXbrlCode] FROM [Member] WHERE [MemberXbrlCode] IS NOT NULL GROUP BY [MemberXbrlCode] HAVING COUNT(1) > 1";
+
+    /// <summary>Distinct <c>MemberXbrlCode</c> values carried by more than one Access member, counted by an independent OLEDB query.</summary>
+    private static long AccessDuplicatedMemberXbrlCodes()
+        => AccessCensus.Scalar(RepoPaths.AccessDatabasePath, $"SELECT COUNT(1) FROM ({MembersWithDuplicatedXbrlCode})");
+
     public OriginAnomalyTests(AllFixture fixture)
     {
         _fixture = fixture;
     }
 
     /// <summary>
-    /// 50 members of the Access carry the namespace prefix INSIDE the <c>MemberCode</c> (e.g.
-    /// <c>TI:x102</c>), measured directly on <c>Access.Member</c>, without going through the
-    /// conversion.
+    /// The members of the Access that carry the namespace prefix INSIDE the <c>MemberCode</c> (e.g.
+    /// <c>TI:x102</c>), counted directly on <c>Access.Member</c> with an independent OLEDB query
+    /// (<see cref="AccessCensus"/>) and compared with what the reader under test returns.
     /// </summary>
     [DataFact]
-    public void Access_HasExactly50MembersWithColonInMemberCode()
+    public void Access_MembersWithColonInMemberCode_AreTheOnesTheIndependentCensusCounts()
     {
+        var expected = AccessCensus.Scalar(
+            RepoPaths.AccessDatabasePath, "SELECT COUNT(1) FROM [Member] WHERE InStr([MemberCode], ':') > 0");
         var members = _fixture.AccessReader.ReadMembers().ToList();
         var withColon = members.Where(m => m.MemberCode.Contains(':')).ToList();
 
+        Assert.True(expected > 0, "No Access.Member has ':' in MemberCode: the anomaly this class pins is gone, review the class.");
         Assert.True(
-            withColon.Count == 50,
-            $"Access.Member with ':' in MemberCode: {withColon.Count} (exactly 50 expected). " +
+            withColon.Count == expected,
+            $"Access.Member with ':' in MemberCode: expected {expected} (derived from [Member] of '{RepoPaths.AccessDatabaseFileName}'), " +
+            $"actual {withColon.Count} through the reader. " +
             $"Examples: {string.Join(", ", withColon.Take(10).Select(m => $"MemberID={m.MemberId} MemberCode={m.MemberCode}"))}");
     }
 
     /// <summary>
-    /// Measured consequence of the above -- 49 duplicated <c>MemberXbrlCode</c> values in the
-    /// Access, always between two distinct domains.
+    /// Consequence of the above -- the <c>MemberXbrlCode</c> values duplicated in the Access, always
+    /// between two distinct domains. The count is derived with an independent OLEDB query and
+    /// compared with the reader under test.
     /// </summary>
     [DataFact]
-    public void Access_HasExactly49DuplicatedMemberXbrlCodes()
+    public void Access_DuplicatedMemberXbrlCodes_AreTheOnesTheIndependentCensusCounts_AlwaysBetweenDistinctDomains()
     {
+        var expected = AccessDuplicatedMemberXbrlCodes();
         var members = _fixture.AccessReader.ReadMembers().ToList();
         var duplicatedCodes = members
             .Where(m => m.MemberXbrlCode is not null)
@@ -52,10 +68,11 @@ public sealed class OriginAnomalyTests
             .Where(g => g.Count() > 1)
             .ToList();
 
+        Assert.True(expected > 0, "No Access.Member has a duplicated MemberXbrlCode: the anomaly this class pins is gone, review the class.");
         Assert.True(
-            duplicatedCodes.Count == 49,
-            $"Duplicated Access.Member.MemberXbrlCode: {duplicatedCodes.Count} codes (exactly 49 " +
-            $"expected). Examples: {string.Join(", ", duplicatedCodes.Take(10).Select(g => g.Key))}");
+            duplicatedCodes.Count == expected,
+            $"Duplicated Access.Member.MemberXbrlCode: expected {expected} codes (derived from [Member] of '{RepoPaths.AccessDatabaseFileName}'), " +
+            $"actual {duplicatedCodes.Count} through the reader. Examples: {string.Join(", ", duplicatedCodes.Take(10).Select(g => g.Key))}");
 
         foreach (var group in duplicatedCodes)
         {
@@ -69,12 +86,13 @@ public sealed class OriginAnomalyTests
 
     /// <summary>
     /// Effect on the output: the census of the generated database must reproduce that of the
-    /// Access, no more and no less, because the 50 members are emitted verbatim and not
-    /// discarded (the only real alternative was to lose source data).
+    /// Access (derived with an independent OLEDB query), no more and no less, because the members
+    /// are emitted verbatim and not discarded (the only real alternative was to lose source data).
     /// </summary>
     [DataFact]
-    public void Generated_HasExactly49DuplicatedMemberXbrlCodes_AndTheUnicityAssertionIsInformativeOnly()
+    public void Generated_DuplicatedMemberXbrlCodes_ReproduceTheAccessCensus_AndTheUnicityAssertionIsInformativeOnly()
     {
+        var expected = AccessDuplicatedMemberXbrlCodes();
         var rows = QueryHelpers.Rows(
             _fixture.GeneratedConnection,
             """
@@ -86,10 +104,10 @@ public sealed class OriginAnomalyTests
             2);
 
         Assert.True(
-            rows.Count == 49,
-            $"Duplicated mMember.MemberXBRLCode in the generated output: {rows.Count} (exactly 49 expected " +
-            $"- uniqueness drops to the informative layer BUT with the census pinned). Examples: " +
-            $"{string.Join(", ", rows.Take(10).Select(r => r[0]))}");
+            rows.Count == expected,
+            $"Duplicated mMember.MemberXBRLCode in the generated output: expected {expected} (derived from [Member] of " +
+            $"'{RepoPaths.AccessDatabaseFileName}' - uniqueness drops to the informative layer BUT with the census equal to the source), " +
+            $"actual {rows.Count}. Examples: {string.Join(", ", rows.Take(10).Select(r => r[0]))}");
     }
 
     /// <summary>

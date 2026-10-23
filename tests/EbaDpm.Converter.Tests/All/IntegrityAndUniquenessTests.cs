@@ -73,7 +73,7 @@ public sealed class IntegrityAndUniquenessTests
     public void DimensionXbrlCode_IsUnique()
     {
         // We do not emit the ad-hoc versioning of 4.x, so there cannot be two rows with the same
-        // DimensionXBRLCode (unlike release 4.0, which does duplicate: 1,319 rows/831 codes).
+        // DimensionXBRLCode (unlike release 4.0, which does duplicate).
         AssertNoDuplicateGroups("mDimension", ["DimensionXBRLCode"], "A-UNQ-02", whereNotNull: "DimensionXBRLCode");
     }
 
@@ -100,7 +100,7 @@ public sealed class IntegrityAndUniquenessTests
     /// <summary>
     /// A-UNQ-07: <c>mTableCell.BusinessCode</c> is unique WITHIN its <c>TableID</c>. NOT
     /// globally: the same cell code repeats between tables reused by different taxonomies
-    /// (286,526 globally duplicated groups when measured, and that is correct).
+    /// (globally duplicated groups exist, and that is correct).
     /// </summary>
     [DataFact]
     public void BusinessCode_IsUniquePerTable_ButNotGlobally()
@@ -162,12 +162,12 @@ public sealed class IntegrityAndUniquenessTests
             """
             SELECT COUNT(*) FROM (SELECT "ModuleCode" FROM "mModule" GROUP BY "ModuleCode" HAVING COUNT(*) > 1)
             """);
-        Assert.True(globalDuplicates > 0, "Global ModuleCode has no duplicates: unexpected (106 distinct codes repeated over 415 rows, measured).");
+        Assert.True(globalDuplicates > 0, "Global ModuleCode has no duplicates: unexpected: modules are reused between taxonomies.");
     }
 
     /// <summary>
-    /// A-UNQ-12: ANTI-INVARIANT. <c>mTable.TableCode</c> is NOT unique (681 repeated codes,
-    /// measured). A test requiring uniqueness would fail by design; this test records positively
+    /// A-UNQ-12: ANTI-INVARIANT. <c>mTable.TableCode</c> is NOT unique (repeated codes exist).
+    /// A test requiring uniqueness would fail by design; this test records positively
     /// that the reuse still exists, without pinning a threshold.
     /// </summary>
     [DataFact]

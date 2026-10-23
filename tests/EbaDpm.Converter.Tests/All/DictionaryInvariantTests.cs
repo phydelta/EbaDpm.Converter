@@ -1,11 +1,13 @@
 using EbaDpm.Converter.Tests.Dictionary;
+using EbaDpm.Converter.Tests.Infrastructure;
+using EbaDpm.Converter.Tests.Schema;
 
 namespace EbaDpm.Converter.Tests.All;
 
 /// <summary>
 /// Dictionary invariants A-DIC-02/03/04/09/10/11/13/15 and A-SEN-06, over <c>--all</c>. The
 /// dictionary is not filtered by taxonomy, so these figures must match those measured over the
-/// COMPLETE Access database, regardless of whether the selection is 1 taxonomy or all 128.
+/// COMPLETE Access database, regardless of the taxonomy selection.
 /// </summary>
 [Collection("All")]
 [Trait("Tier", "RealData")]
@@ -83,7 +85,7 @@ public sealed class DictionaryInvariantTests
     /// <c>NULL</c> -- not true -- when either side is <c>NULL</c>: a row with
     /// <c>IsTypedDimension IS NULL</c> does NOT fall into the <c>WHERE</c> and is therefore NOT
     /// counted as a mismatch. That is exactly the defect there was once: <c>IsTypedDimension</c>
-    /// was <c>NULL</c> in all 864 rows and this test stayed green. The test is kept as it was
+    /// was <c>NULL</c> in every row and this test stayed green. The test is kept as it was
     /// (historical) and <see cref="DimensionIsTyped_IsNeverNull"/> is added next to it, with
     /// <c>IS NOT</c> (NULL-safe), so that a future regression cannot slip through the same gap.
     /// </summary>
@@ -104,15 +106,20 @@ public sealed class DictionaryInvariantTests
     /// <summary>
     /// Independent and NULL-safe measurement (see the note on the sibling test
     /// <see cref="DimensionIsTyped_AlwaysMatchesItsDomainIsTyped"/>, whose <c>&lt;&gt;</c> did not
-    /// detect NULL). Two checks: (1) <c>IsTypedDimension</c> is not <c>NULL</c> in ANY of the 864
-    /// rows of <c>mDimension</c> over <c>--all</c>; (2) using <c>IS NOT</c> (SQLite's NULL-safe
-    /// comparison) it matches the <c>IsTypedDomain</c> of its domain in 864/864.
+    /// detect NULL). Two checks: (1) <c>IsTypedDimension</c> is not <c>NULL</c> in ANY row of
+    /// <c>mDimension</c> over <c>--all</c>, whose row count is the <c>Dimension</c> row count of the
+    /// Access (<c>mDimension</c> is one row per Access dimension, see docs/mapping-dpm1.md);
+    /// (2) using <c>IS NOT</c> (SQLite's NULL-safe comparison) it matches the <c>IsTypedDomain</c>
+    /// of its domain in every row.
     /// </summary>
     [DataFact]
     public void DimensionIsTyped_IsNeverNull()
     {
         var totalDimensions = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mDimension\"");
-        Assert.True(totalDimensions == 864, $"mDimension has {totalDimensions} rows (exactly 864 expected, measured over --all).");
+        var accessDimensions = AccessCensus.Count(RepoPaths.AccessDatabasePath, "Dimension");
+        Assert.True(
+            totalDimensions == accessDimensions,
+            $"mDimension rows: expected {accessDimensions} (derived from [Dimension] of '{RepoPaths.AccessDatabaseFileName}'), actual {totalDimensions}.");
 
         var nullCount = QueryHelpers.Scalar(_fixture.GeneratedConnection, "SELECT COUNT(*) FROM \"mDimension\" WHERE \"IsTypedDimension\" IS NULL");
         Assert.True(nullCount == 0, $"{nullCount} of {totalDimensions} mDimension rows with a NULL IsTypedDimension (0 expected).");
@@ -127,11 +134,11 @@ public sealed class DictionaryInvariantTests
         Assert.True(
             mismatchesNullSafe == 0,
             $"{mismatchesNullSafe} of {totalDimensions} dimensions whose IsTypedDimension (NULL-safe comparison, " +
-            "IS NOT) differs from the IsTypedDomain of their domain (864/864 matching expected).");
+            "IS NOT) differs from the IsTypedDomain of their domain (all of them expected to match).");
     }
 
     /// <summary>
-    /// Measured row by row over <c>--all</c> (128 taxonomies), without sampling, on OUR output:
+    /// Measured row by row over <c>--all</c>, without sampling, on OUR output:
     /// <c>mDomain.DomainXBRLCode</c> is <c>eba_exp:</c> + <c>DomainCode</c> if the domain is NOT
     /// typed, or <c>eba_typ:</c> + <c>DomainCode</c> if it is -- with EXACTLY two named
     /// exceptions: the <c>MET</c> domain (fixed business code <c>"MET"</c> with no prefix) and the
