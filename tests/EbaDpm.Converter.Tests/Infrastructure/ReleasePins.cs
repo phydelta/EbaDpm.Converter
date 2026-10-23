@@ -27,6 +27,28 @@ internal static class ReleasePins
         Schema.RepoPaths.Cutoff42ReleaseCode, Schema.RepoPaths.AccessDpm20DatabaseFileName, "2026-10-22");
 
     /// <summary>
+    /// The 4.2 Annotated Table Layouts (<see cref="Schema.RepoPaths.TableLayouts42DirectoryName"/>)
+    /// compared by plane C with the <see cref="Dpm20Cutoff42"/> output. The figures of the plane C
+    /// checks (units examined) depend on the layouts as much as on the output.
+    /// </summary>
+    public static readonly ReleasePin Layouts42 = new(
+        Schema.RepoPaths.Cutoff42ReleaseCode,
+        $"{Schema.RepoPaths.AccessDpm20DatabaseFileName} output against the layouts in '{Schema.RepoPaths.TableLayouts42DirectoryName}'",
+        "2026-10-23");
+
+    /// <summary>The DPM 2.0 database of the 4.2.1 publication read with its natural cutoff, 4.2.1.</summary>
+    public static readonly ReleasePin Dpm20Natural421 = new(
+        "4.2.1", Schema.RepoPaths.AccessDpm20DatabaseFileName, "2026-10-23");
+
+    /// <summary>The DPM 2.0 database of the 4.3 publication read with its natural cutoff, 4.3.</summary>
+    public static readonly ReleasePin Dpm20Natural43 = new(
+        "4.3", Schema.RepoPaths.AccessDpm20Release43DatabaseFileName, "2026-10-23");
+
+    /// <summary>The DPM 1.0 database of release 4.1 converted with <c>--all</c>.</summary>
+    public static readonly ReleasePin Dpm10All41 = new(
+        "4.1", Schema.RepoPaths.AccessDatabaseFileName, "2026-10-23");
+
+    /// <summary>
     /// Distinct frameworks that carry at least one derived taxonomy (<c>Dpm20TaxonomyDeriver</c>).
     /// Not derivable without re-implementing the derivation (table closure, abstract tables, DORA).
     /// </summary>

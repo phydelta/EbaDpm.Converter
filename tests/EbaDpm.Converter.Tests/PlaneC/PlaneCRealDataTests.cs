@@ -1,5 +1,6 @@
 using EbaDpm.Converter.Core.Validation;
 using EbaDpm.Converter.Tests.Dpm2;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Support;
 
 namespace EbaDpm.Converter.Tests.PlaneC;
@@ -30,7 +31,7 @@ public sealed class PlaneCRealDataTests(Dpm20SkeletonFixture fixture)
 
         // Universe positive control: if this is 0, the layout is not really being read and the
         // rest of the assertions of this test prove nothing.
-        Assert.True(cDps01.Examined > 50_000, $"C-DPS-01 examined only {cDps01.Examined} signatures -- unexpectedly small universe (91,078 were measured).");
+        ReleasePins.AssertPinned(ReleasePins.Layouts42, "C-DPS-01 signatures examined", 91056, cDps01.Examined);
 
         Assert.Equal("pass", cDps01.Status);
         Assert.Equal(0, cDps01.Failed);
@@ -45,7 +46,14 @@ public sealed class PlaneCRealDataTests(Dpm20SkeletonFixture fixture)
 
         // The census has to exist AND be evaluated -- if this is empty, it stopped being loaded
         // (the embedded resource) and C-DPS-01 would pass by default for the wrong reason.
-        Assert.NotEmpty(census);
+        Assert.True(census.Count > 0, "No DD-23 entry in the report: the census stopped being loaded.");
+
+        // Derived: every DD-23 entry the validator declares (KnownExceptions.All, loaded from the
+        // embedded plane-c-known-divergences TSV) is evaluated and reported -- none is dropped.
+        var declared = KnownExceptions.All.Count(e => e.Id == "DD-23");
+        Assert.True(
+            declared == census.Count,
+            $"DD-23 entries in the report: expected {declared} (derived from KnownExceptions.All), actual {census.Count}.");
         Assert.All(census, e => Assert.True(e.Evaluated, $"Census entry '{e.BusinessKey}' was never evaluated -- C-DPS-01 never consulted the census."));
         Assert.All(census, e => Assert.True(e.AppliesToThisReference, $"Census entry '{e.BusinessKey}' with AppliesToThisReference=false -- Reference should be \"-\" (plane A)."));
 
@@ -68,7 +76,7 @@ public sealed class PlaneCRealDataTests(Dpm20SkeletonFixture fixture)
         var coverage = Assert.Single(result.Report.Checks, c => c.Id == "C-COB-01");
 
         Assert.Equal("info", coverage.Status);
-        Assert.True(coverage.Examined > 50_000, $"C-COB-01 examined only {coverage.Examined} layout cells.");
+        ReleasePins.AssertPinned(ReleasePins.Layouts42, "C-COB-01 layout cells examined", 111529, coverage.Examined);
         Assert.Contains("tables compared", coverage.Statement);
     }
 

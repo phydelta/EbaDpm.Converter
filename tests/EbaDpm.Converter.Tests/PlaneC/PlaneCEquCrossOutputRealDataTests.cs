@@ -2,6 +2,7 @@ using EbaDpm.Converter.Core.Validation;
 using EbaDpm.Converter.Core.Validation.PlaneC;
 using EbaDpm.Converter.Tests.All;
 using EbaDpm.Converter.Tests.Dpm2;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Support;
 
 namespace EbaDpm.Converter.Tests.PlaneC;
@@ -23,8 +24,9 @@ namespace EbaDpm.Converter.Tests.PlaneC;
 /// filters THAT set of <c>TableID</c>s by release BEFORE joining their <c>OrdinateID</c>s
 /// (<see cref="PlaneCEqualityChecker"/>). In the CUMULATIVE cut of 4.3 (where <c>TableID</c>s of
 /// 4.0/4.2/4.3 coexist under the same code) the cell lookup would otherwise be ambiguous even for
-/// the rules that the release guard lets through. With the fix, 4.3 yields 4,780 checkable rules
-/// and 0 divergent ones -- an entire new corpus, not just a guard that no longer bites.
+/// the rules that the release guard lets through. With the fix, 4.3 yields checkable rules (pinned
+/// to <see cref="ReleasePins.Dpm20Natural43"/> in the test) and 0 divergent ones -- an entire new
+/// corpus, not just a guard that no longer bites.
 /// <c>PlaneCEquRealDataTests</c> measures the same against 4.2.
 /// </summary>
 [Collection("All")]
@@ -74,11 +76,12 @@ public sealed class PlaneCEquCrossOutputDpm2043Tests(Dpm2043ValidateFixture fixt
     /// <summary>
     /// 4.3 as a LIVE CORPUS -- a publication DIFFERENT from the one the layouts came from (4.2),
     /// and a second INDEPENDENT measurement of the whole plane C machinery. It comes out green
-    /// because 4,780 rules were genuinely evaluated, with 0 divergent -- the exact figure, not a
-    /// threshold. If this stops being 4,780 it is a FINDING.
+    /// because rules were genuinely evaluated, with 0 divergent -- the exact figure (pinned to the
+    /// 4.3 database at its natural cutoff, measured against the 4.2 layouts), not a threshold. If
+    /// the pin stops holding it is a FINDING.
     /// </summary>
     [DataFact]
-    public void CEqu01_OnTheDpm2043Output_4780CheckableRulesZeroDivergent()
+    public void CEqu01_OnTheDpm2043OutputAgainstThe42Layouts_CheckableRulesMatchThePinAndZeroDivergent()
     {
         var result = ValidatorRunCache.Run(fixture.GeneratedDatabasePath, referencePath: null, PlaneCLayoutRepositoryHolder.LayoutsDatabasePath);
 
@@ -87,7 +90,8 @@ public sealed class PlaneCEquCrossOutputDpm2043Tests(Dpm2043ValidateFixture fixt
         var diag = $"Status={cEqu01.Status} Examined={cEqu01.Examined} Failed={cEqu01.Failed} Cov={cEqu02.Statement} " +
                    $"Samples=[{string.Join(" || ", cEqu01.Samples.Select(s => s.BusinessKey))}]";
 
-        Assert.True(cEqu01.Examined == 4780, diag);
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Natural43, "C-EQU-01 checkable rules (4.3 output against the 4.2 layouts)", 4780, cEqu01.Examined);
         Assert.True(cEqu01.Failed == 0, diag);
         Assert.NotEqual("skipped", cEqu01.Status);
     }

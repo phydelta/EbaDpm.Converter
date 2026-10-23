@@ -1,5 +1,6 @@
 using EbaDpm.Converter.Core.Validation;
 using EbaDpm.Converter.Tests.All;
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.Schema;
 using EbaDpm.Converter.Tests.Support;
 
@@ -87,20 +88,19 @@ public static class InvariantChecksAssertions
     }
 
     /// <summary>
-    /// I-REF-01: NOT an invariant of ours - INFORMATIVE layer with a DECLARED census (14 DPM 1.0 /
-    /// 14 4.2 / 15 4.3, the SAME business hierarchies). A test that treated it as critical, or that
+    /// I-REF-01: NOT an invariant of ours - INFORMATIVE layer with a DECLARED census (pinned per
+    /// output in <see cref="ReleasePins"/>: <c>Dpm10All41</c>, <c>Dpm20Cutoff42</c> and
+    /// <c>Dpm20Natural43</c>; the SAME business hierarchies). A test that treated it as critical, or that
     /// stopped checking its exact census, would be exactly the kind of "fix" that is not ours to
     /// make silently.
     /// </summary>
-    public static void AssertIRef01DeclaredCensus(ValidationReport report, string sourceLabel, long expectedCensus)
+    internal static void AssertIRef01DeclaredCensus(ValidationReport report, string sourceLabel, ReleasePin pin, long expectedCensus)
     {
         var iref01 = Assert.Single(report.Checks, c => c.Id == "I-REF-01");
         Assert.Equal("informative", iref01.Layer);
         Assert.True(iref01.Examined > 0, $"{sourceLabel}: I-REF-01 examined 0 rows (positive control).");
         Assert.NotEqual("fail", iref01.Status); // informative: never "fail", at most "info"
-        Assert.Equal(
-            expectedCensus,
-            iref01.Failed);
+        ReleasePins.AssertPinned(pin, $"{sourceLabel}: I-REF-01 hierarchies without nodes (declared census)", expectedCensus, iref01.Failed);
     }
 }
 
@@ -143,12 +143,12 @@ public sealed class InvariantChecksDpm10Tests(AllFixture fixture)
         InvariantChecksAssertions.AssertAo1(result.Report, "DPM 1.0");
     }
 
-    /// <summary>I-REF-01: 14 hierarchies without nodes in DPM 1.0, declared census, informative layer.</summary>
+    /// <summary>I-REF-01: hierarchies without nodes in DPM 1.0, declared census, informative layer.</summary>
     [DataFact]
-    public void Dpm10_All_IRef01DeclaredCensus14()
+    public void Dpm10_All_IRef01DeclaredCensusMatchesThePin()
     {
         var result = ValidatorRunCache.Run(_fixture.ValidatedDatabasePath, referencePath: null);
-        InvariantChecksAssertions.AssertIRef01DeclaredCensus(result.Report, "DPM 1.0", expectedCensus: 14);
+        InvariantChecksAssertions.AssertIRef01DeclaredCensus(result.Report, "DPM 1.0", ReleasePins.Dpm10All41, expectedCensus: 14);
     }
 }
 
@@ -190,10 +190,10 @@ public sealed class InvariantChecksDpm2042Tests(Dpm20SkeletonFixture fixture)
     }
 
     [DataFact]
-    public void Dpm20Release42_All_IRef01DeclaredCensus14()
+    public void Dpm20Release42_All_IRef01DeclaredCensusMatchesThePin()
     {
         var result = ValidatorRunCache.Run(fixture.ValidatedDatabasePath, referencePath: null);
-        InvariantChecksAssertions.AssertIRef01DeclaredCensus(result.Report, "DPM 2.0 4.2", expectedCensus: 14);
+        InvariantChecksAssertions.AssertIRef01DeclaredCensus(result.Report, "DPM 2.0 4.2", ReleasePins.Dpm20Cutoff42, expectedCensus: 14);
     }
 
     /// <summary>
@@ -267,12 +267,12 @@ public sealed class InvariantChecksDpm2043Tests(Dpm2043ValidateFixture fixture)
         InvariantChecksAssertions.AssertAo1(result.Report, "DPM 2.0 4.3");
     }
 
-    /// <summary>I-REF-01: 15 in 4.3 (versus 14 in 4.2/DPM 1.0) - one more business hierarchy, same family.</summary>
+    /// <summary>I-REF-01: declared census of 4.3 (see the pins: it differs from 4.2 and DPM 1.0, same family).</summary>
     [DataFact]
-    public void Dpm20Release43_All_IRef01DeclaredCensus15()
+    public void Dpm20Release43_All_IRef01DeclaredCensusMatchesThePin()
     {
         var result = ValidatorRunCache.Run(fixture.GeneratedDatabasePath, referencePath: null);
-        InvariantChecksAssertions.AssertIRef01DeclaredCensus(result.Report, "DPM 2.0 4.3", expectedCensus: 15);
+        InvariantChecksAssertions.AssertIRef01DeclaredCensus(result.Report, "DPM 2.0 4.3", ReleasePins.Dpm20Natural43, expectedCensus: 15);
     }
 
     [DataFact]

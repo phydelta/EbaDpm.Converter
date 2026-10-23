@@ -111,8 +111,11 @@ internal static class RepoPaths
 
     public static string AccessDpm20Release43DatabasePath => Path.Join(DataDirectory, AccessDpm20Release43DatabaseFileName);
 
+    /// <summary>Name of the directory with the 4.2 Annotated Table Layouts, under the data directory.</summary>
+    public const string TableLayouts42DirectoryName = "4.2 table layouts";
+
     /// <summary>Directory with the 4.2 Annotated Table Layouts.</summary>
-    public static string TableLayouts42Directory => Path.Join(DataDirectory, "4.2 table layouts");
+    public static string TableLayouts42Directory => Path.Join(DataDirectory, TableLayouts42DirectoryName);
 
     /// <summary>Directory with the 4.3 Annotated Table Layouts.</summary>
     public static string TableLayouts43Directory => Path.Join(DataDirectory, "4.3 table layouts");

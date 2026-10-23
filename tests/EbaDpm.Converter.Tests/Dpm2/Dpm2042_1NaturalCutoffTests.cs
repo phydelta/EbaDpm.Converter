@@ -1,3 +1,4 @@
+using EbaDpm.Converter.Tests.Infrastructure;
 using EbaDpm.Converter.Tests.PlaneC;
 using EbaDpm.Converter.Tests.Support;
 using Microsoft.Data.Sqlite;
@@ -78,7 +79,7 @@ public sealed class Dpm2042_1NaturalCutoffTests(Dpm2042_1ValidateFixture fixture
         Assert.True(match.Success, $"C-COB-01 statement has an unexpected shape: {coverage.Statement}");
         var compared = long.Parse(match.Groups["compared"].Value, System.Globalization.CultureInfo.InvariantCulture);
         var contained = long.Parse(match.Groups["contained"].Value, System.Globalization.CultureInfo.InvariantCulture);
-        Assert.True(compared > 50_000, $"only {compared} signatures compared. {diag}");
+        ReleasePins.AssertPinned(ReleasePins.Dpm20Natural421, $"C-COB-01 signatures compared ({diag})", 90430, compared);
         Assert.Equal(compared, contained);
 
         // C-DPS-01 may be Skipped here (its census was measured on release 4.2, the cutoff is
