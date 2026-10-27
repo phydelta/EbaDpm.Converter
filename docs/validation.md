@@ -63,7 +63,7 @@ Plane A needs nothing but the generated database and always runs. Its check code
 | `A-CEL` | Cells and positions: the `BusinessCode` rebuilt from `mCellPosition` equals the emitted one byte for byte, every cell has at least two positions on axes of its own table, abstract headers imply shaded cells, a dimension belongs to exactly one axis of a table, a cell never receives two members of the same dimension |
 | `A-OCA` | Ordinate categorisation: the effective (inherited) categorisation of every closed, non-abstract ordinate is consistent with its own set; members belong to the dimension's domain; open axes are categorised with the sentinel |
 | `A-OAR` | Open-axis value restrictions: column conventions of `mOpenAxisValueRestriction` |
-| `A-MOD` | Modules: template links point to first-level table groups of the same taxonomy, one conceptual module per module, `XBRLSchemaRef` shape, dense ordering, one-to-one taxonomy keys |
+| `A-MOD` | Modules: template links point to first-level table groups of the same taxonomy, one conceptual module per module, `XBRLSchemaRef` shape, dense ordering, one-to-one taxonomy keys; for DPM 2.0 (`A-MOD-10`), every taxonomy has at least one module and each module's `XBRLSchemaRef` framework and release equal its taxonomy's |
 | `A-CPT` | Concepts: `ConceptType` belongs to the target vocabulary, concept counts per type match their entities, every concept has a label translation, `ReleaseID` only where the schema expects it |
 | `A-VAC` | Tables that must be empty are empty (for example the validation-rule tables, references and instance tables), and the tables populated with fixed rows have exactly those rows |
 
@@ -98,6 +98,16 @@ Plane C runs with `--layouts <file>`, a layout repository built by `--extract-la
 [table-layouts.md](table-layouts.md)). Each table of the output is matched with the layout sheet
 of the same table code and release, and each layout cell is compared with the corresponding cell
 of the output.
+
+**Release pairing.** The release of an output table is the release of its taxonomy
+(`TaxonomyCode` = `{framework} {release}`). A table code can belong to taxonomies of two releases
+of the same framework (for example `finrep 4.2` and `finrep 4.2.1`, when modules of both
+publications use it). For each layout sheet, the tables whose release equals the sheet's release
+are used. Only when there is none does the point-release tolerance apply: a layout for `4.2.1` is
+matched to a `4.2` table, and the match is reported in `C-REL-01` or `C-EQU-03`. Each sheet is
+compared only with the tables of its own publication. When a code has sheets of two releases, a
+layout signature counts as contained only if it is contained in every one of them, and a
+violation is reported once, naming the sheet releases where it failed.
 
 | Check | Layer | What it verifies |
 |---|---|---|

@@ -34,12 +34,13 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 /// set of pairs, 847 = 847" carried over to the id space. The <c>TableGroup</c> nodes (group and
 /// template) use a disjoint id range, above the last pair.
 ///
-/// <b>The template tree is built PER TAXONOMY.</b> Only the taxonomies whose release is the
-/// cutoff one (4.2) have a tree: a group or template that is the parent of tables of two different
-/// frameworks (two different 4.2 taxonomies) produces TWO nodes, one per taxonomy — that is how
-/// 111/109 and 572/563 come out without a special case. Tables whose pair falls in an old-release
-/// taxonomy have no tree: <c>ParentTemplateOrTableID = 0</c> (the root, and here also the orphan,
-/// use 0, never NULL).
+/// <b>The template tree is built PER TAXONOMY, for EVERY emitted taxonomy.</b> Every taxonomy
+/// derived by <see cref="Dpm20TaxonomyDeriver"/> hangs from emitted module versions of its own
+/// (the release the module versions start in, not necessarily the cutoff release), so each one
+/// carries its tree: a group or template that is the parent of tables of two different taxonomies
+/// produces TWO nodes, one per taxonomy. The "emitted groups" are still computed once over the
+/// whole derived universe. <c>ParentTemplateOrTableID = 0</c> (the root, and here also the
+/// orphan, use 0, never NULL) is left only for a table whose template has no group to hang from.
 /// </summary>
 public static class Dpm20StructureLoader
 {
@@ -107,7 +108,6 @@ public static class Dpm20StructureLoader
         ArgumentNullException.ThrowIfNull(selectedTaxonomies);
 
         var unresolvedCases = new List<string>();
-        var cutoffReleaseCode = reader.CutoffReleaseCode;
 
         var tableVersionByTableVId = currentTableVersions.ToDictionary(tv => tv.TableVId);
         var tableVersionByTableId = BuildTableVersionByTableId(currentTableVersions, unresolvedCases);
@@ -196,12 +196,6 @@ public static class Dpm20StructureLoader
             }
         }
 
-        // The template tree only exists in the taxonomies of the cutoff release.
-        var treeTaxonomyIds = selectedTaxonomies
-            .Where(t => string.Equals(t.DpmPackageCode, cutoffReleaseCode, StringComparison.Ordinal))
-            .Select(t => t.TaxonomyId)
-            .ToHashSet();
-
         var l1Nodes = new List<NodeDraft>();
         var l1IdByKey = new Dictionary<L1Key, int>();
         var l2Nodes = new List<NodeDraft>();
@@ -229,14 +223,11 @@ public static class Dpm20StructureLoader
 
             var (templateTableId, templateCode, templateName) = ResolveTemplate(tv, tableVersionByTableId, unresolvedCases);
 
-            var parentId = 0;
-            if (treeTaxonomyIds.Contains(taxonomyId))
-            {
-                parentId = ResolveTemplateNode(
-                    taxonomyId, templateTableId, templateCode, templateName,
-                    tableGroups, groupTableIdsById, childrenTableIdsByAbstractTableId, emittedGroupIds,
-                    l1IdByKey, l1Nodes, l2IdByKey, l2Nodes, ref nextGroupNodeId, unresolvedCases);
-            }
+            // The template tree exists in every emitted taxonomy.
+            var parentId = ResolveTemplateNode(
+                taxonomyId, templateTableId, templateCode, templateName,
+                tableGroups, groupTableIdsById, childrenTableIdsByAbstractTableId, emittedGroupIds,
+                l1IdByKey, l1Nodes, l2IdByKey, l2Nodes, ref nextGroupNodeId, unresolvedCases);
 
             mTableRows.Add((pairId, code, label, templateCode));
             taxonomyTableRows.Add((taxonomyId, pairId));
@@ -257,7 +248,7 @@ public static class Dpm20StructureLoader
         // ---- Order: 0-based rank by NATURAL order of the code, within the parent.
         // The L1 groups were already created with a constant Order=0 (ResolveTemplateNode).
         //
-        // For the 48 orphan BusinessTables (Parent=0, old-release taxonomies) this is a DECLARED
+        // For the orphan BusinessTables (Parent=0, no group to hang from) this is a DECLARED
         // CHOICE, NOT DERIVED from the source — measured, not assumed: in the reference those 47
         // rows carry Order = 0..21 consecutively, and then isolated jumps (291-295, 367-370,
         // 424-425, 600-602, 628-634, 794-797). It is NOT 0-based per parent or per taxonomy: esg

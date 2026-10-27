@@ -11,7 +11,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 public sealed class Dpm2CliTests
 {
     [DataFact]
-    public void ListTaxonomies_OnDpm20Source_Exits0_AndReportsThePinnedTaxonomyCount()
+    public void ListTaxonomies_OnDpm20Source_Exits0_AndReportsTheTaxonomiesOfTheEmittedModuleVersions()
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
@@ -23,10 +23,13 @@ public sealed class Dpm2CliTests
 
         Assert.Equal(CliRunner.ExitOk, exitCode);
         Assert.Empty(stderr.ToString());
-        var expected = $"Total: {ReleasePins.Dpm20Cutoff42MTaxonomyRows} taxonomies.";
+        // Derived from Access: one taxonomy per distinct (framework, start release) of the emitted module versions.
+        var taxonomies = AccessCensus.EmittedModuleCodesByTaxonomy(RepoPaths.AccessDpm20DatabasePath, RepoPaths.Cutoff42ReleaseCode);
+        Assert.NotEmpty(taxonomies);
+        var expected = $"Total: {taxonomies.Count} taxonomies.";
         Assert.True(
             stdout.ToString().Contains(expected, StringComparison.Ordinal),
-            $"--list-taxonomies output lacks '{expected}' (cutoff {RepoPaths.Cutoff42ReleaseCode}, {ReleasePins.Dpm20Cutoff42}). Output: {stdout}");
+            $"--list-taxonomies output lacks '{expected}' (cutoff {RepoPaths.Cutoff42ReleaseCode}, derived from '{RepoPaths.AccessDpm20DatabaseFileName}'). Output: {stdout}");
     }
 
     [DataFact]

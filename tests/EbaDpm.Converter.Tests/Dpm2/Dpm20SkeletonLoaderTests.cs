@@ -31,18 +31,32 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
             $"mRelease rows: expected {expected} (COUNT(1) of [Release] in '{RepoPaths.AccessDpm20DatabaseFileName}'), actual {actual}.");
     }
 
-    [DataFact]
-    public void MReportingFramework_RowCount_IsThePinnedCensus()
-        => ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42,
-            "mReportingFramework rows",
-            ReleasePins.Dpm20Cutoff42FrameworksWithTaxonomies,
-            CountRows("mReportingFramework"));
+    /// <summary>Derived from Access: the distinct (lower-case framework, StartRelease.Code) of the emitted module versions.</summary>
+    private static Dictionary<string, SortedSet<string>> ExpectedTaxonomies()
+        => AccessCensus.EmittedModuleCodesByTaxonomy(RepoPaths.AccessDpm20DatabasePath, RepoPaths.Cutoff42ReleaseCode);
 
     [DataFact]
-    public void MTaxonomy_RowCount_IsThePinnedCensus()
-        => ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "mTaxonomy rows", ReleasePins.Dpm20Cutoff42MTaxonomyRows, CountRows("mTaxonomy"));
+    public void MReportingFramework_RowCount_IsTheDistinctFrameworksOfTheDerivedTaxonomies()
+    {
+        var expected = ExpectedTaxonomies().Keys.Select(k => k[..k.IndexOf(' ', StringComparison.Ordinal)]).Distinct().Count();
+        var actual = CountRows("mReportingFramework");
+        Assert.True(
+            expected == actual,
+            $"mReportingFramework rows: expected {expected} (distinct frameworks of the taxonomies derived from '{RepoPaths.AccessDpm20DatabaseFileName}'), actual {actual}.");
+    }
+
+    [DataFact]
+    public void MTaxonomy_Codes_AreTheDistinctFrameworkAndStartReleaseOfTheEmittedModuleVersions()
+    {
+        var expected = ExpectedTaxonomies();
+        Assert.NotEmpty(expected);
+        var actual = ReadStringColumn("SELECT TaxonomyCode FROM mTaxonomy").Where(c => c is not null).Select(c => c!).ToList();
+
+        Assert.Equal(expected.Count, CountRows("mTaxonomy"));
+        Assert.Equal(
+            expected.Keys.OrderBy(k => k, StringComparer.Ordinal),
+            actual.OrderBy(k => k, StringComparer.Ordinal));
+    }
 
     [DataFact]
     public void MOwner_MOwnerParent_MLanguage_HaveTheExpectedCounts()
@@ -223,7 +237,9 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
         using var reader = command.ExecuteReader();
         Assert.True(reader.Read());
         var rows = reader.GetInt64(0);
-        ReleasePins.AssertPinned(ReleasePins.Dpm20Cutoff42, "mTaxonomy rows", ReleasePins.Dpm20Cutoff42MTaxonomyRows, rows);
+        Assert.True(
+            ExpectedTaxonomies().Count == rows,
+            $"mTaxonomy rows: expected {ExpectedTaxonomies().Count} (derived from '{RepoPaths.AccessDpm20DatabaseFileName}'), actual {rows}.");
         Assert.True(reader.GetInt64(1) == rows, $"mTaxonomy rows with all five metadata columns as TEXT: expected {rows} (every row), actual {reader.GetInt64(1)}.");
         Assert.True(reader.GetInt64(2) == rows, $"mTaxonomy rows with ExcelTemplate NULL: expected {rows} (every row), actual {reader.GetInt64(2)}.");
     }
@@ -247,12 +263,12 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     }
 
     /// <summary>
-    /// Against <c>EBA_4.2_Hotfix.db</c>, by CONTAINMENT: the <c>TaxonomyCode</c> values of the
-    /// reference must ALL be among ours, and NONE only in the reference. Never by equality of
-    /// censuses -- the extra one is <c>pay 4.1</c>.
+    /// Plane B, information only, by CONTAINMENT: every generated <c>TaxonomyCode</c> is among the
+    /// reference ones. The reference has more (it keeps the taxonomies of older releases): the ones
+    /// we do not generate must be exactly the reference taxonomies that have no module there.
     /// </summary>
     [DataFact]
-    public void MTaxonomy_ContainsAllReferenceTaxonomyCodes_ByContainment()
+    public void MTaxonomy_IsContainedInTheReferenceTaxonomyCodes_AndTheOnesLeftOutHaveNoModuleThere()
     {
         RepoPaths.EnsureReferenceDatabaseExists();
 
@@ -266,11 +282,28 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
         ReleasePins.AssertPinned(
             ReleasePins.Reference42, "reference mTaxonomy codes", ReleasePins.Reference42MTaxonomyRows, referenceCodes.Count);
 
-        var onlyInReference = referenceCodes.Except(generatedCodes).ToList();
+        var onlyGenerated = generatedCodes.Except(referenceCodes).ToList();
         Assert.True(
-            onlyInReference.Count == 0,
-            $"Reference taxonomy codes missing from the generated mTaxonomy: {string.Join(", ", onlyInReference)}.");
-        Assert.True(referenceCodes.IsSubsetOf(generatedCodes), "The reference taxonomy codes are not a subset of the generated ones.");
+            onlyGenerated.Count == 0,
+            $"Generated taxonomy codes absent from the reference: {string.Join(", ", onlyGenerated)}.");
+
+        using var referenceConnection = OpenReadOnly(RepoPaths.ReferenceDatabasePath);
+        using var command = referenceConnection.CreateCommand();
+        command.CommandText =
+            "SELECT t.TaxonomyCode FROM mTaxonomy t WHERE NOT EXISTS (SELECT 1 FROM mModule m WHERE m.TaxonomyID = t.TaxonomyID)";
+        var withoutModule = new List<string>();
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                withoutModule.Add(reader.GetString(0));
+            }
+        }
+
+        var onlyInReference = referenceCodes.Except(generatedCodes).OrderBy(c => c, StringComparer.Ordinal).ToList();
+        Assert.True(
+            onlyInReference.SequenceEqual(withoutModule.OrderBy(c => c, StringComparer.Ordinal)),
+            $"Reference taxonomies not generated: [{string.Join(", ", onlyInReference)}]; reference taxonomies without a module: [{string.Join(", ", withoutModule)}].");
     }
 
     /// <summary>

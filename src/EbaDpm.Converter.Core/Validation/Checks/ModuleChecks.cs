@@ -7,7 +7,9 @@ namespace EbaDpm.Converter.Core.Validation.Checks;
 /// Modules (<c>mModule</c>, <c>mConceptualModule</c>, <c>mModuleBusinessTemplate</c>).
 /// Plane A, without looking at any reference.
 ///
-/// A-MOD-09 (not every taxonomy has modules) is an ANTI-invariant: it is not checked here.
+/// A-MOD-09 (not every taxonomy has modules) is an ANTI-invariant in DPM 1.0: it is not checked
+/// there. In DPM 2.0 the taxonomies are derived from the emitted module versions, so the opposite
+/// holds and A-MOD-10 checks it (DPM 2.0 outputs only).
 /// </summary>
 public static class ModuleChecks
 {
@@ -18,7 +20,7 @@ public static class ModuleChecks
     private static readonly Regex FrameworkVersionUrlPattern = new(
         @"/fws/[^/]+/[^/]+_[0-9]", RegexOptions.Compiled);
 
-    public static IEnumerable<CheckResult> Run(SqliteConnection c)
+    public static IEnumerable<CheckResult> Run(SqliteConnection c, ValidationSourceModel model)
     {
         yield return ConceptualModuleMirrorsModule(c);
 
@@ -60,6 +62,73 @@ public static class ModuleChecks
         yield return ModuleBusinessTemplateOrderIsDenseZeroBased(c);
 
         yield return TaxonomyKeyBijection(c);
+
+        // DPM 1.0 schema references follow another pattern (.../fws/{fw}/{its}/{date}/mod/...) and
+        // its taxonomies may have no module: the check is scoped to DPM 2.0 outputs.
+        if (model == ValidationSourceModel.Dpm2)
+        {
+            yield return TaxonomiesHaveModulesAndReleaseMatches(c);
+        }
+    }
+
+    /// <summary>
+    /// A-MOD-10 (DPM 2.0): every <c>mTaxonomy</c> row has at least one <c>mModule</c>, and the
+    /// release segment of each module's <c>XBRLSchemaRef</c> (and its framework segment) equals the
+    /// release (and framework) of its taxonomy. <c>mTaxonomy</c> carries no release column of its
+    /// own, so the reference is the <c>TaxonomyCode</c> the DPM 2.0 deriver writes:
+    /// <c>{lower-case framework} {release code}</c>.
+    /// </summary>
+    private static CheckResult TaxonomiesHaveModulesAndReleaseMatches(SqliteConnection c)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var failures = new List<CheckSample>();
+
+        foreach (var row in SqlHelpers.Rows(
+            c,
+            """
+            SELECT t."TaxonomyCode" FROM "mTaxonomy" t
+            WHERE NOT EXISTS (SELECT 1 FROM "mModule" m WHERE m."TaxonomyID" = t."TaxonomyID")
+            """,
+            1))
+        {
+            failures.Add(new CheckSample($"{row[0]}: taxonomy without any module"));
+        }
+
+        var taxonomyCodeById = SqlHelpers.Rows(c, "SELECT \"TaxonomyID\", \"TaxonomyCode\" FROM \"mTaxonomy\"", 2)
+            .ToDictionary(r => r[0]!, r => r[1]);
+
+        var modules = SqlHelpers.Rows(
+            c, "SELECT \"ModuleCode\", \"TaxonomyID\", \"XBRLSchemaRef\" FROM \"mModule\"", 3);
+        foreach (var row in modules)
+        {
+            var moduleCode = row[0]!;
+            var match = row[2] is null ? null : XbrlSchemaRefPattern.Match(row[2]!);
+            if (match is null || !match.Success)
+            {
+                continue; // A-MOD-03 reports the missing or malformed reference.
+            }
+
+            if (!taxonomyCodeById.TryGetValue(row[1] ?? string.Empty, out var taxonomyCode) || taxonomyCode is null)
+            {
+                failures.Add(new CheckSample($"{moduleCode}: TaxonomyID={row[1]} has no mTaxonomy row"));
+                continue;
+            }
+
+            var expectedKey = taxonomyCode.Replace(' ', '/');
+            var key = match.Groups["key"].Value;
+            if (!string.Equals(key, expectedKey, StringComparison.Ordinal))
+            {
+                failures.Add(new CheckSample(
+                    $"{moduleCode}: XBRLSchemaRef segment '{key}' differs from taxonomy '{taxonomyCode}'"));
+            }
+        }
+
+        sw.Stop();
+        var total = taxonomyCodeById.Count + modules.Count;
+        return CheckResult.FromViolationCount(
+            "A-MOD-10", ValidationPlane.A, ValidationLayer.Critical, "mTaxonomy",
+            "DPM 2.0: every taxonomy has at least one module, and each module's XBRLSchemaRef framework/release equals its taxonomy's",
+            total, failures.Count, sw.ElapsedMilliseconds, failures);
     }
 
     private static CheckResult ConceptualModuleMirrorsModule(SqliteConnection c)

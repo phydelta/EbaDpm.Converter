@@ -22,9 +22,16 @@ internal sealed record ReleasePin(string Release, string Database, string Measur
 /// </summary>
 internal static class ReleasePins
 {
-    /// <summary>The DPM 2.0 database of the 4.2.1 publication read with cutoff release 4.2.</summary>
+    /// <summary>
+    /// The DPM 2.0 database of the 4.2.1 publication read with cutoff release 4.2. The populations
+    /// that depend on the taxonomy rule (a module version hangs from the taxonomy of its
+    /// StartRelease, issue 66) were re-measured on 2026-10-27, and checked against the output of the
+    /// previous rule: restricted to the taxonomies whose release is 4.2, the previous output equals
+    /// the current one cell by cell (business code, signature, shading) and in the ordinate, cell
+    /// position and open-axis restriction counts per (taxonomy, table).
+    /// </summary>
     public static readonly ReleasePin Dpm20Cutoff42 = new(
-        Schema.RepoPaths.Cutoff42ReleaseCode, Schema.RepoPaths.AccessDpm20DatabaseFileName, "2026-10-22");
+        Schema.RepoPaths.Cutoff42ReleaseCode, Schema.RepoPaths.AccessDpm20DatabaseFileName, "2026-10-27");
 
     /// <summary>
     /// The 4.2 Annotated Table Layouts (<see cref="Schema.RepoPaths.TableLayouts42DirectoryName"/>)
@@ -38,21 +45,15 @@ internal static class ReleasePins
 
     /// <summary>The DPM 2.0 database of the 4.2.1 publication read with its natural cutoff, 4.2.1.</summary>
     public static readonly ReleasePin Dpm20Natural421 = new(
-        "4.2.1", Schema.RepoPaths.AccessDpm20DatabaseFileName, "2026-10-23");
+        "4.2.1", Schema.RepoPaths.AccessDpm20DatabaseFileName, "2026-10-27");
 
     /// <summary>The DPM 2.0 database of the 4.3 publication read with its natural cutoff, 4.3.</summary>
     public static readonly ReleasePin Dpm20Natural43 = new(
-        "4.3", Schema.RepoPaths.AccessDpm20Release43DatabaseFileName, "2026-10-23");
+        "4.3", Schema.RepoPaths.AccessDpm20Release43DatabaseFileName, "2026-10-27");
 
     /// <summary>The DPM 1.0 database of release 4.1 converted with <c>--all</c>.</summary>
     public static readonly ReleasePin Dpm10All41 = new(
         "4.1", Schema.RepoPaths.AccessDatabaseFileName, "2026-10-23");
-
-    /// <summary>
-    /// Distinct frameworks that carry at least one derived taxonomy (<c>Dpm20TaxonomyDeriver</c>).
-    /// Not derivable without re-implementing the derivation (table closure, abstract tables, DORA).
-    /// </summary>
-    public const int Dpm20Cutoff42FrameworksWithTaxonomies = 18;
 
     /// <summary>
     /// The 4.2 reference export <c>EBA_4.2_Hotfix.db</c> (information only, never an authority): a
@@ -69,40 +70,40 @@ internal static class ReleasePins
     // ------------------------------------------------------------------
 
     /// <summary><c>COUNT(1)</c> of <c>mAxis</c> (and of <c>mTableAxis</c>: one link per axis).</summary>
-    public const int Dpm20Cutoff42MAxisRows = 1993;
+    public const int Dpm20Cutoff42MAxisRows = 1884;
 
     /// <summary><c>COUNT(1)</c> of <c>mAxisOrdinate</c>.</summary>
-    public const int Dpm20Cutoff42MAxisOrdinateRows = 20712;
+    public const int Dpm20Cutoff42MAxisOrdinateRows = 20234;
 
     /// <summary><c>COUNT(1)</c> of <c>mTableCell</c>.</summary>
-    public const int Dpm20Cutoff42MTableCellRows = 163218;
+    public const int Dpm20Cutoff42MTableCellRows = 161896;
 
     /// <summary><c>COUNT(1)</c> of <c>mCellPosition</c>.</summary>
-    public const int Dpm20Cutoff42MCellPositionRows = 415586;
+    public const int Dpm20Cutoff42MCellPositionRows = 412885;
 
     /// <summary>Closed X axes of <c>mAxis</c> (identity: one per <c>mTable</c> row).</summary>
-    public const int Dpm20Cutoff42ClosedXAxes = 847;
+    public const int Dpm20Cutoff42ClosedXAxes = 799;
 
     /// <summary>Closed Y axes of <c>mAxis</c>.</summary>
-    public const int Dpm20Cutoff42ClosedYAxes = 719;
+    public const int Dpm20Cutoff42ClosedYAxes = 678;
 
     /// <summary>Open Y axes of <c>mAxis</c> (key headers of direction X, transposed).</summary>
-    public const int Dpm20Cutoff42OpenYAxes = 241;
+    public const int Dpm20Cutoff42OpenYAxes = 225;
 
     /// <summary>Closed Z axes of <c>mAxis</c>.</summary>
-    public const int Dpm20Cutoff42ClosedZAxes = 38;
+    public const int Dpm20Cutoff42ClosedZAxes = 36;
 
     /// <summary>Open Z axes of <c>mAxis</c> (key headers of direction Z).</summary>
-    public const int Dpm20Cutoff42OpenZAxes = 148;
+    public const int Dpm20Cutoff42OpenZAxes = 146;
 
     /// <summary>Rows of <c>mOrdinateCategorisation</c> whose dimension is the metric dimension 9999.</summary>
-    public const int Dpm20Cutoff42MetCategorisationRows = 9123;
+    public const int Dpm20Cutoff42MetCategorisationRows = 8892;
 
     /// <summary>Cells whose <c>DPS</c> differs from <c>DatapointSignature</c> (the restricted open-axis bracket).</summary>
-    public const int Dpm20Cutoff42BracketCells = 28065;
+    public const int Dpm20Cutoff42BracketCells = 28052;
 
     /// <summary><c>COUNT(1)</c> of <c>mOpenAxisValueRestriction</c>.</summary>
-    public const int Dpm20Cutoff42OpenAxisValueRestrictionRows = 207;
+    public const int Dpm20Cutoff42OpenAxisValueRestrictionRows = 199;
 
     /// <summary>
     /// Distinct (TableCode, AxisCode, HierarchyCode) keys of <c>mOpenAxisValueRestriction</c> in the
@@ -164,14 +165,11 @@ internal static class ReleasePins
     /// <summary>Distinct <c>BusinessTemplateID</c> nodes referenced by <c>mModuleBusinessTemplate</c>.</summary>
     public const int Dpm20Cutoff42BusinessTemplateDistinctNodes = 111;
 
-    /// <summary><c>COUNT(1)</c> of <c>mTaxonomy</c> (derived taxonomies, <c>Dpm20TaxonomyDeriver</c>).</summary>
-    public const int Dpm20Cutoff42MTaxonomyRows = 32;
-
     /// <summary><c>COUNT(1)</c> of <c>mTemplateOrTable</c> (and of its <c>TemplateOrTable</c> concepts).</summary>
-    public const int Dpm20Cutoff42MTemplateOrTableRows = 1530;
+    public const int Dpm20Cutoff42MTemplateOrTableRows = 1482;
 
     /// <summary><c>COUNT(1)</c> of <c>mConceptTranslation</c>.</summary>
-    public const int Dpm20Cutoff42MConceptTranslationRows = 57073;
+    public const int Dpm20Cutoff42MConceptTranslationRows = 56376;
 
     /// <summary><c>COUNT(1)</c> of <c>mModule</c> in the 4.2 reference export (<see cref="Reference42"/>).</summary>
     public const int Reference42MModuleRows = 50;
@@ -183,7 +181,7 @@ internal static class ReleasePins
     // ------------------------------------------------------------------
 
     /// <summary><c>COUNT(1)</c> of <c>mTable</c> (and of <c>mTaxonomyTable</c> and of the <c>BusinessTable</c> rows of <c>mTemplateOrTable</c>).</summary>
-    public const int Dpm20Cutoff42MTableRows = 847;
+    public const int Dpm20Cutoff42MTableRows = 799;
 
     /// <summary><c>TableGroup</c> rows of <c>mTemplateOrTable</c> with <c>Level</c> 1 (the root groups).</summary>
     public const int Dpm20Cutoff42TableGroupLevel1Rows = 111;
@@ -196,9 +194,6 @@ internal static class ReleasePins
 
     /// <summary><c>BusinessTable</c> rows of <c>mTemplateOrTable</c> whose parent is a real node (<c>ParentTemplateOrTableID</c> not 0).</summary>
     public const int Dpm20Cutoff42BusinessTablesWithRealParent = 799;
-
-    /// <summary><c>BusinessTable</c> rows of <c>mTemplateOrTable</c> that are orphans (<c>ParentTemplateOrTableID</c> = 0).</summary>
-    public const int Dpm20Cutoff42OrphanBusinessTables = 48;
 
     /// <summary>Distinct table codes emitted (non-abstract, without DORA): distinct <c>mTable.TableCode</c>.</summary>
     public const int Dpm20Cutoff42EmittedTableCodes = 788;

@@ -79,7 +79,7 @@ public sealed class Dpm2042_1NaturalCutoffTests(Dpm2042_1ValidateFixture fixture
         Assert.True(match.Success, $"C-COB-01 statement has an unexpected shape: {coverage.Statement}");
         var compared = long.Parse(match.Groups["compared"].Value, System.Globalization.CultureInfo.InvariantCulture);
         var contained = long.Parse(match.Groups["contained"].Value, System.Globalization.CultureInfo.InvariantCulture);
-        ReleasePins.AssertPinned(ReleasePins.Dpm20Natural421, $"C-COB-01 signatures compared ({diag})", 90430, compared);
+        ReleasePins.AssertPinned(ReleasePins.Dpm20Natural421, $"C-COB-01 signatures compared ({diag})", 91182, compared);
         Assert.Equal(compared, contained);
 
         // C-DPS-01 may be Skipped here (its census was measured on release 4.2, the cutoff is

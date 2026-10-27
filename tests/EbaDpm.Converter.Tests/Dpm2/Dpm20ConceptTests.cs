@@ -105,8 +105,15 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
         "TemplateOrTable" => ("mTemplateOrTable pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42MTemplateOrTableRows),
         "Dimension" => ("mDimension pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42MDimensionRows),
         "Table" => ("closed X axes pin (one X axis per mTable row)", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42ClosedXAxes),
-        "Taxonomy" => ("mTaxonomy pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42MTaxonomyRows),
-        "ReportingFramework" => ("frameworks-with-taxonomies pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42FrameworksWithTaxonomies),
+        "Taxonomy" => (
+            "distinct (framework, StartRelease) of the emitted module versions",
+            null,
+            AccessCensus.EmittedModuleCodesByTaxonomy(Accdb, RepoPaths.Cutoff42ReleaseCode).Count),
+        "ReportingFramework" => (
+            "distinct frameworks of the emitted module versions",
+            null,
+            AccessCensus.EmittedModuleCodesByTaxonomy(Accdb, RepoPaths.Cutoff42ReleaseCode).Keys
+                .Select(k => k[..k.IndexOf(' ', StringComparison.Ordinal)]).Distinct().Count()),
         "Release" => ("[Release]", null, AccessCensus.Count(Accdb, "Release")),
         _ => throw new ArgumentOutOfRangeException(nameof(conceptType), conceptType, "No anchor for this concept type."),
     };

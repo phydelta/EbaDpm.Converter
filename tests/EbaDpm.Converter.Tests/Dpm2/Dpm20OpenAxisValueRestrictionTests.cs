@@ -177,47 +177,52 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
     }
 
     // ------------------------------------------------------------------
-    // The signature bracket. Concrete nominal case, quoted literally: CellID 120637 of I_11.03
-    // carries TWO open axes in the same cell -- qCOE, WITH a restriction, and qEGT, WITHOUT a
-    // restriction -- so the same DPS demonstrates both branches of the algorithm at once.
+    // The signature bracket. Concrete nominal case: the cells of I_11.03 carry TWO open axes in the
+    // same cell -- qCOE, WITH a restriction, and qEGT, WITHOUT a restriction -- so the same DPS
+    // demonstrates both branches of the algorithm at once. The case is selected by BUSINESS KEY
+    // (table code and the two dimension patterns), not by the surrogate CellID the test used to quote
+    // (120637): surrogate IDs shift whenever the set of (taxonomy, table) pairs changes.
     // ------------------------------------------------------------------
 
     [DataFact]
     public void SignatureWithRestriction_CarriesBracket_DimCodeInDps_DimHierarchyIdInDms_NominalCase()
     {
-        var row = QueryHelpers.Rows(
-                fixture.GeneratedConnection,
-                """
-                SELECT c."CellID", t."TableCode", c."DPS", c."DatapointSignature"
-                FROM "mTableCell" c JOIN "mTable" t ON t."TableID" = c."TableID"
-                WHERE c."CellID" = 120637
-                """,
-                4)
-            .SingleOrDefault();
+        var rows = QueryHelpers.Rows(
+            fixture.GeneratedConnection,
+            """
+            SELECT t."TableCode", c."DPS", c."DatapointSignature"
+            FROM "mTableCell" c JOIN "mTable" t ON t."TableID" = c."TableID"
+            WHERE t."TableCode" = 'I_11.03'
+              AND c."DPS" LIKE '%eba_dim_4.2:qCOE(*[%' AND c."DPS" LIKE '%eba_dim_4.2:qEGT(*)%'
+            """,
+            3);
 
-        Assert.True(row is not null, "CellID=120637 does not exist in this generation: the nominal case is no longer valid, another one has to be chosen.");
+        Assert.True(rows.Count > 0, "No cell of I_11.03 carries both qCOE with a restriction and qEGT without one: the nominal case is no longer valid, another one has to be chosen.");
 
-        var tableCode = row![1];
-        var dps = row[2]!;
-        var dms = row[3]!;
+        foreach (var row in rows)
+        {
+            var tableCode = row[0];
+            var dps = row[1]!;
+            var dms = row[2]!;
 
-        Assert.Equal("I_11.03", tableCode);
+            Assert.Equal("I_11.03", tableCode);
 
-        // The qCOE dimension carries a restriction: the DPS carries the hierarchy CODE in brackets.
-        Assert.Contains("eba_dim_4.2:qCOE(*[new_CO1])", dps);
+            // The qCOE dimension carries a restriction: the DPS carries the hierarchy CODE in brackets.
+            Assert.Contains("eba_dim_4.2:qCOE(*[new_CO1])", dps);
 
-        // The qEGT dimension has NO restriction in this cell: DIM(*) without brackets, no trace of '['.
-        Assert.Contains("eba_dim_4.2:qEGT(*)", dps);
-        Assert.DoesNotContain("qEGT(*[", dps);
+            // The qEGT dimension has NO restriction in this cell: DIM(*) without brackets, no trace of '['.
+            Assert.Contains("eba_dim_4.2:qEGT(*)", dps);
+            Assert.DoesNotContain("qEGT(*[", dps);
 
-        // In the DMS the same qCOE pair carries the (numeric) HierarchyID, not the code.
-        var dmsQcoePart = dms.Split('|').Single(p => p.StartsWith("eba_dim_4.2:qCOE(", StringComparison.Ordinal));
-        var bracketContent = dmsQcoePart[(dmsQcoePart.IndexOf("(*[", StringComparison.Ordinal) + 3)..dmsQcoePart.IndexOf(']')];
-        Assert.True(int.TryParse(bracketContent, out _), $"The DMS bracket of qCOE is not numeric: '{bracketContent}' in '{dmsQcoePart}'");
+            // In the DMS the same qCOE pair carries the (numeric) HierarchyID, not the code.
+            var dmsQcoePart = dms.Split('|').Single(p => p.StartsWith("eba_dim_4.2:qCOE(", StringComparison.Ordinal));
+            var bracketContent = dmsQcoePart[(dmsQcoePart.IndexOf("(*[", StringComparison.Ordinal) + 3)..dmsQcoePart.IndexOf(']')];
+            Assert.True(int.TryParse(bracketContent, out _), $"The DMS bracket of qCOE is not numeric: '{bracketContent}' in '{dmsQcoePart}'");
 
-        // And the corresponding DPS carries the CODE, not that same number.
-        var dpsQcoePart = dps.Split('|').Single(p => p.StartsWith("eba_dim_4.2:qCOE(", StringComparison.Ordinal));
-        Assert.Equal("eba_dim_4.2:qCOE(*[new_CO1])", dpsQcoePart);
+            // And the corresponding DPS carries the CODE, not that same number.
+            var dpsQcoePart = dps.Split('|').Single(p => p.StartsWith("eba_dim_4.2:qCOE(", StringComparison.Ordinal));
+            Assert.Equal("eba_dim_4.2:qCOE(*[new_CO1])", dpsQcoePart);
+        }
     }
 
     [DataFact]

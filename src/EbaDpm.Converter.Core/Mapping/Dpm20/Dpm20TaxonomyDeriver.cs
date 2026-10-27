@@ -11,11 +11,11 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 /// <param name="Taxonomies">
 /// The derived taxonomies, in the <see cref="AccessTaxonomyRow"/> shape deliberately reused from
 /// the DPM 1.0 pipeline so that <c>TaxonomySelector</c> and <c>TaxonomySelectionRequest</c> work
-/// unchanged. 32 rows against the reference source: all 31 of the reference database, plus
-/// <c>pay 4.1</c>.
+/// unchanged. One row per distinct (framework, <c>ModuleVersion.StartReleaseID</c>) of the emitted
+/// module versions.
 /// </param>
 /// <param name="TableCounts">Count of table versions per taxonomy, in the same shape <c>--list-taxonomies</c> uses today for DPM 1.0.</param>
-/// <param name="TaxonomyKeyByTaxonomyId">The <c>TaxonomyKey</c> of each derived taxonomy: <c>lowercase-framework/release</c>, e.g. <c>corep/4.2</c>.</param>
+/// <param name="TaxonomyKeyByTaxonomyId">The <c>TaxonomyKey</c> of each derived taxonomy: <c>lowercase-framework/release</c>, e.g. <c>corep/4.2</c>, with the release the module versions of the taxonomy start in.</param>
 /// <param name="TableVIdsByTaxonomyId">The set of <c>TableVID</c> of each derived taxonomy. Not consumed when listing taxonomies; needed to populate <c>mTaxonomyTable</c> (exposing it now is free).</param>
 public sealed record Dpm20TaxonomyDerivationResult(
     IReadOnlyList<AccessTaxonomyRow> Taxonomies,
@@ -28,28 +28,31 @@ public sealed record Dpm20TaxonomyDerivationResult(
 /// computed from <c>Framework</c>, <c>[Release]</c>, <c>[Module]</c>, <c>ModuleVersion</c>,
 /// <c>ModuleVersionComposition</c> and <c>TableVersion</c> ⋈ <c>[Table]</c>.
 ///
-/// Rules (all verified against the source and against the reference database):
+/// Rules:
 ///
-/// 1. **Universe**: current table versions (already filtered by the cutoff release in
-///    <see cref="Dpm20AccessReader.ReadTableVersions"/>) that are in some current module, via
-///    <c>ModuleVersionComposition</c> → current <c>ModuleVersion</c>.
-/// 1b. <b>Abstract closure</b>: if the composition row declares an ABSTRACT table, its CURRENT
+/// 1. **Emitted module versions**: the current ones at the cutoff release (already filtered in
+///    <see cref="Dpm20AccessReader.ReadModuleVersions"/>), excluding the <c>DORA</c> framework and
+///    <c>Module.isDocumentModule = True</c> — the same selection <see cref="Dpm20ModuleLoader"/>
+///    emits.
+/// 2. **Taxonomy of a module version** = (framework of its module, <c>ModuleVersion.StartReleaseID</c>):
+///    the EBA taxonomy that publishes that module version, NOT the cutoff release.
+///    <c>TaxonomyCode</c> = lowercase framework code + space + release code; <c>DpmPackageCode</c>
+///    = release code. The taxonomies are exactly the distinct pairs of the emitted module versions
+///    (no taxonomy without a module). Measured 2026-10-27: the 4.2.1 database gives 19 taxonomies
+///    for 50 modules (only <c>FINREP9DP</c> on 4.2.1); the 4.3 database gives 21 taxonomies for 54
+///    modules (49 on 4.2, <c>FINREP9DP</c> on 4.2.1, <c>AML_RA</c> and the <c>TCB_*</c> modules on 4.3).
+/// 3. **Tables of a taxonomy**: the current, non-abstract table versions in
+///    <c>ModuleVersionComposition</c> of the taxonomy's emitted module versions. A table in modules
+///    of two taxonomies belongs to both. Tables that only DORA modules or document modules carry
+///    never appear.
+/// 3b. <b>Abstract closure</b>: if the composition row declares an ABSTRACT table, its CURRENT
 ///    concrete children are added as well (<c>TableVersion.AbstractTableID</c> pointing to that
 ///    abstract table), even if they have no row of their own in <c>ModuleVersionComposition</c>
 ///    for that module. It is a rule of the Access database, backed by the invariant "a module
 ///    that declares an abstract table declares all its current children" (394/395 in 4.2, 408/408
 ///    in 4.3; the only failure in the corpus is <c>IF_CLASS2 → C_34.02.b</c>, which Access itself
-///    restores in 4.3). It adds +1 (module, table) pair in 4.2 and +0 in 4.3 — it is NOT
-///    propagated through <c>TableGroup</c> (that route over-produced 26 extra pairs).
-/// 2. **Framework of a table version**: <c>ModuleVersionComposition</c> → <c>ModuleVersion</c>
-///    → <c>[Module].FrameworkID</c> → <c>Framework.Code</c>. A table can fall in SEVERAL
-///    frameworks (unlike DPM 1.0, where the relation was functional): it is modelled with a set,
-///    not with a single id.
-/// 3. **Emitted universe**: abstract tables and those of framework <c>DORA</c> are removed → 788 codes.
-/// 4. **Each emitted table version produces TWO pairs** (framework, release): one with the cutoff
-///    release and one with its <c>StartReleaseID</c>. If they coincide, a single pair. The
-///    intermediate release NEVER generates a pair.
-/// 5. <c>TaxonomyCode</c> = lowercase framework code + space + release code.
+///    restores in 4.3). It is NOT propagated through <c>TableGroup</c> (that route over-produced
+///    26 extra pairs).
 ///
 /// <c>TaxonomyId</c> is synthetic and deterministic: it is ordered by <c>TaxonomyCode</c> and
 /// numbered from 1 — there is no source id to reuse, because the entity does not exist there.
@@ -73,10 +76,11 @@ public static class Dpm20TaxonomyDeriver
         ArgumentNullException.ThrowIfNull(currentTableVersions);
 
         var releaseCodeById = releases.ToDictionary(r => r.ReleaseId, r => r.Code);
-        var cutoffReleaseCode = releaseCodeById.TryGetValue(cutoffReleaseId, out var code)
-            ? code
-            : throw new InvalidOperationException(
+        if (!releaseCodeById.ContainsKey(cutoffReleaseId))
+        {
+            throw new InvalidOperationException(
                 $"The cutoff release (ReleaseID={cutoffReleaseId}) is not in the provided release list.");
+        }
 
         var frameworkById = frameworks.ToDictionary(f => f.FrameworkId);
         var doraFrameworkId = frameworks
@@ -84,11 +88,10 @@ public static class Dpm20TaxonomyDeriver
             .Select(f => (int?)f.FrameworkId)
             .FirstOrDefault();
 
-        var frameworkIdByModuleId = modules.ToDictionary(m => m.ModuleId, m => m.FrameworkId);
-        var moduleIdByModuleVId = currentModuleVersions.ToDictionary(mv => mv.ModuleVId, mv => mv.ModuleId);
+        var moduleById = modules.ToDictionary(m => m.ModuleId);
         var tableVersionByTableVId = currentTableVersions.ToDictionary(tv => tv.TableVId);
 
-        // Index for the abstract closure (rule 1b): abstract TableID -> TableVID of its CURRENT
+        // Index for the abstract closure (rule 3b): abstract TableID -> TableVID of its CURRENT
         // concrete children (TableVersion.AbstractTableID -> that abstract table). Built over
         // currentTableVersions, which is already filtered by the cutoff release, so every child
         // here is current by construction.
@@ -109,27 +112,54 @@ public static class Dpm20TaxonomyDeriver
             list.Add(tv.TableVId);
         }
 
-        // Step 1: universe — table versions current in some current module, and the set of
-        // frameworks each one belongs to (rules 1 and 2), closed with the abstract closure
-        // (rule 1b).
-        var frameworkIdsByTableVId = new Dictionary<int, HashSet<int>>();
+        // Step 1: emitted module versions (rules 1 and 2) and their taxonomy. The taxonomy exists
+        // as soon as one emitted module version hangs from it, with or without tables.
+        var tableVIdsByTaxonomyCode = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
+        var frameworkIdByTaxonomyCode = new Dictionary<string, int>(StringComparer.Ordinal);
+        var releaseCodeByTaxonomyCode = new Dictionary<string, string>(StringComparer.Ordinal);
+        var taxonomyCodeByModuleVId = new Dictionary<int, string>();
 
-        void AddFramework(int tableVId, int frameworkId)
+        foreach (var moduleVersion in currentModuleVersions)
         {
-            if (!frameworkIdsByTableVId.TryGetValue(tableVId, out var set))
+            if (!moduleById.TryGetValue(moduleVersion.ModuleId, out var module))
             {
-                set = [];
-                frameworkIdsByTableVId[tableVId] = set;
+                continue; // reported as unresolved by Dpm20ModuleLoader.
             }
 
-            set.Add(frameworkId);
+            if (module.IsDocumentModule || !frameworkById.TryGetValue(module.FrameworkId, out var framework))
+            {
+                continue;
+            }
+
+            if (doraFrameworkId is { } doraId && framework.FrameworkId == doraId)
+            {
+                continue;
+            }
+
+            if (!releaseCodeById.TryGetValue(moduleVersion.StartReleaseId, out var startReleaseCode))
+            {
+                throw new InvalidOperationException(
+                    $"ModuleVersion.ModuleVID={moduleVersion.ModuleVId} has StartReleaseID={moduleVersion.StartReleaseId} "
+                    + "with no matching row in [Release].");
+            }
+
+            var taxonomyCode = $"{framework.Code.ToLowerInvariant()} {startReleaseCode}";
+            if (!tableVIdsByTaxonomyCode.ContainsKey(taxonomyCode))
+            {
+                tableVIdsByTaxonomyCode[taxonomyCode] = [];
+                frameworkIdByTaxonomyCode[taxonomyCode] = framework.FrameworkId;
+                releaseCodeByTaxonomyCode[taxonomyCode] = startReleaseCode;
+            }
+
+            taxonomyCodeByModuleVId[moduleVersion.ModuleVId] = taxonomyCode;
         }
 
+        // Step 2: tables of each taxonomy (rule 3), closed with the abstract closure (rule 3b).
         foreach (var composition in moduleVersionCompositions)
         {
-            if (!moduleIdByModuleVId.TryGetValue(composition.ModuleVId, out var moduleId))
+            if (!taxonomyCodeByModuleVId.TryGetValue(composition.ModuleVId, out var taxonomyCode))
             {
-                continue; // ModuleVersion not current at the cutoff release.
+                continue; // ModuleVersion not emitted (not current, DORA or document module).
             }
 
             if (!tableVersionByTableVId.TryGetValue(composition.TableVId, out var tableVersion))
@@ -137,91 +167,20 @@ public static class Dpm20TaxonomyDeriver
                 continue; // TableVersion not current at the cutoff release.
             }
 
-            if (!frameworkIdByModuleId.TryGetValue(moduleId, out var frameworkId))
+            var set = tableVIdsByTaxonomyCode[taxonomyCode];
+
+            if (!tableVersion.IsAbstract)
             {
-                throw new InvalidOperationException(
-                    $"[Module] has no ModuleID={moduleId} (referenced from a current ModuleVersion); "
-                    + "the source has changed from what was assumed.");
+                set.Add(composition.TableVId);
             }
-
-            AddFramework(composition.TableVId, frameworkId);
-
-            // Rule 1b: the row declares an ABSTRACT table -> close it with its current concrete
-            // children, under the SAME framework, even if the composition does not carry their
-            // explicit row (case IF_CLASS2 -> C_34.02, abstract; children C_34.02.a declared and
-            // C_34.02.b not declared).
-            if (tableVersion.IsAbstract
-                && concreteChildrenTableVIdsByAbstractTableId.TryGetValue(tableVersion.TableId, out var children))
+            else if (concreteChildrenTableVIdsByAbstractTableId.TryGetValue(tableVersion.TableId, out var children))
             {
+                // Rule 3b: the row declares an ABSTRACT table -> close it with its current concrete
+                // children, even if the composition does not carry their explicit row (case
+                // IF_CLASS2 -> C_34.02, abstract; children C_34.02.a declared and C_34.02.b not).
                 foreach (var childTableVId in children)
                 {
-                    AddFramework(childTableVId, frameworkId);
-                }
-            }
-        }
-
-        // Step 2: emitted universe — no abstract tables, no tables that fall ONLY in DORA (rule 3).
-        var emittedTableVIds = frameworkIdsByTableVId
-            .Where(kvp =>
-            {
-                var tableVersion = tableVersionByTableVId[kvp.Key];
-                if (tableVersion.IsAbstract)
-                {
-                    return false;
-                }
-
-                var frameworkIds = kvp.Value;
-                var isDoraOnly = doraFrameworkId is { } doraId
-                    && frameworkIds.Count == 1
-                    && frameworkIds.Contains(doraId);
-                return !isDoraOnly;
-            })
-            .Select(kvp => kvp.Key)
-            .ToList();
-
-        // Step 3: the (table version, taxonomy) pairs — rules 4 and 5.
-        var tableVIdsByTaxonomyCode = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
-        var frameworkIdByTaxonomyCode = new Dictionary<string, int>(StringComparer.Ordinal);
-        var releaseCodeByTaxonomyCode = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        foreach (var tableVId in emittedTableVIds)
-        {
-            var tableVersion = tableVersionByTableVId[tableVId];
-            var frameworkIds = frameworkIdsByTableVId[tableVId];
-
-            foreach (var frameworkId in frameworkIds)
-            {
-                if (doraFrameworkId is { } doraId && frameworkId == doraId)
-                {
-                    continue; // DORA is not emitted as a pair, even if the table also falls in another framework.
-                }
-
-                var framework = frameworkById[frameworkId];
-                var frameworkCodeLower = framework.Code.ToLowerInvariant();
-
-                if (!releaseCodeById.TryGetValue(tableVersion.StartReleaseId, out var startReleaseCode))
-                {
-                    throw new InvalidOperationException(
-                        $"TableVersion.TableVID={tableVId} has StartReleaseID={tableVersion.StartReleaseId} "
-                        + "with no matching row in [Release].");
-                }
-
-                AddPair(frameworkCodeLower, cutoffReleaseCode, framework.FrameworkId);
-                AddPair(frameworkCodeLower, startReleaseCode, framework.FrameworkId);
-
-                void AddPair(string fwCodeLower, string releaseCode, int fwId)
-                {
-                    var taxonomyCode = $"{fwCodeLower} {releaseCode}";
-
-                    if (!tableVIdsByTaxonomyCode.TryGetValue(taxonomyCode, out var set))
-                    {
-                        set = [];
-                        tableVIdsByTaxonomyCode[taxonomyCode] = set;
-                        frameworkIdByTaxonomyCode[taxonomyCode] = fwId;
-                        releaseCodeByTaxonomyCode[taxonomyCode] = releaseCode;
-                    }
-
-                    set.Add(tableVId);
+                    set.Add(childTableVId);
                 }
             }
         }

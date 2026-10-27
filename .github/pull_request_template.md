@@ -24,7 +24,8 @@
 
 - [ ] `dotnet build` passes with no warnings
 - [ ] The fast test suite passes (`dotnet test` without data files)
-- [ ] If conversion or validation changed: the data-dependent suite passes (`EBADPM_TEST_DATA` set) — result stated above
+- [ ] If `src/EbaDpm.Converter.Core` or a dependency it uses changed: the full data-dependent suite passes, run once after the last change (`EBADPM_TEST_DATA` set), with the result stated above
+- [ ] Otherwise: any data test added or changed was run (`--filter`)
 - [ ] Tests added or updated (a fix comes with a test that fails without it)
 - [ ] Documentation updated where behaviour changed
 - [ ] `CHANGELOG.md` updated under **Unreleased** (if user-visible)

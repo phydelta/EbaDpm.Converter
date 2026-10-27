@@ -35,6 +35,15 @@ public sealed record PlaneCViolation(string TableCode, PlaneCViolationType Type,
     public string BusinessKey => $"{TableCode}\t{CanonicalSignature}";
 
     public string TypeText => Type == PlaneCViolationType.Contradicts ? "contradicts" : "no-match";
+
+    /// <summary>The sheet releases ("{FRAMEWORK} {release}") of the code in whose own publication
+    /// the signature is not contained. Detail only: not part of the business key.</summary>
+    public IReadOnlyList<string> FailedSheetReleases { get; init; } = [];
+
+    /// <summary>The diagnosis plus the sheet release(s) where it failed, for the sample detail.</summary>
+    public string DetailText => FailedSheetReleases.Count == 0
+        ? TypeText
+        : $"{TypeText} (sheet release(s): {string.Join(", ", FailedSheetReleases)})";
 }
 
 public sealed record PlaneCExtraTerm(string TableCode, string Term)
@@ -60,9 +69,10 @@ public sealed record PlaneCCoverage(
     long SheetsMatchedByPointReleaseTolerance,
     IReadOnlyList<string> PointReleaseToleranceSamples,
     IReadOnlyDictionary<PlaneCTableClass, PlaneCClassStats> ByClass,
-    // The unit of comparison is the table CODE, not the TableID: a code with more than one TableID
-    // (the same table in two taxonomies) has a SINGLE layout sheet, so comparing it twice would
-    // count the same evidence twice.
+    // The unit of comparison is the table CODE, not the TableID, and per code the distinct canonical
+    // signature: each sheet release of a code is compared against its own publication, but a
+    // signature carried by several sheet releases is counted once (contained only if contained in
+    // every one of them).
     long TableCodesWithMultipleTableIds,
     long TableCodesWithMultipleTableIdsAndIdenticalSignatures,
     long TableCodesWithInconsistentClass,
@@ -79,15 +89,17 @@ public sealed record PlaneCResult(
     PlaneCCoverage Coverage);
 
 /// <summary>
-/// The plane C comparer: compares TABLE by TABLE, by table CODE (the layout publishes ONE sheet
-/// per code, not one per taxonomy; counting the same code twice via two different <c>TableID</c>
-/// values would contrast the same evidence twice against the same sheet: 58 codes have more than
-/// one <c>TableID</c>, all 58 with an identical signature set after normalization, which produced
-/// 6,696 signatures counted twice with the old unit). The set of signatures rebuilt from the layout
-/// is compared against the UNION of the signatures of all the <c>TableID</c> values that share that
-/// code (<c>mTableCell.DatapointSignature</c>), with a CONTAINMENT criterion, never set equality.
+/// The plane C comparer: compares TABLE CODE by table code, and within a code SHEET by sheet.
+/// The layout signatures of each sheet (sheets of one code sharing framework and release are taken
+/// together) are checked for CONTAINMENT, never set equality, only against the signatures
+/// (<c>mTableCell.DatapointSignature</c>) of the <c>TableID</c> values of THAT sheet's own
+/// publication (<see cref="PlaneCReleaseMatcher.TableIdSelection.Used"/>), never against the union
+/// over the code. A code published in two releases (<c>F_18.00.e</c> in <c>finrep 4.2</c> and
+/// <c>finrep 4.2.1</c>) is therefore compared once per sheet release. The unit "tables compared" is
+/// still the code, counted once; so is a signature, per (code, canonical signature): it is contained only if contained in EVERY sheet release in which it appears, and a violation is emitted once, naming the sheet release(s) that failed. A code with more than
+/// one <c>TableID</c> and an identical signature set after normalization is reported, as before.
 ///
-/// The table class (REGULAR/open/real Z) is still measured per <c>TableID</c> and AGGREGATED by
+/// /// The table class (REGULAR/open/real Z) is still measured per <c>TableID</c> and AGGREGATED by
 /// code: the <c>TableID</c> values of one code must agree on class (it is counted and reported if
 /// they do not, never guessed).
 ///
@@ -243,139 +255,183 @@ public static class PlaneCComparer
 
             var tableClass = classesForCode[0];
 
-            // Union of the own releases of ALL the TableIDs of this code: the same code can live in
-            // taxonomies of the same release published through different paths.
-            var releaseKeys = new HashSet<(string Framework, string Release)>();
-            foreach (var id in tableIds)
+            // Pairing per sheet through PlaneCReleaseMatcher.SelectTableIds: exact pairings win
+            // over the REL.n -> REL tolerance. The comparison is PER SHEET: the sheets of one code
+            // that share (framework, release) pair with the same TableIDs and are compared together;
+            // a sheet of another release is compared on its own, against the TableIDs of ITS
+            // publication only (F_18.00.e: a 4.2 sheet and a 4.2.1 sheet, two comparisons).
+            var groups = new Dictionary<(string Framework, string Release), (PlaneCReleaseMatcher.TableIdSelection Selection, List<LayoutCellSignature> Sheets)>();
+            foreach (var s in candidateSignatures)
             {
-                if (releaseKeysByTableId.TryGetValue(id, out var set))
+                var sheetKey = (s.FrameworkCode, s.ReleaseLabel);
+                if (!groups.TryGetValue(sheetKey, out var group))
                 {
-                    releaseKeys.UnionWith(set);
+                    var selection = PlaneCReleaseMatcher.SelectTableIds(
+                        tableIds, releaseKeysByTableId, s.FrameworkCode, s.ReleaseLabel);
+                    group = (selection, []);
+                    groups[sheetKey] = group;
+                }
+
+                if (group.Selection.Match == PlaneCReleaseMatch.None)
+                {
+                    continue;
+                }
+
+                group.Sheets.Add(s);
+                if (group.Selection.Match == PlaneCReleaseMatch.PointRelease
+                    && toleratedSheetIds.Add(s.SheetId)
+                    && toleratedSamples.Count < 50)
+                {
+                    toleratedSamples.Add($"{tableCode} (sheet release='{s.ReleaseLabel}')");
                 }
             }
 
-            var ownRelease = new List<LayoutCellSignature>();
-            if (releaseKeys.Count > 0)
-            {
-                foreach (var s in candidateSignatures)
-                {
-                    var match = PlaneCReleaseMatcher.ClassifyRelease(releaseKeys, s.FrameworkCode, s.ReleaseLabel);
-                    if (match == PlaneCReleaseMatch.None)
-                    {
-                        continue;
-                    }
-
-                    ownRelease.Add(s);
-                    if (match == PlaneCReleaseMatch.PointRelease
-                        && toleratedSheetIds.Add(s.SheetId)
-                        && toleratedSamples.Count < 50)
-                    {
-                        toleratedSamples.Add($"{tableCode} (sheet release='{s.ReleaseLabel}')");
-                    }
-                }
-            }
-
-            if (ownRelease.Count == 0)
+            var pairedGroups = groups.Values.Where(g => g.Sheets.Count > 0).ToList();
+            if (pairedGroups.Count == 0)
             {
                 tablesSkippedNoMatchingLayoutSheet++;
                 continue;
             }
 
-            // Union of our signatures from ALL the TableIDs of this code (measured: for the 58
-            // duplicated codes, that union is identical to any of its parts).
-            var ourSignatures = tableIds
-                .SelectMany(id => ourSignaturesByTableId.GetValueOrDefault(id, []))
-                .ToList();
+            var codeCompared = false;
 
-            if (ourSignatures.Count == 0)
+            // The unit of the figures and of the business key stays (TableCode, CanonicalSignature):
+            // a distinct signature of the code is counted ONCE however many sheet releases carry it;
+            // it is contained only if it is contained in the population of EVERY sheet release in
+            // which it appears, and a violation is emitted ONCE, naming the sheet releases that failed.
+            var outcomeBySignature = new Dictionary<string, SignatureOutcome>(StringComparer.Ordinal);
+            var keyColumnSignatures = new HashSet<string>(StringComparer.Ordinal);
+            var ourTermUniverse = new HashSet<string>(StringComparer.Ordinal);
+            var layoutTermUniverse = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var (selection, ownRelease) in pairedGroups)
+            {
+                // Our signatures from the TableIDs actually used by THIS sheet
+                // (PlaneCReleaseMatcher.TableIdSelection.Used): never those of another publication.
+                var ourSignatures = selection.Used
+                    .SelectMany(id => ourSignaturesByTableId.GetValueOrDefault(id, []))
+                    .ToList();
+
+                if (ourSignatures.Count == 0)
+                {
+                    continue;
+                }
+
+                codeCompared = true;
+
+                // Inverted indexes over OUR signatures of this sheet's publication: term ->
+                // indexes, and dimension -> indexes (to tell "no-match" from "contradicts" without
+                // brute force O(layout signatures x our signatures)).
+                var distinctOurSignatures = ourSignatures
+                    .Select(f => (Canonical: PlaneCSignature.Canonicalize(f), Terms: f))
+                    .GroupBy(x => x.Canonical, StringComparer.Ordinal)
+                    .Select(g => g.First().Terms)
+                    .ToList();
+
+                var termIndex = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+                var dimIndex = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+                for (var i = 0; i < distinctOurSignatures.Count; i++)
+                {
+                    foreach (var term in distinctOurSignatures[i])
+                    {
+                        ourTermUniverse.Add(term);
+                        if (!termIndex.TryGetValue(term, out var list))
+                        {
+                            list = [];
+                            termIndex[term] = list;
+                        }
+
+                        list.Add(i);
+
+                        var dim = PlaneCSignature.DimensionOf(term);
+                        if (!dimIndex.TryGetValue(dim, out var dimList))
+                        {
+                            dimList = [];
+                            dimIndex[dim] = dimList;
+                        }
+
+                        if (dimList.Count == 0 || dimList[^1] != i)
+                        {
+                            dimList.Add(i);
+                        }
+                    }
+                }
+
+                var seenInGroup = new HashSet<string>(StringComparer.Ordinal);
+                var groupRelease = $"{ownRelease[0].FrameworkCode} {ownRelease[0].ReleaseLabel}";
+
+                foreach (var layoutSignature in ownRelease)
+                {
+                    foreach (var term in layoutSignature.NormalizedTerms)
+                    {
+                        layoutTermUniverse.Add(term);
+                    }
+
+                    var canonical = PlaneCSignature.Canonicalize(layoutSignature.NormalizedTerms);
+                    if (!seenInGroup.Add(canonical))
+                    {
+                        continue; // duplicate signature within this sheet's universe - already evaluated.
+                    }
+
+                    if (IsOpenAxisKeyColumnSignature(layoutSignature.NormalizedTerms))
+                    {
+                        // The layout draws the open axis key as one more grid column (Main Property =
+                        // the dimension itself); in the destination that key IS the axis, not a cell, so
+                        // there is no possible counterpart. It stays out of the compared population
+                        // (neither contained nor a violation), but counted and named.
+                        keyColumnSignatures.Add(canonical);
+                        continue;
+                    }
+
+                    if (!outcomeBySignature.TryGetValue(canonical, out var outcome))
+                    {
+                        outcome = new SignatureOutcome();
+                        outcomeBySignature[canonical] = outcome;
+                    }
+
+                    if (IsContained(layoutSignature.NormalizedTerms, termIndex))
+                    {
+                        continue;
+                    }
+
+                    var dims = layoutSignature.NormalizedTerms.Select(PlaneCSignature.DimensionOf).Distinct(StringComparer.Ordinal);
+                    outcome.HasStructuralCandidate |= HasCommonCandidate(dims, dimIndex);
+                    outcome.FailedSheetReleases.Add(groupRelease);
+                }
+            }
+
+            if (!codeCompared)
             {
                 tablesSkippedNoOutputRows++;
                 continue;
             }
 
+            // The unit "tables compared" stays the CODE: counted once however many sheets it has.
             tablesCompared++;
             byClassTables[tableClass]++;
 
-            // Inverted indexes over OUR signatures of this table: term -> indexes, and
-            // dimension -> indexes (to tell "no-match" from "contradicts" without brute force
-            // O(layout signatures x our signatures)).
-            var distinctOurSignatures = ourSignatures
-                .Select(f => (Canonical: PlaneCSignature.Canonicalize(f), Terms: f))
-                .GroupBy(x => x.Canonical, StringComparer.Ordinal)
-                .Select(g => g.First().Terms)
-                .ToList();
-
-            var termIndex = new Dictionary<string, List<int>>(StringComparer.Ordinal);
-            var dimIndex = new Dictionary<string, List<int>>(StringComparer.Ordinal);
-            var ourTermUniverse = new HashSet<string>(StringComparer.Ordinal);
-            for (var i = 0; i < distinctOurSignatures.Count; i++)
+            foreach (var (canonical, outcome) in outcomeBySignature)
             {
-                foreach (var term in distinctOurSignatures[i])
-                {
-                    ourTermUniverse.Add(term);
-                    if (!termIndex.TryGetValue(term, out var list))
-                    {
-                        list = [];
-                        termIndex[term] = list;
-                    }
-
-                    list.Add(i);
-
-                    var dim = PlaneCSignature.DimensionOf(term);
-                    if (!dimIndex.TryGetValue(dim, out var dimList))
-                    {
-                        dimList = [];
-                        dimIndex[dim] = dimList;
-                    }
-
-                    if (dimList.Count == 0 || dimList[^1] != i)
-                    {
-                        dimList.Add(i);
-                    }
-                }
-            }
-
-            var layoutTermUniverse = new HashSet<string>(StringComparer.Ordinal);
-            var seenLayoutSignatures = new HashSet<string>(StringComparer.Ordinal);
-
-            foreach (var layoutSignature in ownRelease)
-            {
-                foreach (var term in layoutSignature.NormalizedTerms)
-                {
-                    layoutTermUniverse.Add(term);
-                }
-
-                var canonical = PlaneCSignature.Canonicalize(layoutSignature.NormalizedTerms);
-                if (!seenLayoutSignatures.Add(canonical))
-                {
-                    continue; // duplicate signature within this table's universe - already evaluated.
-                }
-
-                if (IsOpenAxisKeyColumnSignature(layoutSignature.NormalizedTerms))
-                {
-                    // The layout draws the open axis key as one more grid column (Main Property =
-                    // the dimension itself); in the destination that key IS the axis, not a cell, so
-                    // there is no possible counterpart. It stays out of the compared population
-                    // (neither contained nor a violation), but counted and named.
-                    signaturesExcludedKeyColumn++;
-                    keyColumnExclusionsByTable[tableCode] = keyColumnExclusionsByTable.GetValueOrDefault(tableCode) + 1;
-                    continue;
-                }
-
                 signaturesCompared++;
                 byClassSignaturesCompared[tableClass]++;
-
-                if (IsContained(layoutSignature.NormalizedTerms, termIndex))
+                if (outcome.FailedSheetReleases.Count == 0)
                 {
                     signaturesContained++;
                     byClassSignaturesContained[tableClass]++;
                     continue;
                 }
 
-                var dims = layoutSignature.NormalizedTerms.Select(PlaneCSignature.DimensionOf).Distinct(StringComparer.Ordinal);
-                var hasStructuralCandidate = HasCommonCandidate(dims, dimIndex);
-                var type = hasStructuralCandidate ? PlaneCViolationType.Contradicts : PlaneCViolationType.NoMatch;
-                violations.Add(new PlaneCViolation(tableCode, type, canonical, tableClass));
+                var type = outcome.HasStructuralCandidate ? PlaneCViolationType.Contradicts : PlaneCViolationType.NoMatch;
+                violations.Add(new PlaneCViolation(tableCode, type, canonical, tableClass)
+                {
+                    FailedSheetReleases = outcome.FailedSheetReleases,
+                });
+            }
+
+            if (keyColumnSignatures.Count > 0)
+            {
+                signaturesExcludedKeyColumn += keyColumnSignatures.Count;
+                keyColumnExclusionsByTable[tableCode] = keyColumnExclusionsByTable.GetValueOrDefault(tableCode) + keyColumnSignatures.Count;
             }
 
             foreach (var term in ourTermUniverse.Where(t => !layoutTermUniverse.Contains(t)))
@@ -416,6 +472,13 @@ public static class PlaneCComparer
             keyColumnExclusionSamples);
 
         return new PlaneCResult(violations, extraTerms, coverage);
+    }
+
+    private sealed class SignatureOutcome
+    {
+        public bool HasStructuralCandidate { get; set; }
+
+        public List<string> FailedSheetReleases { get; } = [];
     }
 
     /// <summary>

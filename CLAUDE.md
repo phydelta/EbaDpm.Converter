@@ -93,11 +93,28 @@ $env:EBADPM_TEST_DATA = 'none'; dotnet test
 Remove-Item Env:EBADPM_TEST_DATA -ErrorAction Ignore; dotnet test
 ```
 
-- Iterate with the fast loop or a `--filter`. Run the full suite **once per cycle**, after
-  grouping the changes in flight, and before any pull request that touches conversion or
-  validation. Do not rerun it on unchanged code.
 - Test collections run sequentially: ACE OLEDB is not safe for concurrent use inside one process.
   Real concurrency over Access is only possible across processes.
+
+## When to run the full suite
+
+CI has no EBA data files, so it runs only the fast suite. The data-dependent tests run only
+locally, and they are the only net under the conversion: running them only before a release would
+let several conversion changes reach `main` unchecked, and a failure found at release time, often
+on the day the EBA publishes, would have to be traced back through every pull request merged since
+the last release. The full suite therefore runs **once per pull request that can change the
+output**, not once per iteration and not only at release time.
+
+| Situation | What to run |
+|---|---|
+| Iterating (developer → tester cycles) | Fast loop, plus `--filter` over the data tests of the area touched. Never the full suite. |
+| Pull request that changes `src/EbaDpm.Converter.Core` (readers, mapping, SQLite writer, validation, layouts, resources such as the schema DDL, `KnownExceptions.cs` or the plane C divergences files), or bumps a dependency the conversion uses | Full suite **once**, after the last change to that code and before the pull request is opened or marked ready. State the result in the pull request. Rerun only if that code changes again. |
+| Pull request with docs, CI, CLI-only or test-only changes | Fast loop, plus `--filter` over any data test added or changed (a test that has not run does not count). |
+| Release pull request (`release/X.Y.Z`) | Full suite once, as a confirmation ([docs/releasing.md](docs/releasing.md)). It should pass without surprises; a failure there means a pull request skipped this policy, and finding which one comes before the release. |
+
+- Group the changes in flight before a full run; never rerun it on unchanged code, and never rerun
+  it because a subagent already ran it on the same code.
+- When in doubt whether a change can alter the output, treat it as if it can.
 
 ## Querying the data
 

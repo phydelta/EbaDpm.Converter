@@ -130,7 +130,7 @@ public static class Validator
             .Concat(TemplateChecks.Run(c))
             .Concat(AxisChecks.Run(c))
             .Concat(CellChecks.Run(c, model))
-            .Concat(ModuleChecks.Run(c))
+            .Concat(ModuleChecks.Run(c, model))
             .Concat(ConceptChecks.Run(c, model))
             .Concat(EmptyTableChecks.Run(c, model));
 

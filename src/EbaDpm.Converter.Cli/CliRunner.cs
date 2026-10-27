@@ -45,6 +45,7 @@ public static class CliRunner
           --taxonomykeys "..."              by TaxonomyKey (a derived identifier, not a stored value)
                                              e.g.: corep/its-005-2020/2022-03-01 (up to 3.x), sbp/4.0 (from 4.0)
           --releases 4.0,4.1                by DpmPackageCode
+                                             DPM 2.0: the release a taxonomy's module versions start in (not the cutoff)
           --all                             all taxonomies
 
         --list-taxonomies shows both columns (TaxonomyKey and TaxonomyCode) in case you do not know what to type.
@@ -498,7 +499,7 @@ public static class CliRunner
 
         var moduleResult = Dpm20ModuleLoader.Load(
             accessReader, destination, modules, moduleVersions, compositions, tableVersions, frameworks,
-            selectedTaxonomies, structure);
+            releases, selectedTaxonomies, structure);
 
         // FINAL phase, after the six previous loaders. Mints mConcept and mConceptTranslation by
         // reading what has already been written; it does not touch any of the six loaders above.

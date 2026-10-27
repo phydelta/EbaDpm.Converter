@@ -31,6 +31,10 @@ Pre-releases use a SemVer suffix (`1.2.0-rc.1`).
    $env:EBADPM_TEST_DATA = "D:\eba-data"
    dotnet test
    ```
+   Every pull request that changed the conversion already ran this suite before it was merged
+   (see [CONTRIBUTING.md](../CONTRIBUTING.md#test)), so this run is a confirmation and should pass.
+   If it fails, find the pull request that introduced the failure and fix it before releasing;
+   do not register a known exception to get the release through.
 3. **Merge** the pull request once CI is green and it is approved.
 4. **Run the release workflow**: *Actions → Release → Run workflow*, on branch `main`. Tick
    *prerelease* for versions with a suffix, or *draft* to review the release before it becomes

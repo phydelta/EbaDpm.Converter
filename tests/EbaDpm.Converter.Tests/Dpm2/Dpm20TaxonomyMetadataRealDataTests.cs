@@ -248,7 +248,7 @@ public abstract class TaxonomyMetadataRealDataTestsBase
     }
 }
 
-/// <summary>4.3 publication, natural cutoff 4.3 (53 taxonomies).</summary>
+/// <summary>4.3 publication, natural cutoff 4.3 (21 taxonomies, one per (framework, start release) of its module versions).</summary>
 [Collection("Dpm2043ValidateSuite")]
 [Trait("Tier", "RealData")]
 public sealed class Dpm2043TaxonomyMetadataTests(Dpm2043ValidateFixture fixture) : TaxonomyMetadataRealDataTestsBase, IDisposable
@@ -269,27 +269,32 @@ public sealed class Dpm2043TaxonomyMetadataTests(Dpm2043ValidateFixture fixture)
     public void Dispose() => _connection?.Dispose();
 
     [DataTheory]
-    // R' differs from R: nothing starts in 4.3, the greatest start is 4.2.
-    [InlineData("corep 4.3", "Common Reporting 4.1.0 (DPM 4.3)", "4.3", "2026-06-28", "2026-03-31", "9999-12-31")]
+    // The module versions of the framework start in 4.2: the taxonomy is corep 4.2 (there is no corep 4.3).
     [InlineData("corep 4.2", "Common Reporting 4.1.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
-    // R' = 4.2.1 (finrep starts new module versions there), label version is the one of R'.
-    [InlineData("finrep 4.3", "Financial Reporting 1.1.0 (DPM 4.3)", "4.3", "2026-06-28", "2026-03-31", "9999-12-31")]
+    // The only module version of finrep that starts in 4.2.1 gives finrep 4.2.1.
     [InlineData("finrep 4.2.1", "Financial Reporting 1.1.0 (DPM 4.2.1)", "4.2.1", "2026-02-15", "2026-03-31", "9999-12-31")]
-    // ToDate closed by a successor with a later FromDate.
-    [InlineData("corep 4.0", "Common Reporting 4.0.0 (DPM 4.0)", "4.0", "2024-12-19", "2024-12-31", "2026-03-30")]
-    [InlineData("esg 4.1", "ESG 1.2.0 (DPM 4.1)", "4.1", "2025-04-28", "2025-06-30", "2026-03-30")]
-    [InlineData("esg 4.0", "ESG 1.1.0 (DPM 4.0)", "4.0", "2024-12-19", "2024-12-31", "2025-06-29")]
-    // Successor with EQUAL FromDate is skipped (rem 4.0 shares 2024-12-31; closed by 4.2).
-    [InlineData("rem 3.5", "Remuneration 2.1.0 (DPM 3.5)", "3.5", "2024-07-11", "2024-12-31", "2026-03-30")]
-    // Successors with EQUAL FromDate only: stays open.
-    [InlineData("pay 4.1", "Payments 1.0.0 (DPM 4.1)", "4.1", "2025-04-28", "2022-12-31", "9999-12-31")]
-    // Framework new in 4.3, FromDate in the future.
+    // Frameworks new in 4.3: their module versions start in 4.3, FromDate in the future.
     [InlineData("tcb 4.3", "Third-country Branches 1.0.0 (DPM 4.3)", "4.3", "2026-06-28", "2027-03-31", "9999-12-31")]
+    [InlineData("amla 4.3", "EBA-AMLA collaboration 1.0.0 (DPM 4.3)", "4.3", "2026-06-28", "2026-12-31", "9999-12-31")]
     public void Anchor_Row(string code, string label, string version, string pub, string from, string to)
         => AssertRow(code, label, version, pub, from, to);
+
+    [DataTheory]
+    [InlineData("corep 4.3")]
+    [InlineData("finrep 4.3")]
+    [InlineData("corep 4.0")]
+    [InlineData("esg 4.1")]
+    [InlineData("pay 4.1")]
+    public void Taxonomy_WithoutAModuleVersionStartingInItsRelease_DoesNotExist(string code)
+    {
+        using var command = Connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(1) FROM mTaxonomy WHERE TaxonomyCode = $c";
+        command.Parameters.AddWithValue("$c", code);
+        Assert.Equal(0L, Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture));
+    }
 }
 
-/// <summary>4.2.1 publication, natural cutoff 4.2.1 (50 taxonomies).</summary>
+/// <summary>4.2.1 publication, natural cutoff 4.2.1 (19 taxonomies: 18 on 4.2 plus finrep 4.2.1).</summary>
 [Collection("Dpm2042_1ValidateSuite")]
 [Trait("Tier", "RealData")]
 public sealed class Dpm2042_1TaxonomyMetadataTests(Dpm2042_1ValidateFixture fixture) : TaxonomyMetadataRealDataTestsBase, IDisposable
@@ -303,19 +308,29 @@ public sealed class Dpm2042_1TaxonomyMetadataTests(Dpm2042_1ValidateFixture fixt
     public void Dispose() => _connection?.Dispose();
 
     [DataTheory]
-    [InlineData("corep 4.2.1", "Common Reporting 4.1.0 (DPM 4.2.1)", "4.2.1", "2026-02-15", "2026-03-31", "9999-12-31")]
     [InlineData("corep 4.2", "Common Reporting 4.1.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
-    [InlineData("corep 4.0", "Common Reporting 4.0.0 (DPM 4.0)", "4.0", "2024-12-19", "2024-12-31", "2026-03-30")]
-    [InlineData("esg 4.1", "ESG 1.2.0 (DPM 4.1)", "4.1", "2025-04-28", "2025-06-30", "2026-03-30")]
     // finrep starts module versions in 4.2.1 (equal FromDate to 4.2): finrep 4.2 stays open.
     [InlineData("finrep 4.2", "Financial Reporting 3.3.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
     [InlineData("finrep 4.2.1", "Financial Reporting 1.1.0 (DPM 4.2.1)", "4.2.1", "2026-02-15", "2026-03-31", "9999-12-31")]
-    [InlineData("rem 3.5", "Remuneration 2.1.0 (DPM 3.5)", "3.5", "2024-07-11", "2024-12-31", "2026-03-30")]
     public void Anchor_Row(string code, string label, string version, string pub, string from, string to)
         => AssertRow(code, label, version, pub, from, to);
+
+    [DataTheory]
+    [InlineData("corep 4.2.1")]
+    [InlineData("esg 4.2.1")]
+    [InlineData("corep 4.0")]
+    [InlineData("esg 4.1")]
+    [InlineData("rem 3.5")]
+    public void Taxonomy_WithoutAModuleVersionStartingInItsRelease_DoesNotExist(string code)
+    {
+        using var command = Connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(1) FROM mTaxonomy WHERE TaxonomyCode = $c";
+        command.Parameters.AddWithValue("$c", code);
+        Assert.Equal(0L, Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture));
+    }
 }
 
-/// <summary>4.2.1 database with the explicit cutoff 4.2 (32 taxonomies): nothing after 4.2 may appear or influence a row.</summary>
+/// <summary>4.2.1 database with the explicit cutoff 4.2 (18 taxonomies, all on 4.2): nothing after 4.2 may appear or influence a row.</summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
 public sealed class Dpm2042CutoffTaxonomyMetadataTests(Dpm20SkeletonFixture fixture) : TaxonomyMetadataRealDataTestsBase
@@ -326,8 +341,6 @@ public sealed class Dpm2042CutoffTaxonomyMetadataTests(Dpm20SkeletonFixture fixt
 
     [DataTheory]
     [InlineData("corep 4.2", "Common Reporting 4.1.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
-    [InlineData("corep 4.0", "Common Reporting 4.0.0 (DPM 4.0)", "4.0", "2024-12-19", "2024-12-31", "2026-03-30")]
-    [InlineData("esg 4.1", "ESG 1.2.0 (DPM 4.1)", "4.1", "2025-04-28", "2025-06-30", "2026-03-30")]
     // Under cutoff 4.2 the 4.2.1 module versions of finrep do not exist: label version is the 4.2 one.
     [InlineData("finrep 4.2", "Financial Reporting 3.3.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
     public void Anchor_Row(string code, string label, string version, string pub, string from, string to)

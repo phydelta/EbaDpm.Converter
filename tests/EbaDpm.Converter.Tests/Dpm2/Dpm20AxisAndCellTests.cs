@@ -115,6 +115,9 @@ public sealed class Dpm20AxisAndCellTests(Dpm20SkeletonFixture fixture)
 
         var counts = rows.ToDictionary(r => (Orientation: r[0]!, IsOpen: r[1]!), r => int.Parse(r[2]!));
 
+        // Since issue 66 (taxonomy = framework + StartRelease of the module version) the pairs that the
+        // old rule hung from taxonomies without a module are gone: every count of this test is the old one
+        // minus the axes of those pairs (checked cell by cell against the old output, see ReleasePins).
         // After the abstract-closure rule: +1 on each closed one (X/Y/Z) for the three closed axes
         // of C_34.02.b/if 4.2 - the open ones (Y=241, Z=148) do not change, the new table
         // contributes no open axis. Before it: X=846, closed Y=718, closed Z=37.
