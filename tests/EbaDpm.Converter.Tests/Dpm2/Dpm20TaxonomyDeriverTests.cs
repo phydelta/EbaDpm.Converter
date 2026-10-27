@@ -6,56 +6,17 @@ using Microsoft.Data.Sqlite;
 namespace EbaDpm.Converter.Tests.Dpm2;
 
 /// <summary>
-/// <c>Dpm20TaxonomyDeriver</c>: the taxonomy derivation. The populations are scoped pins of
-/// <see cref="ReleasePins"/> (scope <see cref="ReleasePins.Dpm20Cutoff42"/>), exact except where
-/// containment (not equality) is the right comparison.
+/// <c>Dpm20TaxonomyDeriver</c> over the real 4.2.1 database with the explicit cutoff 4.2. Rule
+/// (issue 66): a module version hangs from the taxonomy (framework, <c>StartRelease</c>); the
+/// taxonomies are exactly those of the emitted module versions. Every expectation is derived
+/// from the Access database with independent OLEDB queries (<see cref="AccessCensus"/>), never
+/// through the deriver. The only pin left is the number of distinct table codes, which does not
+/// depend on the taxonomy rule.
 /// </summary>
 [Collection("Dpm2")]
 public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
 {
-    /// <summary>
-    /// EXACT breakdown per taxonomy, a scoped census (<see cref="ReleasePins.Dpm20Cutoff42"/>) that
-    /// sums to <see cref="ReleasePins.Dpm20Cutoff42MTableRows"/> (one more than before the
-    /// abstract-table closure rule): a module composition declared <c>C_34.02.b</c> as an ABSTRACT table in <c>if 4.2</c>,
-    /// and the abstract-closure rule adds its current concrete children -- the pair
-    /// <c>(if 4.2, C_34.02.b)</c> goes from 0 to 1, and only <c>if 4.2</c> changes: no other
-    /// taxonomy moves.
-    /// </summary>
-    private static readonly Dictionary<string, int> ExpectedTableCountByTaxonomyCode = new(StringComparer.Ordinal)
-    {
-        ["ae 4.2"] = 23,
-        ["corep 4.0"] = 2,
-        ["corep 4.2"] = 159,
-        ["esg 4.0"] = 3,
-        ["esg 4.1"] = 4,
-        ["esg 4.2"] = 25,
-        ["fc 3.5"] = 1,
-        ["fc 4.0"] = 1,
-        ["fc 4.2"] = 13,
-        ["finrep 4.0"] = 3,
-        ["finrep 4.2"] = 136,
-        ["fp 4.2"] = 15,
-        ["gsii 4.2"] = 1,
-        ["if 4.0"] = 2,
-        ["if 4.2"] = 48,
-        ["imprac 4.2"] = 4,
-        ["ipu 4.2"] = 1,
-        ["irrbb 4.2"] = 18,
-        ["mica 4.0"] = 1,
-        ["mica 4.1"] = 3,
-        ["mica 4.2"] = 19,
-        ["mrel 4.2"] = 10,
-        ["pay 4.1"] = 1,
-        ["pay 4.2"] = 20,
-        ["pillar3 4.0"] = 3,
-        ["pillar3 4.1"] = 19,
-        ["pillar3 4.2"] = 193,
-        ["rem 3.5"] = 2,
-        ["rem 4.0"] = 3,
-        ["rem 4.2"] = 39,
-        ["res 4.2"] = 38,
-        ["sbp 4.2"] = 37,
-    };
+    private static string Accdb => RepoPaths.AccessDpm20DatabasePath;
 
     private Dpm20TaxonomyDerivationResult Derive()
         => Dpm20TaxonomyDeriver.Derive(
@@ -84,7 +45,7 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
             $"Abstract TableVersion in force at {RepoPaths.Cutoff42ReleaseCode}: the source counts {expectedAbstract}, the reader returned {abstractCount}.");
     }
 
-    /// <summary>Emitted = non-abstract, without DORA: the pinned number of table versions, and as many DISTINCT codes.</summary>
+    /// <summary>Emitted = non-abstract, without DORA: the pinned number of distinct table codes, one table version per code.</summary>
     [DataFact]
     public void Derive_EmitsExactlyThePinnedDistinctTableCodes()
     {
@@ -95,93 +56,111 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
             .Distinct()
             .ToList();
 
-        ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "distinct emitted table versions", ReleasePins.Dpm20Cutoff42EmittedTableCodes, emittedTableVIds.Count);
-
         var tableVersionByVId = fixture.TableVersions.ToDictionary(tv => tv.TableVId);
         var distinctCodes = emittedTableVIds.Select(id => tableVersionByVId[id].Code).Distinct().ToList();
         ReleasePins.AssertPinned(
             ReleasePins.Dpm20Cutoff42, "distinct emitted table codes", ReleasePins.Dpm20Cutoff42EmittedTableCodes, distinctCodes.Count);
-    }
-
-    [DataFact]
-    public void Derive_ProducesThePinnedTableTaxonomyPairs()
-    {
-        var derivation = Derive();
-
-        var totalPairs = derivation.TableCounts.Sum(c => c.TableCount);
-
-        // The abstract-closure rule adds the pair (if 4.2, C_34.02.b) that the closure without
-        // resolving abstract tables used to lose.
-        ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "derived (taxonomy, table) pairs", ReleasePins.Dpm20Cutoff42MTableRows, totalPairs);
-    }
-
-    [DataFact]
-    public void Derive_ProducesThePinnedTaxonomies_AndThePinnedNumberOfDistinctFrameworks()
-    {
-        var derivation = Derive();
-
-        // One more than the reference, deliberate: all of the reference's, plus "pay 4.1".
-        ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "derived taxonomies", ReleasePins.Dpm20Cutoff42MTaxonomyRows, derivation.Taxonomies.Count);
-
-        var distinctFrameworks = derivation.Taxonomies.Select(t => t.FrameworkId).Distinct().Count();
-        Assert.True(
-            ReleasePins.Dpm20Cutoff42FrameworksWithTaxonomies == distinctFrameworks,
-            ReleasePins.Message(ReleasePins.Dpm20Cutoff42, "distinct frameworks carrying a derived taxonomy", ReleasePins.Dpm20Cutoff42FrameworksWithTaxonomies, distinctFrameworks));
-    }
-
-    /// <summary>Exact breakdown, one by one, against <see cref="ExpectedTableCountByTaxonomyCode"/>.</summary>
-    [DataFact]
-    public void Derive_TableCountPerTaxonomy_MatchesTheMeasuredBreakdown()
-    {
-        var derivation = Derive();
-
-        var countByCode = derivation.Taxonomies
-            .Join(derivation.TableCounts, t => t.TaxonomyId, c => c.TaxonomyId, (t, c) => (t.TaxonomyCode, c.TableCount))
-            .ToDictionary(x => x.TaxonomyCode, x => x.TableCount, StringComparer.Ordinal);
-
-        var pin = ReleasePins.Dpm20Cutoff42;
-        ReleasePins.AssertPinned(pin, "derived taxonomies with a table count", ExpectedTableCountByTaxonomyCode.Count, countByCode.Count);
-
-        foreach (var (code, expectedCount) in ExpectedTableCountByTaxonomyCode)
-        {
-            Assert.True(countByCode.TryGetValue(code, out var actualCount), $"Derived taxonomy '{code}' is missing ({pin}).");
-            ReleasePins.AssertPinned(pin, $"tables derived for taxonomy '{code}'", expectedCount, actualCount);
-        }
-
-        // Identity: the breakdown sums to the pinned mTable population.
-        ReleasePins.AssertPinned(
-            pin, "sum of the tables derived per taxonomy", ReleasePins.Dpm20Cutoff42MTableRows, countByCode.Values.Sum());
+        Assert.Equal(emittedTableVIds.Count, distinctCodes.Count);
     }
 
     /// <summary>
-    /// Comparison by CONTAINMENT, never by equality. The 31 <c>TaxonomyCode</c> values of
-    /// <c>mTaxonomy</c> (EBA_4.2_Hotfix.db) must ALL be among the derived ones, and NONE may be
-    /// left only in the reference. A test demanding equal censuses would be wrongly written.
+    /// The taxonomy codes are exactly the distinct (lower-case framework, StartRelease.Code) of the
+    /// emitted module versions, read from Access: no taxonomy without a module, none missing. The
+    /// distinct frameworks carrying a taxonomy are those of the same query.
     /// </summary>
     [DataFact]
-    public void Derive_Contains_AllReferenceTaxonomyCodes_ByContainment()
+    public void Derive_TaxonomyCodes_AreTheDistinctFrameworkAndStartReleaseOfTheEmittedModuleVersions()
+    {
+        var derivation = Derive();
+        var expected = AccessCensus.EmittedModuleCodesByTaxonomy(Accdb, RepoPaths.Cutoff42ReleaseCode);
+
+        Assert.True(expected.Count > 0, "The independent query returned no taxonomy: the comparison would be vacuous.");
+        Assert.Equal(
+            expected.Keys.OrderBy(k => k, StringComparer.Ordinal),
+            derivation.Taxonomies.Select(t => t.TaxonomyCode).OrderBy(k => k, StringComparer.Ordinal));
+
+        var expectedFrameworks = expected.Keys.Select(k => k[..k.IndexOf(' ', StringComparison.Ordinal)]).Distinct().Count();
+        Assert.Equal(expectedFrameworks, derivation.Taxonomies.Select(t => t.FrameworkId).Distinct().Count());
+
+        // DpmPackageCode is the release the module versions start in: the part of the code after the space.
+        Assert.All(
+            derivation.Taxonomies,
+            t => Assert.Equal(t.TaxonomyCode[(t.TaxonomyCode.IndexOf(' ', StringComparison.Ordinal) + 1)..], t.DpmPackageCode));
+    }
+
+    /// <summary>The (taxonomy, table) pairs: as many as the independent derivation from Access.</summary>
+    [DataFact]
+    public void Derive_TableTaxonomyPairs_EqualTheIndependentDerivationFromAccess()
+    {
+        var derivation = Derive();
+        var expectedPairs = AccessCensus.TableCodesByTaxonomy(Accdb, RepoPaths.Cutoff42ReleaseCode).Values.Sum(v => v.Count);
+        var actualPairs = derivation.TableCounts.Sum(c => c.TableCount);
+
+        Assert.True(expectedPairs > 0, "The independent query returned no pair: the comparison would be vacuous.");
+        Assert.True(
+            expectedPairs == actualPairs,
+            $"derived (taxonomy, table) pairs: expected {expectedPairs} (derived from '{RepoPaths.AccessDpm20DatabaseFileName}'), actual {actualPairs}.");
+    }
+
+    /// <summary>Exact table CODES of every taxonomy, one by one, against the independent derivation.</summary>
+    [DataFact]
+    public void Derive_TablesOfEveryTaxonomy_EqualTheIndependentDerivationFromAccess()
+    {
+        var derivation = Derive();
+        var tableCodeByVId = fixture.TableVersions.ToDictionary(tv => tv.TableVId, tv => tv.Code);
+        var actual = derivation.Taxonomies.ToDictionary(
+            t => t.TaxonomyCode,
+            t => derivation.TableVIdsByTaxonomyId[t.TaxonomyId].Select(v => tableCodeByVId[v]).ToList(),
+            StringComparer.Ordinal);
+        var expected = AccessCensus.TableCodesByTaxonomy(Accdb, RepoPaths.Cutoff42ReleaseCode);
+
+        Assert.Equal(expected.Keys.OrderBy(k => k, StringComparer.Ordinal), actual.Keys.OrderBy(k => k, StringComparer.Ordinal));
+        foreach (var (code, expectedCodes) in expected)
+        {
+            var actualCodes = actual[code];
+            Assert.True(
+                actualCodes.Count == actualCodes.Distinct().Count(),
+                $"Taxonomy '{code}' lists a table version twice.");
+            Assert.True(
+                expectedCodes.SetEquals(actualCodes),
+                $"Taxonomy '{code}': tables only in Access [{string.Join(",", expectedCodes.Except(actualCodes))}]; only derived [{string.Join(",", actualCodes.Except(expectedCodes))}].");
+        }
+    }
+
+    /// <summary>
+    /// Plane B, information only. The reference export has more taxonomies than the rule derives (it
+    /// keeps the ones of older releases): every derived taxonomy is among its codes (containment of
+    /// the derived set in the reference), and the reference taxonomies we do not derive are exactly
+    /// those that have no module in the reference.
+    /// </summary>
+    [DataFact]
+    public void Derive_TaxonomyCodes_AreContainedInTheReference_AndTheOnesLeftOutHaveNoModuleThere()
     {
         RepoPaths.EnsureReferenceDatabaseExists();
 
         var derivation = Derive();
         var derivedCodes = derivation.Taxonomies.Select(t => t.TaxonomyCode).ToHashSet(StringComparer.Ordinal);
 
-        var referenceCodes = ReadReferenceTaxonomyCodes();
-
-        var onlyInReference = referenceCodes.Except(derivedCodes).ToList();
-
+        var referenceCodes = ReadReferenceTaxonomyCodes("SELECT TaxonomyCode FROM mTaxonomy");
         ReleasePins.AssertPinned(
             ReleasePins.Reference42, "reference mTaxonomy codes", ReleasePins.Reference42MTaxonomyRows, referenceCodes.Count);
+
+        var onlyDerived = derivedCodes.Except(referenceCodes).ToList();
         Assert.True(
-            onlyInReference.Count == 0,
-            $"Reference taxonomy codes not derived: {string.Join(", ", onlyInReference)}.");
-        Assert.True(referenceCodes.IsSubsetOf(derivedCodes), "The reference taxonomy codes are not a subset of the derived ones.");
+            onlyDerived.Count == 0,
+            $"Derived taxonomy codes absent from the reference: {string.Join(", ", onlyDerived)}.");
+
+        var onlyInReference = referenceCodes.Except(derivedCodes).OrderBy(c => c, StringComparer.Ordinal).ToList();
+        var withoutModuleInReference = ReadReferenceTaxonomyCodes(
+                "SELECT t.TaxonomyCode FROM mTaxonomy t WHERE NOT EXISTS (SELECT 1 FROM mModule m WHERE m.TaxonomyID = t.TaxonomyID)")
+            .OrderBy(c => c, StringComparer.Ordinal)
+            .ToList();
+        Assert.True(
+            onlyInReference.SequenceEqual(withoutModuleInReference),
+            $"Reference taxonomies we do not derive: [{string.Join(", ", onlyInReference)}]; reference taxonomies without a module: [{string.Join(", ", withoutModuleInReference)}].");
     }
 
-    private static HashSet<string> ReadReferenceTaxonomyCodes()
+    private static HashSet<string> ReadReferenceTaxonomyCodes(string sql)
     {
         var connectionString = new SqliteConnectionStringBuilder
         {
@@ -193,7 +172,7 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT TaxonomyCode FROM mTaxonomy";
+        command.CommandText = sql;
 
         var codes = new HashSet<string>(StringComparer.Ordinal);
         using var reader = command.ExecuteReader();
@@ -206,13 +185,14 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
     }
 
     /// <summary>
-    /// The INTERMEDIATE release does not generate a pair. Witness case <c>D_04.00</c> (ESG
-    /// framework): current since 4.0, still alive today (4.2). It must produce <c>esg 4.0</c> and
-    /// <c>esg 4.2</c>, and NOT <c>esg 4.1</c> -- skipping the intermediate release is the rule, not
-    /// an accident.
+    /// Witness case <c>D_04.00</c> (ESG framework): current since 4.0, still alive at the cutoff.
+    /// Under the rule "a module version hangs from the taxonomy of its StartRelease" the table lands
+    /// ONLY in the taxonomies of the ESG module versions that compose it (here <c>esg 4.2</c>): the
+    /// old copies of the table in <c>esg 4.0</c> and <c>esg 4.1</c> do not exist, because no ESG
+    /// module version starts in those releases. The expected taxonomies are read from Access.
     /// </summary>
     [DataFact]
-    public void Derive_D_04_00_SkipsTheIntermediateRelease()
+    public void Derive_D_04_00_LandsOnlyInTheTaxonomiesOfItsModuleVersions()
     {
         var tableVersion = fixture.TableVersions.SingleOrDefault(tv => tv.Code == "D_04.00");
         Assert.True(tableVersion is not null, "The current version of D_04.00 was not found in the source (has the measured data changed?).");
@@ -224,8 +204,15 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
             .Select(kvp => derivation.Taxonomies.Single(t => t.TaxonomyId == kvp.Key).TaxonomyCode)
             .ToHashSet(StringComparer.Ordinal);
 
-        Assert.Contains("esg 4.0", taxonomyCodesForTable);
+        var expected = AccessCensus.TableCodesByTaxonomy(Accdb, RepoPaths.Cutoff42ReleaseCode)
+            .Where(kvp => kvp.Value.Contains("D_04.00"))
+            .Select(kvp => kvp.Key)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.NotEmpty(expected);
         Assert.Contains("esg 4.2", taxonomyCodesForTable);
+        Assert.Equal(expected.OrderBy(c => c, StringComparer.Ordinal), taxonomyCodesForTable.OrderBy(c => c, StringComparer.Ordinal));
+        Assert.DoesNotContain("esg 4.0", taxonomyCodesForTable);
         Assert.DoesNotContain("esg 4.1", taxonomyCodesForTable);
     }
 

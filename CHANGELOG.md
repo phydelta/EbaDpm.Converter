@@ -6,6 +6,22 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking (DPM 2.0 output).** A module now belongs to the taxonomy of the release in which its
+  current module version was published (`ModuleVersion.StartReleaseID`), not to the cutoff
+  release. `mModule.XBRLSchemaRef` carries that release
+  (`…/fws/finrep/4.2.1/mod/finrep9dp.xsd`, `…/fws/corep/4.2/mod/…` on the 4.3 database), and
+  `mTaxonomy` holds only taxonomies that have at least one module: 21 on the 4.3 database
+  instead of 53, and 19 on 4.2.1 instead of 50. `TaxonomyCode` values change accordingly, and
+  `--releases 4.3` selects only the taxonomies published in 4.3. The template tree of
+  `mTemplateOrTable` is built for every taxonomy. (#66)
+- `--validate --layouts`: when a table code belongs to taxonomies of two releases of one
+  framework, each layout sheet is compared only with the tables of its own release. The
+  point-release tolerance applies only when no table of the exact release exists. Before, both
+  tables were used together, and an equality rule over such a code was reported as not checkable
+  (ambiguous cell).
+
 ## 1.3.0 - 2026-10-23
 
 ### Added

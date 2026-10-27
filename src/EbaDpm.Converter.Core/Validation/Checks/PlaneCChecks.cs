@@ -69,8 +69,9 @@ public static class PlaneCChecks
 
         var c = result.Coverage;
         var coverageStatement =
-            $"plane C coverage, unit = table CODE (the layout publishes one sheet per code, not per " +
-            $"TableID): {c.TablesCompared} tables compared, " +
+            $"plane C coverage, unit = table CODE and, per code, distinct signature (compared per sheet release against " +
+            $"the TableIDs of that release only; a signature is contained if contained in every sheet release " +
+            $"where it appears): {c.TablesCompared} tables compared, " +
             $"{c.SignaturesCompared} signatures compared ({c.SignaturesContained} contained); excluded: " +
             $"{c.TablesSkippedNoMatchingLayoutSheet} table(s) without a layout sheet of their release, " +
             $"{c.TablesSkippedNoOutputRows} table(s) without output, {c.LayoutTableCodesWithoutGeneratedTable} " +
@@ -278,7 +279,7 @@ public static class PlaneCChecks
         if (generatedRelease is null)
         {
             var rawSamples = result.Violations
-                .Select(v => new CheckSample(v.BusinessKey, Generated: null, Reference: v.TypeText))
+                .Select(v => new CheckSample(v.BusinessKey, Generated: null, Reference: v.DetailText))
                 .ToList();
 
             return CheckResult.FromViolationCount(
@@ -301,7 +302,7 @@ public static class PlaneCChecks
         var violationByKey = result.Violations.ToDictionary(v => v.BusinessKey, StringComparer.Ordinal);
         var samples = unresolved
             .Select(key => violationByKey.TryGetValue(key, out var v)
-                ? new CheckSample(v.BusinessKey, Generated: null, Reference: v.TypeText)
+                ? new CheckSample(v.BusinessKey, Generated: null, Reference: v.DetailText)
                 : new CheckSample(key)) // "(absent, <Id> no longer violates) ..." - expired, see KnownExceptions.
             .ToList();
 

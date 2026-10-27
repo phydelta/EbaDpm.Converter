@@ -173,11 +173,11 @@ version, `FromDate` and `ToDate` of a taxonomy depend on the module versions pub
 releases (see [mapping-dpm2.md](mapping-dpm2.md#mtaxonomy)). This history only feeds those
 columns; no superseded module version is emitted.
 
-**Taxonomies and the cutoff.** Each emitted table version produces up to two derived taxonomies:
-`(framework, cutoff release)` and `(framework, release in which that table version started)`.
-So a 4.3 database yields `corep 4.3` together with older taxonomies such as `corep 4.0` for
-tables unchanged since 4.0. The template tree, modules and module templates exist only for the
-cutoff-release taxonomies. See [mapping-dpm2.md](mapping-dpm2.md#mtaxonomy).
+**Taxonomies and the cutoff.** Each module version current at the cutoff belongs to the
+taxonomy `(framework, release in which that module version started)`, and only those taxonomies
+are derived. So a 4.3 database yields `corep 4.2` (COREP has not changed since 4.2) next to
+`tcb 4.3`, and no `corep 4.3`. This matches the EBA Annotated Table Layouts, which are published
+per module under the same framework and release. See [mapping-dpm2.md](mapping-dpm2.md#mtaxonomy).
 
 ## DPM 1.0 and releases
 

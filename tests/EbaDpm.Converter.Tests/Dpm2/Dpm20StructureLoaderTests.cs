@@ -31,10 +31,22 @@ public sealed class Dpm20StructureLoaderTests(Dpm20SkeletonFixture fixture)
     // 1 - ROW counts: mTable = mTaxonomyTable = BusinessTable rows; mTemplateOrTable = L1 + L2 + BusinessTable
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// <c>mTable</c> has one row per (taxonomy, table) pair. The expected figure is derived from the
+    /// Access database (module versions in force, grouped by framework and start release, tables
+    /// composed plus the abstract closure), not pinned.
+    /// </summary>
     [DataFact]
-    public void MTable_RowCount_IsThePinnedCensus()
-        => ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "mTable rows", ReleasePins.Dpm20Cutoff42MTableRows, CountRows("mTable"));
+    public void MTable_RowCount_EqualsThePairsDerivedFromAccess()
+    {
+        var expected = AccessCensus.TableCodesByTaxonomy(RepoPaths.AccessDpm20DatabasePath, RepoPaths.Cutoff42ReleaseCode)
+            .Values.Sum(v => v.Count);
+        var actual = CountRows("mTable");
+        Assert.True(expected > 0, "The independent query returned no pair: the comparison would be vacuous.");
+        Assert.True(
+            expected == actual,
+            $"mTable rows: expected {expected} (derived from '{RepoPaths.AccessDpm20DatabaseFileName}'), actual {actual}.");
+    }
 
     [DataFact]
     public void MTaxonomyTable_HasOneRowPerMTableRow() => AssertRowsEqualMTable("mTaxonomyTable");
@@ -137,8 +149,8 @@ public sealed class Dpm20StructureLoaderTests(Dpm20SkeletonFixture fixture)
 
     /// <summary>
     /// <c>Level</c> is NOT the depth of the tree: a <c>BusinessTable</c> is <c>Level</c> 1 and hangs
-    /// from a <c>Level</c> 2 node. It checks the invariant in ALL rows with a real parent (all but
-    /// the orphans; the pair <c>(if 4.2, C_34.02.b)</c> hangs from a real parent), not just the witness case
+    /// from a <c>Level</c> 2 node. It checks the invariant in ALL rows with a real parent (all of
+    /// them; the pair <c>(if 4.2, C_34.02.b)</c> hangs from a real parent), not just the witness case
     /// -- a test that "fixed" this by expecting the parent to be Level 0 would be wrong.
     /// </summary>
     [DataFact]
@@ -152,11 +164,10 @@ public sealed class Dpm20StructureLoaderTests(Dpm20SkeletonFixture fixture)
             WHERE bt."TemplateOrTableType" = 'BusinessTable' AND bt."ParentTemplateOrTableID" <> 0
             """);
 
-        ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42,
-            "BusinessTable rows with a real parent",
-            ReleasePins.Dpm20Cutoff42BusinessTablesWithRealParent,
-            rows.Count);
+        // Every BusinessTable row has a real parent (no orphans): as many as mTable rows.
+        Assert.True(
+            rows.Count == CountRows("mTable"),
+            $"BusinessTable rows with a real parent: expected {CountRows("mTable")} (mTable rows, derived from the generated .db), actual {rows.Count}.");
 
         var wrong = rows.Where(r => r.B != 1 || r.C != 2).ToList();
         Assert.True(
@@ -166,9 +177,9 @@ public sealed class Dpm20StructureLoaderTests(Dpm20SkeletonFixture fixture)
     }
 
     /// <summary>
-    /// The root -- and, here, the orphan as well -- carries <c>ParentTemplateOrTableID = 0</c>, NEVER
+    /// The root carries <c>ParentTemplateOrTableID = 0</c>, NEVER
     /// <c>NULL</c> (this is not universal across the other mappings). It is checked explicitly, in
-    /// the three populations that could carry 0: the Level 1 groups, the orphans and, for
+    /// the populations that could carry 0: the Level 1 groups, the (now absent) orphans and, for
     /// completeness, that the whole column is never NULL in any row.
     /// </summary>
     [DataFact]
@@ -184,11 +195,11 @@ public sealed class Dpm20StructureLoaderTests(Dpm20SkeletonFixture fixture)
             $"Level 1 TableGroup rows read: expected {level1Groups} (COUNT(1) of the Level 1 TableGroup rows of the generated mTemplateOrTable), actual {rootParents.Count}.");
         Assert.All(rootParents, p => Assert.Equal(0, p));
 
+        // Since issue 66 the template tree is built for EVERY taxonomy, so no BusinessTable row is an
+        // orphan: every one of them hangs from a real parent (no more Parent = 0 rows besides the roots).
         var orphanParents = ReadIntColumn(
             "SELECT \"ParentTemplateOrTableID\" FROM \"mTemplateOrTable\" WHERE \"TemplateOrTableType\" = 'BusinessTable' AND \"ParentTemplateOrTableID\" = 0");
-        ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "orphan BusinessTable rows", ReleasePins.Dpm20Cutoff42OrphanBusinessTables, orphanParents.Count);
-        Assert.All(orphanParents, p => Assert.Equal(0, p));
+        Assert.Empty(orphanParents);
 
         // Confirms with type literalness: the column is an integer, and the value read is the
         // integer 0 (not an empty string or another DBNull in disguise) -- through a typed read.
@@ -265,35 +276,29 @@ public sealed class Dpm20StructureLoaderTests(Dpm20SkeletonFixture fixture)
     }
 
     /// <summary>
-    /// The tree only exists in the 4.2 taxonomies: no taxonomy whose code does not end in " 4.2"
-    /// has <c>TableGroup</c> nodes, or <c>BusinessTable</c> rows with a real parent; and,
-    /// symmetrically, no 4.2 taxonomy has orphan <c>BusinessTable</c> rows (Parent = 0).
+    /// The template tree is built for EVERY taxonomy (issue 66): every taxonomy that has
+    /// <c>BusinessTable</c> rows has <c>TableGroup</c> nodes too, every <c>BusinessTable</c> row has a
+    /// real parent, and the taxonomies that carry <c>BusinessTable</c> rows are exactly those of
+    /// <c>mTaxonomyTable</c>.
     /// </summary>
     [DataFact]
-    public void TheTreeOnlyExistsInThe42Taxonomies()
+    public void TheTreeExistsInEveryTaxonomyThatHasTables_AndNoBusinessTableIsAnOrphan()
     {
-        var taxonomyCodeById = ReadTaxonomyCodes();
-
+        var taxonomyIdsWithTables = ReadIntColumn(
+            "SELECT DISTINCT \"TaxonomyID\" FROM \"mTemplateOrTable\" WHERE \"TemplateOrTableType\" = 'BusinessTable'");
         var taxonomyIdsWithGroupNodes = ReadIntColumn(
-            "SELECT DISTINCT \"TaxonomyID\" FROM \"mTemplateOrTable\" WHERE \"TemplateOrTableType\" = 'TableGroup'");
-        var nonCurrentWithGroups = taxonomyIdsWithGroupNodes
-            .Where(id => !taxonomyCodeById.TryGetValue(id, out var code) || !code.EndsWith(" 4.2", StringComparison.Ordinal))
-            .ToList();
-        Assert.True(nonCurrentWithGroups.Count == 0, $"Non-4.2 taxonomies with TableGroup nodes: {string.Join(",", nonCurrentWithGroups)}");
+            "SELECT DISTINCT \"TaxonomyID\" FROM \"mTemplateOrTable\" WHERE \"TemplateOrTableType\" = 'TableGroup'").ToHashSet();
+        var taxonomyIdsInTaxonomyTable = ReadIntColumn("SELECT DISTINCT \"TaxonomyID\" FROM \"mTaxonomyTable\"");
 
-        var taxonomyIdsWithRealParentTables = ReadIntColumn(
-            "SELECT DISTINCT \"TaxonomyID\" FROM \"mTemplateOrTable\" WHERE \"TemplateOrTableType\" = 'BusinessTable' AND \"ParentTemplateOrTableID\" <> 0");
-        var nonCurrentWithRealParent = taxonomyIdsWithRealParentTables
-            .Where(id => !taxonomyCodeById.TryGetValue(id, out var code) || !code.EndsWith(" 4.2", StringComparison.Ordinal))
-            .ToList();
-        Assert.True(nonCurrentWithRealParent.Count == 0, $"Non-4.2 taxonomies with BusinessTable rows with a real parent: {string.Join(",", nonCurrentWithRealParent)}");
+        Assert.NotEmpty(taxonomyIdsWithTables);
+        Assert.Equal(taxonomyIdsInTaxonomyTable.OrderBy(i => i), taxonomyIdsWithTables.OrderBy(i => i));
 
-        var taxonomyIdsWithOrphans = ReadIntColumn(
-            "SELECT DISTINCT \"TaxonomyID\" FROM \"mTemplateOrTable\" WHERE \"TemplateOrTableType\" = 'BusinessTable' AND \"ParentTemplateOrTableID\" = 0");
-        var currentWithOrphans = taxonomyIdsWithOrphans
-            .Where(id => taxonomyCodeById.TryGetValue(id, out var code) && code.EndsWith(" 4.2", StringComparison.Ordinal))
-            .ToList();
-        Assert.True(currentWithOrphans.Count == 0, $"4.2 taxonomies with an orphan BusinessTable: {string.Join(",", currentWithOrphans)}");
+        var withoutGroups = taxonomyIdsWithTables.Where(id => !taxonomyIdsWithGroupNodes.Contains(id)).ToList();
+        Assert.True(withoutGroups.Count == 0, $"Taxonomies with BusinessTable rows but without TableGroup nodes: {string.Join(",", withoutGroups)}");
+
+        var orphans = ScalarLong(
+            "SELECT COUNT(1) FROM \"mTemplateOrTable\" WHERE \"TemplateOrTableType\" = 'BusinessTable' AND \"ParentTemplateOrTableID\" = 0");
+        Assert.True(orphans == 0, $"{orphans} BusinessTable rows are orphans (Parent = 0).");
     }
 
     // ------------------------------------------------------------------
@@ -477,13 +482,12 @@ public sealed class Dpm20StructureLoaderTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// <c>S_04.00</c> appears as an orphan in <c>pay 4.1</c> (a taxonomy that the reference does not
-    /// publish) and with a real parent in <c>pay 4.2</c>. Nominal test of the case, measured in the
-    /// real .db: TaxonomyID of pay 4.1 -> ParentTemplateOrTableID = 0; TaxonomyID of pay 4.2 -> real
-    /// parent.
+    /// <c>S_04.00</c> used to appear also as an orphan in <c>pay 4.1</c>. Since issue 66 no PAY
+    /// module version starts in 4.1, so <c>pay 4.1</c> does not exist: the table is in <c>pay 4.2</c>
+    /// only, with a real parent. Nominal test of the case, by business key.
     /// </summary>
     [DataFact]
-    public void NamedCase_S0400_OrphanInPay41_WithARealParentInPay42()
+    public void NamedCase_S0400_OnlyInPay42_WithARealParent()
     {
         var taxonomyCodeById = ReadTaxonomyCodes();
 
@@ -494,16 +498,10 @@ public sealed class Dpm20StructureLoaderTests(Dpm20SkeletonFixture fixture)
             + "JOIN \"mTemplateOrTable\" bt ON bt.\"TemplateOrTableID\" = tt.\"TableID\" AND bt.\"TemplateOrTableType\" = 'BusinessTable' "
             + "WHERE mt.\"TableCode\" = 'S_04.00'");
 
-        Assert.Equal(2, rows.Count);
-
-        var pay41 = rows.SingleOrDefault(r => taxonomyCodeById.GetValueOrDefault(r.A) == "pay 4.1");
-        var pay42 = rows.SingleOrDefault(r => taxonomyCodeById.GetValueOrDefault(r.A) == "pay 4.2");
-
-        Assert.True(pay41.A != 0, "The S_04.00 row in 'pay 4.1' was not found.");
-        Assert.True(pay42.A != 0, "The S_04.00 row in 'pay 4.2' was not found.");
-
-        Assert.Equal(0, pay41.B); // orphan
-        Assert.NotEqual(0, pay42.B); // real parent
+        Assert.Single(rows);
+        Assert.Equal("pay 4.2", taxonomyCodeById.GetValueOrDefault(rows[0].A));
+        Assert.NotEqual(0, rows[0].B); // real parent
+        Assert.DoesNotContain("pay 4.1", taxonomyCodeById.Values);
     }
 
     /// <summary>
@@ -538,26 +536,6 @@ public sealed class Dpm20StructureLoaderTests(Dpm20SkeletonFixture fixture)
         var codesForB = TaxonomyCodesFor("C_34.02.b");
         Assert.Contains("corep 4.2", codesForB); // was already there, untouched by the rule
         Assert.Contains("if 4.2", codesForB); // the pair that the abstract-closure rule adds
-    }
-
-    /// <summary>
-    /// The <c>Order</c> of the orphans is a DECLARED CHOICE, not derived -- the reference uses
-    /// another numbering (<c>esg 4.0</c> carries 632/633/634). This test is about INTERNAL
-    /// COHERENCE (contiguous 0-based range within the Parent=0 group, which is what the code says
-    /// it implements), never about equality with the reference -- comparing against the reference
-    /// here would measure the internal counter of ITS generator, which must not be chased.
-    /// </summary>
-    [DataFact]
-    public void OrderOfTheOrphans_IsContiguousFrom0_ByDeclaredChoice_NotAgainstTheReference()
-    {
-        var orders = ReadIntColumn(
-                "SELECT \"Order\" FROM \"mTemplateOrTable\" WHERE \"TemplateOrTableType\" = 'BusinessTable' AND \"ParentTemplateOrTableID\" = 0")
-            .OrderBy(o => o)
-            .ToList();
-
-        ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "orphan BusinessTable rows", ReleasePins.Dpm20Cutoff42OrphanBusinessTables, orders.Count);
-        Assert.Equal(Enumerable.Range(0, orders.Count), orders);
     }
 
     // ------------------------------------------------------------------

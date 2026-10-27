@@ -376,28 +376,21 @@ public static class PlaneCEqualityChecker
             // rule's source sheet are candidates to resolve the cell: same criterion as
             // PlaneCComparer, via PlaneCReleaseMatcher (including the REL.n -> REL tolerance), but
             // applied PER TableID, not per aggregated TableCode.
-            var matchingTableIds = new List<long>();
-            foreach (var tableId in tableIdsByTableCode[term.TableCode])
-            {
-                var releaseKeys = releaseKeysByTableId.GetValueOrDefault(tableId, []);
-                var releaseMatch = PlaneCReleaseMatcher.ClassifyRelease(releaseKeys, ruleFrameworkCode, ruleReleaseLabel);
-                if (releaseMatch == PlaneCReleaseMatch.None)
-                {
-                    continue;
-                }
-
-                if (releaseMatch == PlaneCReleaseMatch.PointRelease)
-                {
-                    usedPointReleaseTolerance = true;
-                }
-
-                matchingTableIds.Add(tableId);
-            }
+            // Precedence (PlaneCReleaseMatcher.SelectTableIds): exact pairings win over the
+            // REL.n -> REL tolerance when the code lives in both taxonomies.
+            var selection = PlaneCReleaseMatcher.SelectTableIds(
+                tableIdsByTableCode[term.TableCode], releaseKeysByTableId, ruleFrameworkCode, ruleReleaseLabel);
+            var matchingTableIds = selection.Used;
 
             if (matchingTableIds.Count == 0)
             {
                 statuses.Add("different release");
                 continue;
+            }
+
+            if (selection.Match == PlaneCReleaseMatch.PointRelease)
+            {
+                usedPointReleaseTolerance = true;
             }
 
             var axisSteps = new List<(string Orientation, string Code)> { ("Y", term.RowCode), ("X", term.ColumnCode) };

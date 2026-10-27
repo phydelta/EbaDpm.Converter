@@ -90,8 +90,14 @@ public sealed class PlaneCEquCrossOutputDpm2043Tests(Dpm2043ValidateFixture fixt
         var diag = $"Status={cEqu01.Status} Examined={cEqu01.Examined} Failed={cEqu01.Failed} Cov={cEqu02.Statement} " +
                    $"Samples=[{string.Join(" || ", cEqu01.Samples.Select(s => s.BusinessKey))}]";
 
+        // Pin dated 2026-10-27: 4610 checkable rules = 4780 (before #66, taxonomy per module start
+        // release) - 270 (correct: rules whose tables no longer pair) + 100 (correct: newly pairing
+        // rules). The intermediate value after #66 was 4499 because 111 rules of the FINREP9DP 4.2.1
+        // layout fell into "ambiguous cell" (a code lived in both finrep 4.2 and finrep 4.2.1); with
+        // exact pairings winning over the REL.n -> REL tolerance
+        // (PlaneCReleaseMatcher.SelectTableIds) the 111 are recovered: 4499 + 111 = 4610.
         ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Natural43, "C-EQU-01 checkable rules (4.3 output against the 4.2 layouts)", 4780, cEqu01.Examined);
+            ReleasePins.Dpm20Natural43, "C-EQU-01 checkable rules (4.3 output against the 4.2 layouts)", 4610, cEqu01.Examined);
         Assert.True(cEqu01.Failed == 0, diag);
         Assert.NotEqual("skipped", cEqu01.Status);
     }

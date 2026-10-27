@@ -32,11 +32,12 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 /// second filter 52 come out, not 50 — the 2 extra ones are <c>P3_NONREM_DIS_DOCS</c> and
 /// <c>P3_REM_DIS_DOCS</c>, links to PDFs with no tables), with <c>ModuleCode</c> =
 /// <b><c>UCase(ModuleVersion.Code)</c></b> (50/50). <c>ModuleLabel</c>
-/// = <c>ModuleVersion.Name</c> verbatim (50/50). <c>TaxonomyID</c> is the taxonomy of the module's
-/// FRAMEWORK in the CUTOFF release (4.2) — the only one a current module can hang from (all 50
-/// hang from 4.2 taxonomies, none from the 13 old ones). <c>XBRLSchemaRef</c> is DERIVED (unlike
-/// DPM 1.0, where it was not): pattern
-/// <c>…/fws/&lt;framework&gt;/&lt;release&gt;/mod/&lt;lowercase module&gt;.xsd</c> (50/50).
+/// = <c>ModuleVersion.Name</c> verbatim (50/50). <c>TaxonomyID</c> is the taxonomy
+/// (<c>FrameworkID</c>, <c>ModuleVersion.StartReleaseID</c>) — the EBA taxonomy that publishes that
+/// module version, NOT the cutoff release (see <see cref="Dpm20TaxonomyDeriver"/>, which derives
+/// exactly those taxonomies). <c>XBRLSchemaRef</c> is DERIVED (unlike DPM 1.0, where it was not):
+/// pattern <c>…/fws/&lt;framework&gt;/&lt;StartRelease.Code&gt;/mod/&lt;lowercase module&gt;.xsd</c>,
+/// so its release segment always equals the <c>DpmPackageCode</c> of the module's taxonomy.
 /// <c>ConceptualModuleID</c> = the same synthetic id as <c>ModuleID</c> (mirror, see below).
 /// <c>DefaultFrequency</c>/<c>JSONSchemaRef</c> → NULL; <c>AutogenerateRefs</c> → constant 1;
 /// <c>JsonBlob</c> → empty string. <c>ConceptID</c> → NULL until the concept loader runs.
@@ -75,6 +76,7 @@ public static class Dpm20ModuleLoader
         IReadOnlyList<Dpm20ModuleVersionCompositionRow> moduleVersionCompositions,
         IReadOnlyList<Dpm20TableVersionRow> currentTableVersions,
         IReadOnlyList<Dpm20FrameworkRow> frameworks,
+        IReadOnlyList<Dpm20ReleaseRow> releases,
         IReadOnlyList<AccessTaxonomyRow> selectedTaxonomies,
         Dpm20StructureLoader.Result structure)
     {
@@ -85,24 +87,25 @@ public static class Dpm20ModuleLoader
         ArgumentNullException.ThrowIfNull(moduleVersionCompositions);
         ArgumentNullException.ThrowIfNull(currentTableVersions);
         ArgumentNullException.ThrowIfNull(frameworks);
+        ArgumentNullException.ThrowIfNull(releases);
         ArgumentNullException.ThrowIfNull(selectedTaxonomies);
         ArgumentNullException.ThrowIfNull(structure);
 
         var unresolvedCases = new List<string>();
-        var cutoffReleaseCode = reader.CutoffReleaseCode;
+        var releaseCodeById = releases.ToDictionary(r => r.ReleaseId, r => r.Code);
 
         var moduleById = modules.ToDictionary(m => m.ModuleId);
         var frameworkById = frameworks.ToDictionary(f => f.FrameworkId);
         var taxonomyById = selectedTaxonomies.ToDictionary(t => t.TaxonomyId);
 
-        // (FrameworkID, release) -> TaxonomyID: only the CUTOFF release is needed (the 50 current
-        // modules always hang from the 4.2 taxonomy of their framework).
+        // (FrameworkID, release code) -> TaxonomyID. A module version hangs from the taxonomy of
+        // its framework in the release its ModuleVersion starts in.
         var taxonomyIdByFrameworkAndRelease = selectedTaxonomies
             .Where(t => t.FrameworkId.HasValue)
             .ToDictionary(t => (t.FrameworkId!.Value, t.DpmPackageCode), t => t.TaxonomyId);
 
-        // ---- Selection of emitted modules: current, without DORA, with the 4.2 taxonomy of their
-        // framework present in the current selection. ----
+        // ---- Selection of emitted modules: current, without DORA, without document modules, with
+        // the taxonomy (framework, StartRelease) present in the current selection. ----
         var emitted = new List<(int ModuleVId, string ModuleCode, string ModuleLabel, int TaxonomyId)>();
 
         foreach (var mv in currentModuleVersions)
@@ -136,12 +139,21 @@ public static class Dpm20ModuleLoader
                 continue;
             }
 
-            if (!taxonomyIdByFrameworkAndRelease.TryGetValue(
-                    (framework.FrameworkId, cutoffReleaseCode), out var taxonomyId))
+            if (!releaseCodeById.TryGetValue(mv.StartReleaseId, out var startReleaseCode))
             {
                 unresolvedCases.Add(
+                    $"ModuleVersion ModuleVID={mv.ModuleVId} ('{mv.Code}'): StartReleaseID="
+                    + $"{mv.StartReleaseId} missing from [Release].");
+                continue;
+            }
+
+            if (!taxonomyIdByFrameworkAndRelease.TryGetValue(
+                    (framework.FrameworkId, startReleaseCode), out var taxonomyId))
+            {
+                // Not an error when a selector (--releases, --taxonomies...) left the taxonomy out.
+                unresolvedCases.Add(
                     $"Module '{mv.Code}' (framework '{framework.Code}'): no taxonomy "
-                    + $"{framework.Code.ToLowerInvariant()} {cutoffReleaseCode} in the current selection.");
+                    + $"{framework.Code.ToLowerInvariant()} {startReleaseCode} in the current selection.");
                 continue;
             }
 
@@ -178,8 +190,9 @@ public static class Dpm20ModuleLoader
                 var moduleId = moduleIdByModuleVId[m.ModuleVId];
                 var taxonomy = taxonomyById[m.TaxonomyId];
 
-                // One-line pattern, 50/50 — a real improvement of the new source (in DPM 1.0 the
-                // XBRLSchemaRef was NOT derivable).
+                // One-line pattern — a real improvement of the new source (in DPM 1.0 the
+                // XBRLSchemaRef was NOT derivable). DpmPackageCode of the taxonomy is the release
+                // the module version starts in.
                 var xbrlSchemaRef =
                     $"http://www.eba.europa.eu/eu/fr/xbrl/crr/fws/{taxonomy.TechnicalStandard}/"
                     + $"{taxonomy.DpmPackageCode}/mod/{m.ModuleCode.ToLowerInvariant()}.xsd";

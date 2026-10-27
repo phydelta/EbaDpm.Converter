@@ -76,46 +76,6 @@ public static class PlaneCReleaseMatcher
     }
 
     /// <summary>
-    /// <c>TableCode</c> -&gt; union of the release keys of ALL the <c>TableID</c> values that share
-    /// that code (as already done in <see cref="PlaneCComparer"/>: a code lives in more than one
-    /// taxonomy, and the layout publishes a single sheet per code, not one per <c>TableID</c>).
-    /// </summary>
-    public static Dictionary<string, HashSet<(string Framework, string Release)>> LoadReleaseKeysByTableCode(SqliteConnection generated)
-    {
-        var tableCodeByTableId = new Dictionary<long, string>();
-        using (var cmd = generated.CreateCommand())
-        {
-            cmd.CommandText = """SELECT "TableID", "TableCode" FROM "mTable" WHERE "TableCode" IS NOT NULL""";
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                tableCodeByTableId[reader.GetInt64(0)] = reader.GetString(1);
-            }
-        }
-
-        var releaseKeysByTableId = LoadReleaseKeysByTableId(generated);
-
-        var result = new Dictionary<string, HashSet<(string Framework, string Release)>>(StringComparer.Ordinal);
-        foreach (var (tableId, tableCode) in tableCodeByTableId)
-        {
-            if (!releaseKeysByTableId.TryGetValue(tableId, out var set))
-            {
-                continue;
-            }
-
-            if (!result.TryGetValue(tableCode, out var union))
-            {
-                union = [];
-                result[tableCode] = union;
-            }
-
-            union.UnionWith(set);
-        }
-
-        return result;
-    }
-
-    /// <summary>
     /// A layout release <c>REL.n</c> (a hotfix/point release of <c>REL</c>) is the table's own
     /// release when the table has release <c>REL</c>: the hotfix mechanism leaves a clean trace
     /// (e.g. <c>FINREP9DP</c> in 4.2.1) and a 4.2 hotfix IS the arbiter of 4.2. General rule
@@ -147,4 +107,66 @@ public static class PlaneCReleaseMatcher
 
         return sawPointRelease ? PlaneCReleaseMatch.PointRelease : PlaneCReleaseMatch.None;
     }
+
+    /// <summary>
+    /// The <c>TableID</c> values of ONE table code that pair with a layout sheet
+    /// (<paramref name="frameworkCode"/>, <paramref name="layoutRelease"/>), with the precedence
+    /// shared by <see cref="PlaneCComparer"/> and <see cref="PlaneCEqualityChecker"/>:
+    /// <list type="bullet">
+    /// <item>if at least one <c>TableID</c> pairs <see cref="PlaneCReleaseMatch.Exact"/>, ONLY the
+    /// exact-pairing ones are used (<see cref="TableIdSelection.Match"/> is
+    /// <see cref="PlaneCReleaseMatch.Exact"/>);</item>
+    /// <item>the <c>REL.n -> REL</c> tolerance applies only when NO <c>TableID</c> pairs exactly
+    /// (<see cref="TableIdSelection.Match"/> is <see cref="PlaneCReleaseMatch.PointRelease"/>);</item>
+    /// <item>otherwise nothing pairs (<see cref="PlaneCReleaseMatch.None"/>).</item>
+    /// </list>
+    /// Why: since the module-start-release derivation (#66) the same code can live at once in a
+    /// taxonomy of release <c>REL</c> and another of release <c>REL.n</c> of one framework (e.g.
+    /// <c>F_18.00.e</c> in <c>finrep 4.2</c> and <c>finrep 4.2.1</c>). For the sheet of
+    /// <c>REL.n</c> the <c>REL.n</c> TableID is the publication itself and the <c>REL</c> one is only
+    /// a tolerance; mixing both would double every cell (ambiguous cell) although they carry the
+    /// same signatures. The choice stays visible: the tolerance is flagged only when it is the
+    /// pairing actually used.
+    /// </summary>
+    public static TableIdSelection SelectTableIds(
+        IEnumerable<long> tableIds,
+        IReadOnlyDictionary<long, HashSet<(string Framework, string Release)>> releaseKeysByTableId,
+        string frameworkCode,
+        string layoutRelease)
+    {
+        var exact = new List<long>();
+        var point = new List<long>();
+        foreach (var tableId in tableIds)
+        {
+            if (!releaseKeysByTableId.TryGetValue(tableId, out var releaseKeys))
+            {
+                continue;
+            }
+
+            switch (ClassifyRelease(releaseKeys, frameworkCode, layoutRelease))
+            {
+                case PlaneCReleaseMatch.Exact:
+                    exact.Add(tableId);
+                    break;
+                case PlaneCReleaseMatch.PointRelease:
+                    point.Add(tableId);
+                    break;
+            }
+        }
+
+        if (exact.Count > 0)
+        {
+            return new TableIdSelection(PlaneCReleaseMatch.Exact, exact);
+        }
+
+        return point.Count > 0
+            ? new TableIdSelection(PlaneCReleaseMatch.PointRelease, point)
+            : new TableIdSelection(PlaneCReleaseMatch.None, []);
+    }
+
+    /// <summary>
+    /// Result of <see cref="SelectTableIds"/>: the pairing kind actually used, the <c>TableID</c>
+    /// values to use (both consumers read cells and signatures ONLY from these, per sheet).
+    /// </summary>
+    public sealed record TableIdSelection(PlaneCReleaseMatch Match, IReadOnlyList<long> Used);
 }

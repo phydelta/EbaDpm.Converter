@@ -48,8 +48,10 @@ correct - or to prove that it is not.
 - File names and the data layout: `tests/EbaDpm.Converter.Tests/Schema/RepoPaths.cs` and
   `docs/test-data.md`.
 - Fast loop: `$env:EBADPM_TEST_DATA='none'; dotnet test` (~15 s). Full suite: `dotnet test` with
-  `./Data` present (~9 min). Iterate with the fast loop or `--filter`; run the full suite **once
-  per cycle**, and state in your report how many full runs you did and why.
+  `./Data` present (~9 min). Iterate with the fast loop or `--filter` over the data tests of the
+  area touched. Run the full suite only when the orchestrator asks for it: once per pull request
+  that changes `src/EbaDpm.Converter.Core`, and once for a release (see *When to run the full
+  suite* in `CLAUDE.md`). State in your report how many full runs you did and why.
 
 ## .NET plugins
 

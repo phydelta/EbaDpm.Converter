@@ -77,9 +77,15 @@ $env:EBADPM_TEST_DATA = "D:\eba-data"
 dotnet test
 ```
 
-The full suite converts several large Access databases and takes several minutes. Use the fast
-suite while iterating and run the full suite before opening a pull request that touches the
-conversion or the validation.
+The full suite converts several large Access databases and takes several minutes. CI does not
+have the data files, so it runs only the fast suite; the data-dependent suite is the contributor's
+responsibility. Use the fast suite while iterating (with `--filter` for the data tests of the area
+you touch), and run the full suite **once per pull request** that changes
+`src/EbaDpm.Converter.Core` (readers, mapping, writer, validation, layouts or their resources) or
+a dependency the conversion uses, after the last change and before asking for review. Pull
+requests limited to documentation, CI, the CLI or tests need only the fast suite, plus any data
+test they add or change. The release pull request runs the full suite once more as a
+confirmation.
 
 Test collections run sequentially (`xunit.runner.json`): the ACE OLEDB provider is not safe for
 concurrent use within one process. Do not enable parallel collections.

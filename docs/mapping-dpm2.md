@@ -61,18 +61,27 @@ All rows of `[Release]`, not filtered by the selection.
 
 DPM 2.0 has no `Taxonomy` table; taxonomies are **derived** (`Dpm20TaxonomyDeriver`):
 
-1. **Universe.** Table versions current at the cutoff that belong to a current module version
-   (via `ModuleVersionComposition`). When a module declares an **abstract** table, its current
-   concrete children are added to that module too, even if the composition does not list them:
-   a module that declares an abstract table declares all its children.
-2. **Framework of a table version.** `ModuleVersionComposition` → `ModuleVersion` →
-   `Module.FrameworkID`. A table can belong to several frameworks.
-3. **Emitted tables.** Abstract tables and tables that belong only to DORA are removed.
-4. **Pairs.** Each emitted table version produces the taxonomy `(framework, cutoff release)` and
-   the taxonomy `(framework, release in which this table version started)` — one pair if both
-   coincide. Intermediate releases never produce a pair.
-5. **Codes.** `TaxonomyCode` = framework code in lower case + space + release code
+1. **Modules.** The emitted module versions: current at the cutoff, excluding DORA and
+   document modules (see [Modules](#modules)).
+2. **One taxonomy per publication.** A module version belongs to the taxonomy
+   `(Module.FrameworkID, ModuleVersion.StartReleaseID)`: the release in which that module version
+   was published, which is the release of the EBA taxonomy that carries it. `mTaxonomy` holds
+   exactly the distinct pairs of the emitted module versions, so every taxonomy has at least one
+   module. A module that has not changed since an earlier release stays in that release's
+   taxonomy: on the 4.3 database (measured 2026-10-27) 49 of the 54 modules are in a `4.2`
+   taxonomy, `FINREP9DP` in `finrep 4.2.1`, and only `AML_RA` and the three `TCB_*` modules in a
+   `4.3` taxonomy.
+3. **Tables of a taxonomy.** The current, non-abstract table versions that
+   `ModuleVersionComposition` assigns to the taxonomy's module versions. When a module declares
+   an **abstract** table, its current concrete children are added to that module too, even if
+   the composition does not list them: a module that declares an abstract table declares all its
+   children. A table used by modules of two taxonomies belongs to both. No current table version
+   starts after the module version that contains it (0 cases on the 4.2.1 and 4.3 databases), so
+   a taxonomy never holds a table newer than its release.
+4. **Codes.** `TaxonomyCode` = framework code in lower case + space + release code
    (`corep 4.2`). `TaxonomyKey` = framework code in lower case + `/` + release (`corep/4.2`).
+   `DpmPackageCode` = the release code, so `--releases 4.3` selects the taxonomies published in
+   4.3, not every taxonomy current at 4.3.
 
 | Column | Value |
 |---|---|
@@ -91,9 +100,9 @@ and a `FromReferenceDate`. For a taxonomy T = (framework F, release R), with rel
 `ReleaseID` and only releases up to the cutoff considered:
 
 - **R′** is the latest release ≤ R in which a module version of F starts (`StartReleaseID`) that
-  is still current at R. When F publishes module versions in R, R′ = R. Otherwise the taxonomy
-  has the content of R′ (for example `corep 4.3` on the 4.3 database, unchanged since 4.2) and
-  takes its version and `FromDate`.
+  is still current at R. Since every taxonomy is the release in which some of its module versions
+  start, R′ = R for every emitted taxonomy; the general definition is kept so the calculation
+  does not depend on how the taxonomies were chosen.
 - The **publications** of F are the releases in which some module version of F starts, over the
   whole `ModuleVersion` history up to the cutoff, not only the emitted taxonomies. They form a
   chain: `ToDate` is the day before the `FromDate` of the first later publication (in release
@@ -291,8 +300,7 @@ for `mTable.TableID`, for the `BusinessTable` node in `mTemplateOrTable` and for
 
 ### mTemplateOrTable
 
-Three strata. The tree exists only for taxonomies of the **cutoff release**; table nodes of
-older taxonomies have parent `0`.
+Three strata, built for **every** emitted taxonomy.
 
 | Stratum | Type / `Level` | Source | Code / label |
 |---|---|---|---|
@@ -425,12 +433,13 @@ picks (on a tie, the ordinate of the first closed axis in X, Y, Z order), but th
 
 | Table | Rule |
 |---|---|
-| `mModule` | Current `ModuleVersion` rows, excluding DORA modules and **document modules** (`Module.isDocumentModule`, links to PDF documentation without tables). `ModuleCode` = `ModuleVersion.Code` in **upper case**; `ModuleLabel` = `Name`. `TaxonomyID` = the cutoff-release taxonomy of the module's framework (a current module belongs to the current release). `XBRLSchemaRef` = `http://www.eba.europa.eu/eu/fr/xbrl/crr/fws/<framework>/<release>/mod/<module in lower case>.xsd`. `ConceptualModuleID` = `ModuleID`; `AutogenerateRefs = 1`; `JsonBlob` empty; `DefaultFrequency`, `JSONSchemaRef` `NULL`. |
+| `mModule` | Current `ModuleVersion` rows, excluding DORA modules and **document modules** (`Module.isDocumentModule`, links to PDF documentation without tables). `ModuleCode` = `ModuleVersion.Code` in **upper case**; `ModuleLabel` = `Name`. `TaxonomyID` = the taxonomy `(framework, ModuleVersion.StartReleaseID)` ([mTaxonomy](#mtaxonomy)). `XBRLSchemaRef` = `http://www.eba.europa.eu/eu/fr/xbrl/crr/fws/<framework in lower case>/<StartRelease.Code>/mod/<module in lower case>.xsd`: the release in which the module version was published, not the cutoff release. `ConceptualModuleID` = `ModuleID`; `AutogenerateRefs = 1`; `JsonBlob` empty; `DefaultFrequency`, `JSONSchemaRef` `NULL`. |
 | `mConceptualModule` | a 1:1 mirror of `mModule` |
 | `mModuleBusinessTemplate` | one row per (module, emitted group containing any of the module's tables), via `ModuleVersionComposition` → `TableVersion` → `TableGroupComposition`. `BusinessTemplateID` is the level-1 group node of the module's taxonomy. `Order` is 0-based natural order of the group code — a declared convention (the source has no order for this relation). |
 
 Unlike DPM 1.0, where `XBRLSchemaRef` had to be copied from the source, DPM 2.0 lets the
-converter derive it.
+converter derive it. Without the taxonomy files, the start release of the module version is
+what the Access database declares about the taxonomy that publishes it (issue #66).
 
 ---
 

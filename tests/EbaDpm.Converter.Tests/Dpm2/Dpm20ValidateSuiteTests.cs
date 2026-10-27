@@ -53,9 +53,9 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
         Assert.Equal(0, result.Report.Summary.Critical.Failed);
 
         // Run WITHOUT a reference (referencePath: null above). A drop would be the harness silently
-        // losing coverage; a rise is a new critical check, to be re-measured.
+        // losing coverage; a rise is a new critical check, to be re-measured (216 -> 217: A-MOD-10, issue 66).
         ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "critical checks run without a reference", 216, result.Report.Summary.Critical.Checks);
+            ReleasePins.Dpm20Cutoff42, "critical checks run without a reference", 217, result.Report.Summary.Critical.Checks);
         Assert.Equal(0, result.ExitCode);
 
         // Explicit protection of the merge of the ABSTRACT ordinate with its own cells: without it,
@@ -90,7 +90,7 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
 
         var bOca01 = Assert.Single(result.Report.Checks, c => c.Id == "B-OCA-01");
 
-        ReleasePins.AssertPinned(ReleasePins.Reference42, "B-OCA-01 leaf ordinates examined", 18556, bOca01.Examined);
+        ReleasePins.AssertPinned(ReleasePins.Reference42, "B-OCA-01 leaf ordinates examined", 18164, bOca01.Examined);
 
         // No concrete number of failures is asserted (similarity of a table that is not compared by
         // census is not pursued): only that the failures are a subset of what was examined.
