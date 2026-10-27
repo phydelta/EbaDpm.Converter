@@ -117,10 +117,19 @@ jobs:
           $zip = "dist/EbaDpm.Converter-$version-win.zip"
           Compress-Archive -Path publish/* -DestinationPath $zip
           Push-Location dist
-          Get-ChildItem -File | ForEach-Object {
-            "{0}  {1}" -f (Get-FileHash $_.Name -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
-          } | Set-Content SHA256SUMS.txt -Encoding ascii
+          # LF line endings: GNU sha256sum -c reads a CR as part of the file name (#59).
+          $sums = Get-ChildItem -File | ForEach-Object {
+            "{0}  {1}`n" -f (Get-FileHash $_.Name -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+          }
+          [IO.File]::WriteAllText("$PWD/SHA256SUMS.txt", -join $sums, [Text.Encoding]::ASCII)
           Pop-Location
+
+      - name: Check SHA256SUMS.txt with sha256sum
+        shell: bash
+        working-directory: dist
+        run: |
+          if grep -q $'\r' SHA256SUMS.txt; then echo "SHA256SUMS.txt contains CR bytes" >&2; exit 1; fi
+          sha256sum -c SHA256SUMS.txt
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v4

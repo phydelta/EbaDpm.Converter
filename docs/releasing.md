@@ -51,15 +51,19 @@ The workflow then:
 3. publishes the self-contained single-file executable for `win-x64` (at the root) and
    `win-x86` (in `x86\`) and packages them with `LICENSE`, `README.md` and `CHANGELOG.md` as
    `EbaDpm.Converter-X.Y.Z-win.zip`;
-4. writes `SHA256SUMS.txt` and a build provenance attestation for the zip;
+4. writes `SHA256SUMS.txt` (LF line endings, checked with `sha256sum -c`) and a build provenance
+   attestation for the zip;
 5. creates the tag `vX.Y.Z` on the commit it built and the GitHub release, with the
    `CHANGELOG.md` section as release notes.
 
 ## Verifying a downloaded release
 
 ```powershell
-# Checksum
+# Checksum, in PowerShell
 Get-FileHash .\EbaDpm.Converter-X.Y.Z-win.zip -Algorithm SHA256   # compare with SHA256SUMS.txt
+
+# Checksum, with GNU coreutils (Git Bash, WSL, Linux), next to SHA256SUMS.txt
+sha256sum -c SHA256SUMS.txt
 
 # Provenance: proves the file was built by this repository's release workflow
 gh attestation verify .\EbaDpm.Converter-X.Y.Z-win.zip --repo phydelta/EbaDpm.Converter

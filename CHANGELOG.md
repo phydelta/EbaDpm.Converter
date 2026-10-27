@@ -22,6 +22,11 @@ All notable changes to this project are documented in this file. The format is b
   tables were used together, and an equality rule over such a code was reported as not checkable
   (ambiguous cell).
 
+### Fixed
+
+- `SHA256SUMS.txt` in the release assets is written with LF line endings, so
+  `sha256sum -c SHA256SUMS.txt` works; the release workflow now runs that check itself. (#59)
+
 ## 1.3.0 - 2026-10-23
 
 ### Added
