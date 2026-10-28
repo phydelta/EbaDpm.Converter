@@ -38,8 +38,11 @@ public interface IDpm20DictionarySource
     /// <inheritdoc cref="Dpm20AccessReader.ReadSubCategories"/>
     IEnumerable<Dpm20SubCategoryRow> ReadSubCategories();
 
-    /// <inheritdoc cref="Dpm20AccessReader.ReadHeaderVersionSubCategories"/>
-    IEnumerable<Dpm20HeaderVersionSubCategoryRow> ReadHeaderVersionSubCategories();
+    /// <inheritdoc cref="Dpm20AccessReader.ReadMetricSubCategoryCandidates"/>
+    IEnumerable<Dpm20MetricSubCategoryCandidateRow> ReadMetricSubCategoryCandidates();
+
+    /// <inheritdoc cref="Dpm20AccessReader.CutoffReleaseId"/>
+    int CutoffReleaseId { get; }
 
     /// <inheritdoc cref="Dpm20AccessReader.ReadContextCompositionPropertyIds"/>
     IEnumerable<int> ReadContextCompositionPropertyIds();

@@ -39,6 +39,11 @@ namespace EbaDpm.Converter.Core.Validation.Checks;
 /// </summary>
 public static class IntegrityChecks
 {
+    /// <summary>Name of the single extension table of the 45-table distribution schema.</summary>
+    public const string ExtensionTable = "mOrdinateMetricRestriction";
+
+    private const int StandardTableCount = 45;
+
     private static CheckResult Orphans(SqliteConnection c, string id, string childTable, string childColumn, string parentTable, string parentColumn, ValidationLayer layer = ValidationLayer.Critical)
     {
         var totalSql = $"SELECT COUNT(*) FROM \"{childTable}\"";
@@ -179,7 +184,7 @@ public static class IntegrityChecks
         // ---- A-VAC-02: mOwnerParent has exactly 1 row ----
         yield return ExactRowCount(c, "A-VAC-02", "mOwnerParent", 1);
 
-        // ---- A-VAC-03: the schema has exactly 45 tables and 12 sqlite_autoindex_* indexes ----
+        // ---- A-VAC-03: the schema has the 45 distribution tables + the extension table and 12 sqlite_autoindex_* indexes ----
         yield return SchemaTableAndIndexCount(c);
 
         // ---- The FKs that the schema does NOT declare. Measured 0/0/0 over our three outputs
@@ -189,6 +194,23 @@ public static class IntegrityChecks
         yield return ReferencedHierarchyBelongsToReferencedDomain(c);
         yield return DomainUnionFksValidAndDistinct(c);
         yield return Orphans(c, "I-REF-08", "mOpenAxisValueRestriction", "HierarchyID", "mHierarchy", "HierarchyID");
+        // I-REF-17: the extension table mOrdinateMetricRestriction (not in the 45-table distribution schema).
+        // An output of an older converter version lacks the table: Skipped, probed once (A-VAC-03 still fails).
+        var extensionPresent = SqlHelpers.TableExists(c, ExtensionTable);
+        var extensionFks = new (string Id, string Col, string Parent, string ParentCol)[]
+        {
+            ("I-REF-17.1", "OrdinateID", "mAxisOrdinate", "OrdinateID"),
+            ("I-REF-17.2", "HierarchyID", "mHierarchy", "HierarchyID"),
+            ("I-REF-17.3", "HierarchyStartingMemberID", "mMember", "MemberID"),
+        };
+        foreach (var (id, col, parent, parentCol) in extensionFks)
+        {
+            yield return extensionPresent
+                ? Orphans(c, id, ExtensionTable, col, parent, parentCol)
+                : CheckResult.Skip(
+                    id, ValidationPlane.A, ValidationLayer.Critical, ExtensionTable,
+                    $"{ExtensionTable}.{col} -> {parent}.{parentCol}: no orphans", SqlHelpers.ExtensionTableAbsentReason);
+        }
         yield return Orphans(c, "I-REF-09", "mTableCell", "TableID", "mTable", "TableID");
         yield return Orphans(c, "I-REF-10.1", "mTableAxis", "TableID", "mTable", "TableID");
         yield return Orphans(c, "I-REF-10.2", "mTableAxis", "AxisID", "mAxis", "AxisID");
@@ -587,11 +609,17 @@ public static class IntegrityChecks
         var autoIndexCount = SqlHelpers.Scalar(c, "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'sqlite_autoindex_%'");
         sw.Stop();
 
-        var failed = (tableCount == 45 ? 0 : 1) + (autoIndexCount == 12 ? 0 : 1);
-        var samples = failed == 0 ? [] : new List<CheckSample> { new($"tables={tableCount} (expected 45), sqlite_autoindex_*={autoIndexCount} (expected 12)") };
+        // The extension table is named, not counted by pattern: its single-column INTEGER PRIMARY
+        // KEY is the rowid and creates no sqlite_autoindex_* index.
+        var extensionPresent = SqlHelpers.Scalar(c, $"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{ExtensionTable}'");
+        const int expectedTables = StandardTableCount + 1;
+        var failed = (tableCount == expectedTables ? 0 : 1) + (autoIndexCount == 12 ? 0 : 1) + (extensionPresent == 1 ? 0 : 1);
+        var samples = failed == 0
+            ? []
+            : new List<CheckSample> { new($"tables={tableCount} (expected {expectedTables}), sqlite_autoindex_*={autoIndexCount} (expected 12), {ExtensionTable} present={extensionPresent} (expected 1)") };
         return CheckResult.FromViolationCount(
             "A-VAC-03", ValidationPlane.A, ValidationLayer.Critical, "(schema)",
-            "The schema has exactly 45 tables and 12 sqlite_autoindex_* indexes (composite PKs)",
-            examined: 2, failed, sw.ElapsedMilliseconds, samples);
+            $"The schema has the 45 tables of the distribution schema plus the extension table {ExtensionTable} ({expectedTables} in total) and 12 sqlite_autoindex_* indexes (composite PKs)",
+            examined: 3, failed, sw.ElapsedMilliseconds, samples);
     }
 }

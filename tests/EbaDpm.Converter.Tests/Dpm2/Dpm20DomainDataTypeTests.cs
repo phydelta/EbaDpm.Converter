@@ -106,6 +106,8 @@ public sealed class Dpm20DomainDataTypeSyntheticTests
         "CREATE TABLE [SubCategory] ([SubCategoryID] INTEGER, [CategoryID] INTEGER, [Code] TEXT(50), [Name] TEXT(100))",
         "CREATE TABLE [SubCategoryVersion] ([SubCategoryVID] INTEGER, [SubCategoryID] INTEGER, [StartReleaseID] INTEGER, [EndReleaseID] INTEGER)",
         "CREATE TABLE [ContextComposition] ([ContextID] INTEGER, [PropertyID] INTEGER)",
+        "CREATE TABLE [TableVersion] ([TableVID] INTEGER, [StartReleaseID] INTEGER, [EndReleaseID] INTEGER)",
+        "CREATE TABLE [TableVersionHeader] ([TableVID] INTEGER, [HeaderVID] INTEGER)",
         "CREATE TABLE [DataType] ([DataTypeID] INTEGER, [Code] TEXT(20))",
         "CREATE TABLE [Property] ([PropertyID] INTEGER, [DataTypeID] INTEGER)",
         "CREATE TABLE [PropertyCategory] ([PropertyID] INTEGER, [CategoryID] INTEGER, [StartReleaseID] INTEGER, [EndReleaseID] INTEGER)",

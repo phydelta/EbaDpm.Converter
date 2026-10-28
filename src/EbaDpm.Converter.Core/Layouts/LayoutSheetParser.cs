@@ -129,6 +129,12 @@ internal sealed class ValueRow
     public string? MemberCode { get; init; }
     public string? Label { get; init; }
     public required string CellRef { get; init; }
+
+    /// <summary>Domain and hierarchy of the trailing bracket <c>[qCO:new_CO5]</c> of a metric
+    /// annotation (<c>(qAYV) label[qCO:new_CO5]</c>): the per-use restriction of an enumerated
+    /// metric. Only set for the metric (<c>MET</c>) value; <see langword="null"/> otherwise.</summary>
+    public string? HierarchyDomainCode { get; init; }
+    public string? HierarchyCode { get; init; }
 }
 
 internal sealed class UnparsedRow
@@ -623,6 +629,8 @@ internal static class LayoutSheetParser
                     MemberCode = parse.Code1,
                     Label = LayoutAnnotationGrammar.ExtractLabel(parse),
                     CellRef = cellRef,
+                    HierarchyDomainCode = parse.TrailingBracketDomain,
+                    HierarchyCode = parse.TrailingBracketCode,
                 });
                 claimed.Add((row, col));
                 return true;

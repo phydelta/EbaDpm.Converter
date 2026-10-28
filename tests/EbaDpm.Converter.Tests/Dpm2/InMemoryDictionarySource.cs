@@ -18,7 +18,10 @@ internal sealed class InMemoryDictionarySource : IDpm20DictionarySource
     public List<int> FactVariablePropertyIds { get; } = [];
     public List<int> NonKeyHeaderPropertyIds { get; } = [];
     public List<Dpm20SubCategoryRow> SubCategories { get; } = [];
-    public List<Dpm20HeaderVersionSubCategoryRow> HeaderVersionSubCategories { get; } = [];
+    public List<Dpm20MetricSubCategoryCandidateRow> MetricSubCategoryCandidates { get; } = [];
+
+    /// <summary>Cutoff release of the source; 0 keeps every PropertyCategory row with StartReleaseId &lt;= 0 out, so tests that need one set it.</summary>
+    public int CutoffReleaseId { get; set; }
     public List<int> ContextCompositionPropertyIds { get; } = [];
     public List<int> KeyVariablePropertyIds { get; } = [];
     public List<Dpm20ReleaseRow> Releases { get; } = [];
@@ -43,7 +46,7 @@ internal sealed class InMemoryDictionarySource : IDpm20DictionarySource
 
     public IEnumerable<Dpm20SubCategoryRow> ReadSubCategories() => SubCategories;
 
-    public IEnumerable<Dpm20HeaderVersionSubCategoryRow> ReadHeaderVersionSubCategories() => HeaderVersionSubCategories;
+    public IEnumerable<Dpm20MetricSubCategoryCandidateRow> ReadMetricSubCategoryCandidates() => MetricSubCategoryCandidates;
 
     public IEnumerable<int> ReadContextCompositionPropertyIds() => ContextCompositionPropertyIds;
 

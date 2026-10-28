@@ -355,26 +355,82 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
     }
 
     /// <summary>
-    /// <c>PropertyID</c> to <c>SubCategoryID</c> via <c>HeaderVersion.SubCategoryVID</c> to
-    /// <c>SubCategoryVersion.SubCategoryID</c>: source of <c>mMetric.ReferencedHierarchyID</c>.
-    /// Ordered by <c>HeaderVID</c> so that the resolution of the properties with more than one
-    /// distinct candidate is deterministic (the first one is kept, see
-    /// <see cref="Dpm20DictionaryLoader"/>).
+    /// The DISTINCT (<c>PropertyID</c>, <c>SubCategoryID</c>) pairs of the hierarchies that the
+    /// NON-key headers (<c>Header.IsKey = 0</c>) declare for a property through
+    /// <c>HeaderVersion.SubCategoryVID</c>, counting only the header versions referenced by
+    /// <c>TableVersionHeader</c> of a <c>TableVersion</c> current at <see cref="CutoffReleaseId"/>
+    /// (the same predicate as <see cref="ReadTableVersions"/>). <c>SubCategoryVID</c> is mapped to
+    /// the stable <c>SubCategoryID</c> through <c>SubCategoryVersion</c> WITHOUT the cutoff filter:
+    /// a stale <c>SubCategoryVID</c> still names the same subcategory. Independent of the taxonomy
+    /// and release selection. Rows with IsCurrent=false are the historical uses (header versions of
+    /// ANY table version), the fallback of a property with no current use. It is the source of <c>mMetric.ReferencedHierarchyID</c> (exactly one
+    /// candidate) and the reason for <c>mOrdinateMetricRestriction</c> (several).
+    ///
+    /// ACE does not join more than 2 tables reliably: the pieces are read separately and composed
+    /// in memory (tens of thousands of rows, not millions).
     /// </summary>
-    public IEnumerable<Dpm20HeaderVersionSubCategoryRow> ReadHeaderVersionSubCategories()
+    public IEnumerable<Dpm20MetricSubCategoryCandidateRow> ReadMetricSubCategoryCandidates()
     {
-        const string sql =
+        var cutoff = CutoffReleaseId;
+
+        // Step 1: the table versions current at the cutoff.
+        const string currentTableVersionsSql =
+            "SELECT [TableVID] FROM [TableVersion] WHERE [StartReleaseID] <= ? AND ([EndReleaseID] IS NULL OR [EndReleaseID] > ?)";
+        var currentTableVIds = new HashSet<int>();
+        foreach (var row in Query(currentTableVersionsSql, [cutoff, cutoff]))
+        {
+            currentTableVIds.Add(Convert.ToInt32(row.GetValue(0)));
+        }
+
+        // Step 2: the header versions referenced by those table versions.
+        var currentHeaderVIds = new HashSet<int>();
+        foreach (var row in Query("SELECT [TableVID], [HeaderVID] FROM [TableVersionHeader]"))
+        {
+            var tableVId = Convert.ToInt32(row.GetValue(0));
+            var headerVId = Convert.ToInt32(row.GetValue(1));
+            if (currentTableVIds.Contains(tableVId))
+            {
+                currentHeaderVIds.Add(headerVId);
+            }
+        }
+
+        // Step 3: the stable SubCategoryID of every SubCategoryVID (no cutoff filter).
+        var subCategoryIdByVId = new Dictionary<int, int>();
+        foreach (var scv in ReadAllSubCategoryVersions())
+        {
+            subCategoryIdByVId[scv.SubCategoryVId] = scv.SubCategoryId;
+        }
+
+        // Step 4: the non-key header versions with a property and a subcategory version
+        // (a 2-table JOIN, which works in this source).
+        const string headerVersionsSql =
             """
-            SELECT hv.[PropertyID], scv.[SubCategoryID], hv.[HeaderVID]
-            FROM [HeaderVersion] hv INNER JOIN [SubCategoryVersion] scv ON scv.[SubCategoryVID] = hv.[SubCategoryVID]
-            WHERE hv.[PropertyID] IS NOT NULL AND hv.[SubCategoryVID] IS NOT NULL
-            ORDER BY hv.[HeaderVID]
+            SELECT hv.[HeaderVID], hv.[PropertyID], hv.[SubCategoryVID]
+            FROM [HeaderVersion] hv INNER JOIN [Header] h ON h.[HeaderID] = hv.[HeaderID]
+            WHERE h.[IsKey] = 0 AND hv.[PropertyID] IS NOT NULL AND hv.[SubCategoryVID] IS NOT NULL
             """;
 
-        foreach (var row in Query(sql))
+        var candidates = new SortedSet<(int PropertyId, int SubCategoryId, bool IsCurrent)>();
+        foreach (var row in Query(headerVersionsSql))
         {
-            yield return new Dpm20HeaderVersionSubCategoryRow(
-                Convert.ToInt32(row.GetValue(0)), Convert.ToInt32(row.GetValue(1)), Convert.ToInt32(row.GetValue(2)));
+            // SequentialAccess: the columns are read once, in order.
+            var headerVId = Convert.ToInt32(row.GetValue(0));
+            var propertyId = Convert.ToInt32(row.GetValue(1));
+            var subCategoryVId = Convert.ToInt32(row.GetValue(2));
+
+            if (subCategoryIdByVId.TryGetValue(subCategoryVId, out var subCategoryId))
+            {
+                candidates.Add((propertyId, subCategoryId, false)); // historical: any table version
+                if (currentHeaderVIds.Contains(headerVId))
+                {
+                    candidates.Add((propertyId, subCategoryId, true));
+                }
+            }
+        }
+
+        foreach (var (propertyId, subCategoryId, isCurrent) in candidates)
+        {
+            yield return new Dpm20MetricSubCategoryCandidateRow(propertyId, subCategoryId, isCurrent);
         }
     }
 

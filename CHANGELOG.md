@@ -6,7 +6,27 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Added
+
+- Extension table `mOrdinateMetricRestriction`: the hierarchy that restricts an enumerated metric
+  on one ordinate, which can differ between the tables where the metric is used (in the 4.3
+  database, `qAYV` is `new_CO4` in C_67.00 and `new_CO5` in E_04.01). DPM 1.0 takes it from the
+  `RestrictionID` of metric categorisations, DPM 2.0 from the `SubCategoryVID` of non-key headers.
+  Both models used to lose it. Consumers that read only the 45 standard tables are unaffected.
+  Plane A checks it (`A-OMR`), and plane C compares it with the layout annotation
+  `(code) label[domain:hierarchy]` (`C-MHR-01`, `C-MHR-02`); the layout repository now stores
+  that bracket. (#61)
+
 ### Changed
+
+- **DPM 2.0 output.** `mMetric.ReferencedHierarchyID` is taken only from non-key headers of the
+  table versions current at the cutoff. Before, the first header version by `HeaderVID` won,
+  including key headers and superseded versions (`qNCO` got `new_CO1` from key headers instead
+  of `new_CO5`). When those headers use more than one hierarchy, it is `NULL` and the metrics are
+  listed in the conversion log (in the 4.3 database: `ei351`, `GXI`, `qAPH`, `qAYV`, `qAZC`). A
+  metric that no current table uses keeps the hierarchy of its past uses (155 in the 4.3
+  database). An enumerated metric without a single hierarchy takes `ReferencedDomainID` from its
+  `PropertyCategory`. (#61)
 
 - **Breaking (DPM 2.0 output).** A module now belongs to the taxonomy of the release in which its
   current module version was published (`ModuleVersion.StartReleaseID`), not to the cutoff

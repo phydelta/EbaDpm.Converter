@@ -1,7 +1,8 @@
 # Target schema
 
 The converter always produces the same **45-table DPM distribution schema**, whatever the source
-model. The DDL is embedded in the assembly:
+model, plus one **extension table**, `mOrdinateMetricRestriction` (see
+[Extension tables](#extension-tables)). The DDL is embedded in the assembly:
 
 ```
 src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql
@@ -71,6 +72,7 @@ followed.
 | `mAxisOrdinate` | yes | yes | Rows, columns and sheets (ordinates) |
 | `mOrdinateCategorisation` | yes | yes | Dimension/member pairs of each ordinate, with their signatures |
 | `mOpenAxisValueRestriction` | yes | yes | Hierarchy restricting the values of an open axis |
+| `mOrdinateMetricRestriction` | yes | yes | Hierarchy restricting the values of an enumerated metric on one ordinate (**extension**) |
 | `mTableCell` | yes | yes | Cells, with business code and data point signatures |
 | `mCellPosition` | yes | yes | Ordinates of each cell |
 
@@ -104,6 +106,49 @@ data.** A table without a source is created, but stays empty.
 
 The `Source model` row tells the validator which rule set to apply; its absence means DPM 1.0,
 so DPM 1.0 outputs are unaffected by its introduction. See [validation.md](validation.md).
+
+## Extension tables
+
+### mOrdinateMetricRestriction
+
+An enumerated metric can be restricted to a **different hierarchy in each table where it is
+used**. Both source models declare this per use, and the EBA Annotated Table Layouts publish it per
+column (`(qAYV) Type of entity code (Concentration funding)[qCO:new_CO5]`), but the 45-table
+distribution schema has no place for it: `mMetric` holds one row per metric (one XBRL concept),
+`mOrdinateCategorisation` has no restriction column, `mOpenAxisValueRestriction` is per open axis,
+and the restriction is not part of the data point identity, so it never appears in a signature.
+The converter adds one table for it:
+
+```sql
+CREATE TABLE mOrdinateMetricRestriction (
+    OrdinateID                INTEGER PRIMARY KEY REFERENCES mAxisOrdinate (OrdinateID),
+    HierarchyID               INTEGER NOT NULL REFERENCES mHierarchy (HierarchyID),
+    HierarchyStartingMemberID INTEGER REFERENCES mMember (MemberID),
+    IsStartingMemberIncluded  BOOLEAN
+);
+```
+
+Contract:
+
+- `OrdinateID` is the ordinate that carries the `MET` categorisation; a cell reaches its
+  restriction through `mCellPosition`. At most one row per ordinate.
+- The metric of that ordinate is enumerated (`mMetric.DataType` `Enumeration/Code` in DPM 2.0,
+  `Code` in DPM 1.0, as the source labels it), and `HierarchyID` is a hierarchy of the
+  metric's `mMetric.ReferencedDomainID`.
+- `HierarchyStartingMemberID` and `IsStartingMemberIncluded` are both `NULL` or both set, with
+  the same meaning as in `mOpenAxisValueRestriction`; a starting member is a node of the
+  hierarchy.
+- Every declared restriction is emitted, including one equal to the metric's own hierarchy.
+
+Consumers that read only the 45 standard tables are unaffected. The list of allowed members of
+an enumerated cell is resolved in this order: `mOrdinateMetricRestriction` →
+`mMetric.ReferencedHierarchyID` (cut to the starting member when declared) → every member of
+`mMetric.ReferencedDomainID`.
+
+Known limitation: `HierarchyID` references an `mHierarchy` row, whose nodes are those of the
+hierarchy's version in force at the cutoff. A DPM 2.0 header can still point to an older version
+of the sub-category with other members, so the restriction names the right hierarchy but not
+necessarily the right member list (accepted loss, tracked in #62).
 
 ## Conventions in the data
 

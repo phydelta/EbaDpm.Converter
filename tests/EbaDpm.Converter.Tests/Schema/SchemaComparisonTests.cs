@@ -27,18 +27,24 @@ public sealed class SchemaComparisonTests : IClassFixture<SchemaFixture>
     // ------------------------------------------------------------------
 
     [DataFact]
-    public void GeneratedDatabase_HasIdenticalTableSet_ToReference()
+    public void GeneratedDatabase_HasTheTableSetOfTheReference_PlusTheDeclaredExtensionTable()
     {
         var referenceTables = SchemaInspector.GetTableNames(_fixture.ReferenceConnection).ToHashSet(StringComparer.Ordinal);
         var generatedTables = SchemaInspector.GetTableNames(_fixture.GeneratedConnection).ToHashSet(StringComparer.Ordinal);
 
         var missing = referenceTables.Except(generatedTables).OrderBy(n => n, StringComparer.Ordinal).ToList();
-        var extra = generatedTables.Except(referenceTables).OrderBy(n => n, StringComparer.Ordinal).ToList();
+
+        // The ONE table the output has beyond the 45 of the contract is the declared extension
+        // (issue 61, docs/target-schema.md "Extension tables"). It is named, never matched by pattern:
+        // it must be present, and any other extra table still fails.
+        const string extensionTable = "mOrdinateMetricRestriction";
+        Assert.Contains(extensionTable, generatedTables);
+        var extra = generatedTables.Except(referenceTables).Where(n => n != extensionTable).OrderBy(n => n, StringComparer.Ordinal).ToList();
 
         var message =
             "The table set of the generated database does not match the contract " +
             $"({RepoPaths.ReferenceDatabaseFileName}).\n" +
-            $"Contract tables: {referenceTables.Count}. Generated tables: {generatedTables.Count}.\n" +
+            $"Contract tables: {referenceTables.Count}. Generated tables: {generatedTables.Count} (the declared extension table {extensionTable} included).\n" +
             $"Missing from the generated one ({missing.Count}): {(missing.Count == 0 ? "(none)" : string.Join(", ", missing))}\n" +
             $"Extra in the generated one ({extra.Count}): {(extra.Count == 0 ? "(none)" : string.Join(", ", extra))}";
 
@@ -213,13 +219,13 @@ public sealed class SchemaComparisonTests : IClassFixture<SchemaFixture>
         FailIfDataMissingSentinel(tableName);
 
         // Only compare against tables that really exist in the generated database: if the table
-        // does not exist, GeneratedDatabase_HasIdenticalTableSet_ToReference already reports it
+        // does not exist, GeneratedDatabase_HasTheTableSetOfTheReference_PlusTheDeclaredExtensionTable already reports it
         // with its own evidence; this test must not mask that failure with a different SQL error.
         var generatedTables = SchemaInspector.GetTableNames(_fixture.GeneratedConnection).ToHashSet(StringComparer.Ordinal);
         Assert.True(
             generatedTables.Contains(tableName),
             $"Table '{tableName}' does not exist in the generated database, so its row count cannot be checked. "
-            + "See GeneratedDatabase_HasIdenticalTableSet_ToReference for the table-set evidence.");
+            + "See GeneratedDatabase_HasTheTableSetOfTheReference_PlusTheDeclaredExtensionTable for the table-set evidence.");
 
         var rowCount = SchemaInspector.GetRowCount(_fixture.GeneratedConnection, tableName);
 

@@ -105,7 +105,12 @@ internal static class LayoutRepositorySchema
             DomainCode TEXT NULL,
             MemberCode TEXT NULL,
             Label      TEXT NULL,
-            CellRef    TEXT NOT NULL
+            CellRef    TEXT NOT NULL,
+            -- Trailing bracket "[domain:hierarchy]" of a METRIC annotation (DomainCode = 'MET'),
+            -- the per-use restriction of an enumerated metric; NULL for every other value. Absent
+            -- from a repository built before it existed: readers must probe for the column.
+            HierarchyDomainCode TEXT NULL,
+            HierarchyCode       TEXT NULL
         );
 
         CREATE TABLE LayoutRaw (

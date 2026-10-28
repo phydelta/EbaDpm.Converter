@@ -552,9 +552,14 @@ public static class Dpm20DictionaryLoader
         SqliteConnection destination,
         IReadOnlyList<(int MemberId, int PropertyId, string Code)> metMembers,
         IReadOnlyDictionary<int, string> dataTypeCodeByPropertyId,
-        IReadOnlyDictionary<int, int> subCategoryIdByPropertyId,
+        IReadOnlyDictionary<int, IReadOnlyList<int>> candidateSubCategoryIdsByPropertyId,
+        IReadOnlyDictionary<int, IReadOnlyList<int>> historicalSubCategoryIdsByPropertyId,
         IReadOnlyDictionary<int, (int HierarchyId, string HierarchyCode, int DomainId)> hierarchyBySubCategoryId,
-        List<string> unresolvedDataTypeCases)
+        IReadOnlyDictionary<int, IReadOnlyList<Dpm20PropertyCategoryRow>> propertyCategoriesByPropertyId,
+        IReadOnlyDictionary<int, int> domainIdByCategoryId,
+        int cutoffReleaseId,
+        List<string> unresolvedDataTypeCases,
+        List<string> metricsWithSeveralHierarchies)
     {
         using var writer = new SqliteBatchWriter(
             destination,
@@ -583,13 +588,50 @@ public static class Dpm20DictionaryLoader
                 continue;
             }
 
+            // The hierarchies that the NON-key headers (of the table versions current at the cutoff)
+            // declare for this property. Exactly one: it is the hierarchy of every use of the metric.
+            // Zero or several: mMetric names no hierarchy (the source does not declare one for the
+            // metric as such; with several, the per-use hierarchy is in mOrdinateMetricRestriction)
+            // and the domain, if the property has an enumerated one, comes from PropertyCategory.
+            List<(int HierarchyId, string HierarchyCode, int DomainId)> ResolveHierarchies(
+                IReadOnlyDictionary<int, IReadOnlyList<int>> idsByProperty) =>
+                idsByProperty.TryGetValue(member.PropertyId, out var candidateIds)
+                    ? candidateIds
+                        .Where(hierarchyBySubCategoryId.ContainsKey)
+                        .Select(id => hierarchyBySubCategoryId[id])
+                        .DistinctBy(h => h.HierarchyId)
+                        .ToList()
+                    : [];
+
+            // Backward-compatibility fallback: only a property with NO current non-key use looks at
+            // its historical uses (any table version). A current set with several hierarchies
+            // never falls back.
+            var hierarchies = ResolveHierarchies(candidateSubCategoryIdsByPropertyId);
+            if (hierarchies.Count == 0)
+            {
+                hierarchies = ResolveHierarchies(historicalSubCategoryIdsByPropertyId);
+            }
+
             int? referencedHierarchyId = null;
             int? referencedDomainId = null;
-            if (subCategoryIdByPropertyId.TryGetValue(member.PropertyId, out var subCategoryId)
-                && hierarchyBySubCategoryId.TryGetValue(subCategoryId, out var hierarchy))
+            if (hierarchies.Count == 1)
             {
-                referencedHierarchyId = hierarchy.HierarchyId;
-                referencedDomainId = hierarchy.DomainId;
+                referencedHierarchyId = hierarchies[0].HierarchyId;
+                referencedDomainId = hierarchies[0].DomainId;
+            }
+            else
+            {
+                if (hierarchies.Count > 1)
+                {
+                    metricsWithSeveralHierarchies.Add(
+                        $"{member.Code}: {string.Join(", ", hierarchies.Select(h => h.HierarchyCode).OrderBy(c => c, StringComparer.Ordinal))}");
+                }
+
+                if (dataType == "Enumeration/Code")
+                {
+                    referencedDomainId = ResolveDomainAtCutoff(
+                        member.PropertyId, propertyCategoriesByPropertyId, domainIdByCategoryId, cutoffReleaseId);
+                }
             }
 
             writer.AddRow(
@@ -609,6 +651,34 @@ public static class Dpm20DictionaryLoader
         }
 
         return (int)writer.RowsWritten;
+    }
+
+    /// <summary>
+    /// The <c>mDomain</c> of the <c>PropertyCategory</c> row of <paramref name="propertyId"/> in
+    /// force at the cutoff (<c>Start &lt;= R AND (End IS NULL OR End &gt; R)</c>), or
+    /// <see langword="null"/> if there is none, there is more than one distinct category (nothing
+    /// is chosen), or the category has no <c>mDomain</c> (for example <c>_PR</c>).
+    /// </summary>
+    private static int? ResolveDomainAtCutoff(
+        int propertyId,
+        IReadOnlyDictionary<int, IReadOnlyList<Dpm20PropertyCategoryRow>> propertyCategoriesByPropertyId,
+        IReadOnlyDictionary<int, int> domainIdByCategoryId,
+        int cutoffReleaseId)
+    {
+        if (!propertyCategoriesByPropertyId.TryGetValue(propertyId, out var rows))
+        {
+            return null;
+        }
+
+        var categoryIds = rows
+            .Where(r => r.StartReleaseId <= cutoffReleaseId && (r.EndReleaseId is null || r.EndReleaseId > cutoffReleaseId))
+            .Select(r => r.CategoryId)
+            .Distinct()
+            .ToList();
+
+        return categoryIds.Count == 1 && domainIdByCategoryId.TryGetValue(categoryIds[0], out var domainId)
+            ? domainId
+            : null;
     }
 
     // ------------------------------------------------------------------
@@ -769,7 +839,8 @@ public static class Dpm20DictionaryLoader
         IReadOnlyList<string> DimensionsWithoutCode,
         IReadOnlyList<string> DimensionsWithoutPropertyCategory,
         IReadOnlyList<string> UnresolvedDimensionDomainCases,
-        IReadOnlyList<string> UnresolvedDomainDataTypeCases);
+        IReadOnlyList<string> UnresolvedDomainDataTypeCases,
+        IReadOnlyList<string> MetricsWithSeveralHierarchies);
 
     /// <summary>
     /// Loads the dictionary tables (domains, domain unions, members, hierarchies, metrics and
@@ -861,23 +932,49 @@ public static class Dpm20DictionaryLoader
 
         // ---- What mMetric and mDimension need in addition, on the SAME connection ----
 
-        // mMetric.ReferencedHierarchyID: PropertyID -> SubCategoryID, first row per HeaderVID
-        // (36 of 537 properties have more than one distinct candidate — documented in
-        // Dpm20HeaderVersionSubCategoryRow, not resolved by voting or averaging).
-        var subCategoryIdByPropertyId = new Dictionary<int, int>();
-        foreach (var row in reader.ReadHeaderVersionSubCategories())
+        // mMetric.ReferencedHierarchyID: the DISTINCT stable SubCategoryIDs that the non-key headers
+        // of the current table versions declare for each property (see ReadMetricSubCategoryCandidates).
+        // Exactly one is the metric's hierarchy; with several, none is chosen.
+        var candidateSubCategoryIdsByProperty = new Dictionary<int, List<int>>();
+        var historicalSubCategoryIdsByProperty = new Dictionary<int, List<int>>();
+        foreach (var row in reader.ReadMetricSubCategoryCandidates())
         {
-            subCategoryIdByPropertyId.TryAdd(row.PropertyId, row.SubCategoryId);
+            var target = row.IsCurrent ? candidateSubCategoryIdsByProperty : historicalSubCategoryIdsByProperty;
+            if (!target.TryGetValue(row.PropertyId, out var candidates))
+            {
+                candidates = [];
+                target[row.PropertyId] = candidates;
+            }
+
+            if (!candidates.Contains(row.SubCategoryId))
+            {
+                candidates.Add(row.SubCategoryId);
+            }
         }
 
+        var candidateSubCategoryIdsByPropertyId = candidateSubCategoryIdsByProperty
+            .ToDictionary(kv => kv.Key, IReadOnlyList<int> (kv) => kv.Value);
+
+        var historicalSubCategoryIdsByPropertyId = historicalSubCategoryIdsByProperty
+            .ToDictionary(kv => kv.Key, IReadOnlyList<int> (kv) => kv.Value);
+
+        var propertyCategoriesForMetrics = propertyCategoriesByPropertyId
+            .ToDictionary(kv => kv.Key, IReadOnlyList<Dpm20PropertyCategoryRow> (kv) => kv.Value);
+
         var unresolvedMetricDataTypeCases = new List<string>();
+        var metricsWithSeveralHierarchies = new List<string>();
         var metricRows = LoadMetrics(
             destination,
             memberResult.MetMembers,
             dataTypeCodeByPropertyId,
-            subCategoryIdByPropertyId,
+            candidateSubCategoryIdsByPropertyId,
+            historicalSubCategoryIdsByPropertyId,
             hierarchyResult.BySubCategoryId,
-            unresolvedMetricDataTypeCases);
+            propertyCategoriesForMetrics,
+            domainResult.DomainIdByCategoryId,
+            reader.CutoffReleaseId,
+            unresolvedMetricDataTypeCases,
+            metricsWithSeveralHierarchies);
 
         // mDimension: properties = ContextComposition ∪ key variables.
         var dimensionPropertyIds = new HashSet<int>(reader.ReadContextCompositionPropertyIds());
@@ -947,7 +1044,8 @@ public static class Dpm20DictionaryLoader
             dimensionsWithoutCode,
             dimensionsWithoutPropertyCategory,
             unresolvedDimensionDomainCases,
-            unresolvedDomainDataTypeCases);
+            unresolvedDomainDataTypeCases,
+            metricsWithSeveralHierarchies);
 
         return new Result(
             domainResult.RowsWritten,

@@ -118,7 +118,8 @@ public sealed class AxisAndCellFixture : IDisposable
         Skeleton = SkeletonLoader.Load(AccessReader, GeneratedConnection, AllTaxonomies, SelectedTaxonomies);
         DictionaryResult = DictionaryLoader.Load(AccessReader, GeneratedConnection, AllTaxonomies, SelectedTaxonomies);
         TemplateOrTableResult = TemplateOrTableLoader.Load(AccessReader, GeneratedConnection, SelectedTaxonomies);
-        AxisAndCellResult = AxisAndCellLoader.Load(AccessReader, GeneratedConnection, TemplateOrTableResult.TableIdByTableVId);
+        AxisAndCellResult = AxisAndCellLoader.Load(
+            AccessReader, GeneratedConnection, TemplateOrTableResult.TableIdByTableVId, DictionaryResult.MemberIdRenumbering);
 
         Reference32Connection = OpenReadOnly(RepoPaths.Reference32Path);
         Reference40Connection = OpenReadOnly(RepoPaths.Reference40Path);

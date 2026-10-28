@@ -8,7 +8,7 @@ target table, in the order the loaders run:
 | `SkeletonLoader` | `mOwner`, `mOwnerParent`, `mLanguage`, `mReportingFramework`, `mTaxonomy`, `mRelease`, `mConcept` (part) |
 | `DictionaryLoader` | `mDomain`, `mMember`, `mDimension`, `mMetric`, `mHierarchy`, `mHierarchyNode`, `mConceptTranslation` (part) |
 | `TemplateOrTableLoader` | `mTemplateOrTable`, `mTable`, `mTaxonomyTable` |
-| `AxisAndCellLoader` | `mAxis`, `mTableAxis`, `mAxisOrdinate`, `mOrdinateCategorisation`, `mOpenAxisValueRestriction`, `mTableCell`, `mCellPosition` |
+| `AxisAndCellLoader` | `mAxis`, `mTableAxis`, `mAxisOrdinate`, `mOrdinateCategorisation`, `mOpenAxisValueRestriction`, `mOrdinateMetricRestriction`, `mTableCell`, `mCellPosition` |
 | `ModuleLoader` | `mModule`, `mConceptualModule`, `mModuleBusinessTemplate` |
 
 The source model is described in [source-models.md](source-models.md) and the target tables in
@@ -316,6 +316,24 @@ dimension, and the content from `OpenMemberRestriction`:
 | `HierarchyID` | `OpenMemberRestriction.HierarchyID` (no row if `NULL`, or if the axis is open without restriction) |
 | `HierarchyStartingMemberID`, `IsStartingMemberIncluded` | `MemberID` and `MemberIncluded`, unless `IgnoreMemberID` is set, in which case `NULL` |
 
+### mOrdinateMetricRestriction
+
+Extension table (see [target-schema.md](target-schema.md#mordinatemetricrestriction)). One row
+per emitted **metric** categorisation whose `OrdinateCategorisation.RestrictionID` is set, with
+the content from `OpenMemberRestriction`, as for `mOpenAxisValueRestriction`:
+
+| Column | Rule |
+|---|---|
+| `OrdinateID` | the ordinate that carries the metric categorisation |
+| `HierarchyID` | `OpenMemberRestriction.HierarchyID` |
+| `HierarchyStartingMemberID`, `IsStartingMemberIncluded` | `MemberID` and `MemberIncluded`, unless `IgnoreMemberID` is set, in which case `NULL` |
+
+Every declared restriction is emitted, including those equal to `Metric.CodeSubdomainID`. Most
+repeat the metric's hierarchy, but not all: in the 4.1 database, 48 of 745 metric
+categorisations with a restriction name another hierarchy, across 13 metrics (for example `ei207`
+is `SC1_1` on the metric and `SC1` on some ordinates). `mMetric` is unchanged: `CodeSubdomainID`
+is the metric's own hierarchy.
+
 ### mTableCell and mCellPosition
 
 | Item | Rule |
@@ -362,7 +380,7 @@ ID variant encodes this database's IDs, so it can only be compared with another 
 normalising those numbers.
 
 A `RestrictionID` attached to a *metric* categorisation restricts the metric's values, not an
-axis, and never produces brackets.
+axis, and never produces brackets: it goes to `mOrdinateMetricRestriction`.
 
 ---
 

@@ -172,13 +172,16 @@ public sealed record Dpm20PropertyRow(int PropertyId, int? DataTypeId);
 public sealed record Dpm20PropertyCategoryRow(int PropertyId, int CategoryId, int StartReleaseId, int? EndReleaseId);
 
 /// <summary>
-/// <c>PropertyID</c> to <c>SubCategoryID</c> via <c>HeaderVersion.SubCategoryVID</c> to
-/// <c>SubCategoryVersion.SubCategoryID</c>: the only source table that links a property with a
-/// subcategory. Source of <c>mMetric.ReferencedHierarchyID</c>. <see cref="HeaderVId"/> is read
-/// only to be able to order deterministically when a property has more than one candidate (see
-/// <see cref="Dpm20DictionaryLoader"/>).
+/// One DISTINCT (property, stable <c>SubCategoryID</c>) pair declared by the NON-key headers of the
+/// table versions current at the cutoff (<c>HeaderVersion.SubCategoryVID</c> to
+/// <c>SubCategoryVersion.SubCategoryID</c>, without release filter on the subcategory: the stable
+/// ID). <see cref="IsCurrent"/> is true when the header version belongs to a table version current
+/// at the cutoff; false rows are the HISTORICAL uses (any table version), a pair can come with both
+/// values. A property with exactly one pair has one hierarchy for every use of its metric
+/// (<c>mMetric.ReferencedHierarchyID</c>); with several, the hierarchy is per ordinate
+/// (<c>mOrdinateMetricRestriction</c>) and <c>mMetric.ReferencedHierarchyID</c> stays NULL.
 /// </summary>
-public sealed record Dpm20HeaderVersionSubCategoryRow(int PropertyId, int SubCategoryId, int HeaderVId);
+public sealed record Dpm20MetricSubCategoryCandidateRow(int PropertyId, int SubCategoryId, bool IsCurrent);
 
 // ------------------------------------------------------------------------
 // Structure: mTable, mTaxonomyTable, mTemplateOrTable.

@@ -18,6 +18,12 @@
 # (0010, 0020, 0060, 0070); F_02.00.dp draws rows 0440 and 0450 when the Access jumps from 0430
 # to 0455. Our output matches the Access. This list is not a census of suspicions: it is a census
 # of defects of someone else's artifact that have already been arbitrated.
+#
+# Type 'hierarchy' (C-MHR-01, metric restriction hierarchy): ONE row = ONE unit, with a 4th column.
+#   TableCode<TAB>hierarchy<TAB>{ReleaseLabel}|{Axis}|{OrdinateCode}|{MetricCode}<TAB>Reason
+# The third column is the business key of the unit (layout release label, axis Y/X, ordinate code,
+# layout metric code); the Reason is mandatory. Like every entry here, it must still violate or it
+# FAILS as stale.
 TableCode	Type	LayoutSignature
 F_02.00.dp	no-match	MET(qBCU)|qCAA(qx2022)|qLHL(qx2001)|qLJM(qx2095)|qLLI(qx2051)|qLLJ(qx2021)|qMKJ(qx2017)
 F_02.00.dp	contradicts	MET(qBCU)|qCAA(qx2022)|qLJM(qx2140)|qLLI(qx2051)|qMKJ(qx2017)

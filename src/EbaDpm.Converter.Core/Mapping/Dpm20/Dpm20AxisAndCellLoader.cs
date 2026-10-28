@@ -118,7 +118,9 @@ public static class Dpm20AxisAndCellLoader
         int UnresolvedMetricPairs,
         int UnresolvedOpenAxisDimensions,
         int UnresolvedOpenAxisRestrictions,
-        IReadOnlyList<string> StructuralAnomalies);
+        IReadOnlyList<string> StructuralAnomalies,
+        int OrdinateMetricRestrictionRows = 0,
+        int UnresolvedMetricRestrictions = 0);
 
     // ==================================================================
     // Internal working structures
@@ -198,6 +200,13 @@ public static class Dpm20AxisAndCellLoader
         /// doc of <see cref="DimensionMemberResolver.IsDefaultMemberByMemberId"/>).
         /// </summary>
         public required Dictionary<int, Dictionary<int, (int MemberId, string DimensionXbrlCode, string? MemberXbrlCode, bool IsDefaultMember)>> OwnCategorisationByHeaderId;
+
+        /// <summary>
+        /// Hierarchy restriction of the metric of each CLOSED survivor whose MET pair comes from
+        /// source 3 (non-key header with a <c>PropertyID</c>) and whose header carries a resolved
+        /// <c>SubCategoryVID</c>, by source <c>HeaderID</c>. Feeds <c>mOrdinateMetricRestriction</c>.
+        /// </summary>
+        public required Dictionary<int, (int HierarchyId, string HierarchyCode)> MetricRestrictionByHeaderId;
 
         /// <summary>Source coordinate (ColumnID, RowID, SheetID) -> CellID of <c>Cell</c> (<c>TableID</c> entity).</summary>
         public required Dictionary<(int? Column, int? Row, int? Sheet), int> OriginCellIdByCoordinate;
@@ -391,6 +400,7 @@ public static class Dpm20AxisAndCellLoader
         var cellPositionRows = new List<CellPositionRowData>();
         var categorisationRows = new List<CategorisationRowData>();
         var openAxisRestrictionRows = new List<OpenAxisRestrictionRowData>();
+        var ordinateMetricRestrictionRows = new List<OrdinateMetricRestrictionRowData>();
 
         foreach (var (tableId, tableVId) in tableVIdByTableId.OrderBy(kv => kv.Key))
         {
@@ -401,7 +411,8 @@ public static class Dpm20AxisAndCellLoader
 
             EmitTablePlan(
                 plan, tableId, tableCode, counters, axisRows, tableAxisRows, ordinateRows, cellRows,
-                cellPositionRows, categorisationRows, openAxisRestrictionRows, structuralAnomalies);
+                cellPositionRows, categorisationRows, openAxisRestrictionRows, ordinateMetricRestrictionRows,
+                structuralAnomalies);
         }
 
         WriteAxisRows(destination, axisRows);
@@ -411,6 +422,7 @@ public static class Dpm20AxisAndCellLoader
         WriteCellPositionRows(destination, cellPositionRows);
         WriteCategorisationRows(destination, categorisationRows);
         WriteOpenAxisValueRestrictionRows(destination, openAxisRestrictionRows);
+        WriteOrdinateMetricRestrictionRows(destination, ordinateMetricRestrictionRows);
 
         return new Result(
             AxisRows: axisRows.Count,
@@ -424,7 +436,9 @@ public static class Dpm20AxisAndCellLoader
             UnresolvedMetricPairs: resolver.UnresolvedMetricPairs,
             UnresolvedOpenAxisDimensions: resolver.UnresolvedOpenAxisDimensions,
             UnresolvedOpenAxisRestrictions: resolver.UnresolvedOpenAxisRestrictions,
-            StructuralAnomalies: structuralAnomalies);
+            StructuralAnomalies: structuralAnomalies,
+            OrdinateMetricRestrictionRows: ordinateMetricRestrictionRows.Count,
+            UnresolvedMetricRestrictions: resolver.UnresolvedMetricRestrictions);
     }
 
     // ------------------------------------------------------------------
@@ -444,6 +458,9 @@ public static class Dpm20AxisAndCellLoader
 
     /// <summary>One row per restricted open axis; <c>HierarchyStartingMemberID</c>/<c>IsStartingMemberIncluded</c> are always NULL/0.</summary>
     private sealed record OpenAxisRestrictionRowData(int AxisId, int HierarchyId);
+
+    /// <summary>One row per emitted ordinate whose metric header restricts it to a hierarchy; no starting member (NULL/NULL).</summary>
+    private sealed record OrdinateMetricRestrictionRowData(int OrdinateId, int HierarchyId);
 
     private static void WriteAxisRows(SqliteConnection destination, List<AxisRowData> rows)
     {
@@ -540,6 +557,20 @@ public static class Dpm20AxisAndCellLoader
                 row.AxisId, row.HierarchyId,
                 null, // HierarchyStartingMemberID: always NULL (the source does not model a starting member)
                 false); // IsStartingMemberIncluded: 0 (false, NOT null — measured 2026-10-22: 207/207 on the 4.2 cutoff against the 4.2 reference export; 398 in the 4.2.1 database, 413 in 4.3)
+        }
+    }
+
+    private static void WriteOrdinateMetricRestrictionRows(SqliteConnection destination, List<OrdinateMetricRestrictionRowData> rows)
+    {
+        using var writer = new SqliteBatchWriter(
+            destination, "mOrdinateMetricRestriction",
+            ["OrdinateID", "HierarchyID", "HierarchyStartingMemberID", "IsStartingMemberIncluded"]);
+        foreach (var row in rows)
+        {
+            writer.AddRow(
+                row.OrdinateId, row.HierarchyId,
+                null, // HierarchyStartingMemberID: always NULL (the source does not model a starting member)
+                null); // IsStartingMemberIncluded: NULL with it (A-OMR-04)
         }
     }
 
@@ -1070,6 +1101,55 @@ public static class Dpm20AxisAndCellLoader
         }
     }
 
+    /// <summary>
+    /// <c>SubCategoryVID → SubCategoryVersion.SubCategoryID → mHierarchy</c>, shared by the
+    /// open-axis restriction (key header) and the metric restriction (non-key header). The
+    /// literal <c>SubCategoryVID</c> may have stopped being current because the source
+    /// re-versioned the subcategory without propagating the change to this header (measured, see
+    /// <c>allSubCategoryIdBySubCategoryVId</c> in <see cref="Load"/>): the fallback WITHOUT the
+    /// release-cutoff filter is safe by construction (<paramref name="hierarchyBySubCategoryId"/>
+    /// is indexed by the stable <c>SubCategoryID</c>, so it resolves to the SAME hierarchy as the
+    /// current version). It is NOT an error but it leaves a trace in
+    /// <paramref name="structuralAnomalies"/>, naming the case. Returns <see langword="null"/> when
+    /// the chain does not resolve: the caller counts it.
+    /// </summary>
+    private static (int HierarchyId, string HierarchyCode)? ResolveSubCategoryHierarchy(
+        int tableVId,
+        string headerKind,
+        int headerId,
+        int subCategoryVId,
+        string restrictionKind,
+        IReadOnlyDictionary<int, int> subCategoryIdBySubCategoryVId,
+        IReadOnlyDictionary<int, int> allSubCategoryIdBySubCategoryVId,
+        IReadOnlyDictionary<int, (int HierarchyId, string HierarchyCode, int DomainId)> hierarchyBySubCategoryId,
+        List<string> structuralAnomalies)
+    {
+        var resolvedByCurrentVersion = subCategoryIdBySubCategoryVId.TryGetValue(subCategoryVId, out var subCategoryId);
+
+        var usedFallback = false;
+        if (!resolvedByCurrentVersion)
+        {
+            usedFallback = allSubCategoryIdBySubCategoryVId.TryGetValue(subCategoryVId, out subCategoryId);
+        }
+
+        if ((resolvedByCurrentVersion || usedFallback)
+            && hierarchyBySubCategoryId.TryGetValue(subCategoryId, out var hierarchy))
+        {
+            if (usedFallback)
+            {
+                structuralAnomalies.Add(
+                    $"TableVID={tableVId}: {headerKind} HeaderID={headerId} (SubCategoryVID="
+                    + $"{subCategoryVId}) resolved its {restrictionKind} by FALLBACK to "
+                    + $"SubCategoryID={subCategoryId} — its SubCategoryVID is no longer current at the "
+                    + "release cutoff, the source did not propagate the re-versioning to this header.");
+            }
+
+            return (hierarchy.HierarchyId, hierarchy.HierarchyCode);
+        }
+
+        return null;
+    }
+
     // ==================================================================
     // The plan of ONE table: pruned closed axes, open axes, categorisation.
     // ==================================================================
@@ -1208,36 +1288,11 @@ public static class Dpm20AxisAndCellLoader
                 (int HierarchyId, string HierarchyCode)? restriction = null;
                 if (keyHeader.SubCategoryVId is { } subCategoryVId)
                 {
-                    var resolvedByCurrentVersion = subCategoryIdBySubCategoryVId.TryGetValue(subCategoryVId, out var subCategoryId);
-
-                    // The literal SubCategoryVID may have stopped being current because the source
-                    // re-versioned the subcategory without propagating the change to this header
-                    // (measured, see the comment of allSubCategoryIdBySubCategoryVId above).
-                    // Fallback WITHOUT the release-cutoff filter, safe by construction:
-                    // hierarchyBySubCategoryId is indexed by the stable SubCategoryID, so it
-                    // resolves to the SAME Hierarchy as the current version. It is NOT an error, it
-                    // is a legitimate recovery — but it must leave a trace, naming the case,
-                    // instead of being fixed silently.
-                    var usedFallback = false;
-                    if (!resolvedByCurrentVersion)
-                    {
-                        usedFallback = allSubCategoryIdBySubCategoryVId.TryGetValue(subCategoryVId, out subCategoryId);
-                    }
-
-                    if ((resolvedByCurrentVersion || usedFallback)
-                        && hierarchyBySubCategoryId.TryGetValue(subCategoryId, out var hierarchy))
-                    {
-                        restriction = (hierarchy.HierarchyId, hierarchy.HierarchyCode);
-                        if (usedFallback)
-                        {
-                            structuralAnomalies.Add(
-                                $"TableVID={tableVId}: key header HeaderID={keyHeader.HeaderId} (SubCategoryVID="
-                                + $"{subCategoryVId}) resolved its open-axis restriction by FALLBACK to "
-                                + $"SubCategoryID={subCategoryId} — its SubCategoryVID is no longer current at the "
-                                + "release cutoff, the source did not propagate the re-versioning to this header.");
-                        }
-                    }
-                    else
+                    restriction = ResolveSubCategoryHierarchy(
+                        tableVId, "key header", keyHeader.HeaderId, subCategoryVId, "open-axis restriction",
+                        subCategoryIdBySubCategoryVId, allSubCategoryIdBySubCategoryVId, hierarchyBySubCategoryId,
+                        structuralAnomalies);
+                    if (restriction is null)
                     {
                         resolver.UnresolvedOpenAxisRestrictions++;
                     }
@@ -1313,6 +1368,7 @@ public static class Dpm20AxisAndCellLoader
             contextCompositionsByContextId, resolver, structuralAnomalies);
 
         // Source 3: the metric — non-key header with a PropertyID.
+        var metricRestrictionByHeaderId = new Dictionary<int, (int HierarchyId, string HierarchyCode)>();
         // It is never inherited; it is added AFTER the projection, in case an ordinate had no entry.
         foreach (var axis in closedAxes)
         {
@@ -1344,6 +1400,26 @@ public static class Dpm20AxisAndCellLoader
                 }
 
                 own[MetDimensionId] = (m.MemberId, "MET", m.MemberXbrlCode);
+
+                // The hierarchy this header restricts the metric to (HeaderVersion.SubCategoryVID),
+                // resolved exactly like the key-header open-axis restriction. It is per ordinate
+                // (mOrdinateMetricRestriction), never per metric.
+                if (node.SubCategoryVId is { } metricSubCategoryVId)
+                {
+                    var metricRestriction = ResolveSubCategoryHierarchy(
+                        tableVId, "non-key header", node.HeaderId, metricSubCategoryVId, "metric restriction",
+                        subCategoryIdBySubCategoryVId, allSubCategoryIdBySubCategoryVId, hierarchyBySubCategoryId,
+                        structuralAnomalies);
+                    if (metricRestriction is { } mrs)
+                    {
+                        metricRestrictionByHeaderId[survivor.HeaderId] = mrs;
+                    }
+                    else
+                    {
+                        resolver.UnresolvedMetricRestrictions++;
+                    }
+                }
+
                 // Real IsDefaultMember, even though the metric is ALWAYS exempt from the filter
                 // ("the metric is never discarded"): informative, it does not decide.
                 ownWithDefaultFlag[MetDimensionId] = (
@@ -1460,6 +1536,7 @@ public static class Dpm20AxisAndCellLoader
             OpenAxes = openAxes,
             CategorisationByHeaderId = categorisationByHeaderId,
             OwnCategorisationByHeaderId = ownWithDefaultFlagByHeaderId,
+            MetricRestrictionByHeaderId = metricRestrictionByHeaderId,
             OriginCellIdByCoordinate = originCellIdByCoordinate,
             IsExcludedByCellId = isExcludedByCellId,
         };
@@ -1588,6 +1665,7 @@ public static class Dpm20AxisAndCellLoader
         List<CellPositionRowData> cellPositionRows,
         List<CategorisationRowData> categorisationRows,
         List<OpenAxisRestrictionRowData> openAxisRestrictionRows,
+        List<OrdinateMetricRestrictionRowData> ordinateMetricRestrictionRows,
         List<string> structuralAnomalies)
     {
         // Axis description (orientation + code/ID) by AxisID, and the cross-axis dimensions found
@@ -1643,6 +1721,13 @@ public static class Dpm20AxisAndCellLoader
                     survivor.Level, survivor.Order, parentOrdinateId));
 
                 EmitCategorisation(categorisationRows, ordinateId, plan.CategorisationByHeaderId.GetValueOrDefault(survivor.HeaderId));
+
+                // The MET pair of this ordinate comes from its own header (source 3), which declares
+                // the hierarchy: one row per ordinate, keyed by the freshly minted OrdinateID.
+                if (plan.MetricRestrictionByHeaderId.TryGetValue(survivor.HeaderId, out var metricRestriction))
+                {
+                    ordinateMetricRestrictionRows.Add(new OrdinateMetricRestrictionRowData(ordinateId, metricRestriction.HierarchyId));
+                }
 
                 // Code for BusinessCode, orientation+AxisID for its order (Y,X,Z), and OWN
                 // categorisation (without closure) + parent for ComposeCellSignature.

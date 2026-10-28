@@ -454,6 +454,10 @@ public static class KnownExceptions
 
     private const string PlaneCTsvResourceName = "EbaDpm.Converter.Core.Resources.plane-c-known-divergences-4.2.tsv";
 
+    /// <summary>The <c>Type</c> value of a census row that names a <c>C-MHR-01</c> unit instead of a
+    /// <c>C-DPS-01</c> signature (4 columns, the 4th is the mandatory reason).</summary>
+    private const string PlaneCHierarchyType = "hierarchy";
+
     private const string PlaneCCensusReason =
         "DD-23: DATED census of the live plane C violations against the EBA Annotated Table Layout " +
         "(src/EbaDpm.Converter.Core/Resources/plane-c-known-divergences-4.2.tsv). Regenerated per release, never relaxed by threshold.";
@@ -495,7 +499,8 @@ public static class KnownExceptions
     /// so it does not compare).</summary>
     public static string? PlaneCCensusRelease => PlaneCCensusLazy.Value.CorpusRelease;
 
-    private sealed record PlaneCCensus(IReadOnlyList<KnownException> Exceptions, string? CorpusRelease);
+    /// <summary>A parsed plane C divergences census: its exceptions and the release it was measured on.</summary>
+    internal sealed record PlaneCCensus(IReadOnlyList<KnownException> Exceptions, string? CorpusRelease);
 
     private static PlaneCCensus LoadPlaneCDivergences()
     {
@@ -505,7 +510,19 @@ public static class KnownExceptions
                 $"Embedded resource '{PlaneCTsvResourceName}' not found (DD-23): " +
                 "plane-c-known-divergences-4.2.tsv is not registered as an EmbeddedResource in the .csproj.");
 
-        using var textReader = new StreamReader(stream);
+        using var reader = new StreamReader(stream);
+        return ParsePlaneCCensus(reader);
+    }
+
+    /// <summary>Parses a plane C divergences TSV given as text (the parser of the embedded resource).</summary>
+    internal static PlaneCCensus ParsePlaneCCensus(string tsvText)
+    {
+        using var reader = new StringReader(tsvText);
+        return ParsePlaneCCensus(reader);
+    }
+
+    private static PlaneCCensus ParsePlaneCCensus(TextReader textReader)
+    {
         var result = new List<KnownException>();
         string? corpusRelease = null;
         string? line;
@@ -524,6 +541,28 @@ public static class KnownExceptions
             }
 
             var parts = line.Split('\t');
+
+            // Type "hierarchy" (C-MHR-01): ONE row = ONE unit (a metric on an ordinate of a table of a
+            // release), with a 4th column, the REASON, mandatory: TableCode, hierarchy,
+            // "{ReleaseLabel}|{Axis}|{OrdinateCode}|{MetricCode}", Reason.
+            if (parts.Length >= 2 && string.Equals(parts[1], PlaneCHierarchyType, StringComparison.Ordinal))
+            {
+                if (parts.Length != 4 || string.IsNullOrWhiteSpace(parts[3]))
+                {
+                    throw new InvalidOperationException(
+                        $"Malformed row in plane-c-known-divergences-4.2.tsv (DD-27): '{line}' - a '{PlaneCHierarchyType}' " +
+                        "row expects 4 tab-separated columns (TableCode, hierarchy, " +
+                        "{ReleaseLabel}|{Axis}|{OrdinateCode}|{MetricCode}, Reason) with a non-empty reason.");
+                }
+
+                result.Add(new KnownException(
+                    "DD-27", ExceptionKind.OriginAnomaly, $"{parts[0]}\t{parts[2]}", "-", null, "C-MHR-01",
+                    "DD-27: plane C hierarchy divergence of one metric use " +
+                    $"(src/EbaDpm.Converter.Core/Resources/plane-c-known-divergences-4.2.tsv). {parts[3]}",
+                    ValidationLayer.Critical, Sidedness.TwoSided));
+                continue;
+            }
+
             if (parts.Length != 3)
             {
                 throw new InvalidOperationException(
@@ -717,6 +756,26 @@ public static class KnownExceptions
         string checkId, IReadOnlySet<string> violatingKeys, ValidationPlane plane)
     {
         var applicable = For(checkId, plane).Where(e => e.Kind == ExceptionKind.OriginAnomaly).ToList();
+        return ApplyOriginAnomalyCore(applicable, violatingKeys);
+    }
+
+    /// <summary>
+    /// Same as the public overload, but the declared entries come from <paramref name="census"/>
+    /// (an injected plane C census) instead of the registry. The check is still registered as queried.
+    /// </summary>
+    internal static (IReadOnlyList<string> UnresolvedViolations, IReadOnlyList<Outcome> Outcomes) ApplyOriginAnomalyExceptions(
+        string checkId, IReadOnlySet<string> violatingKeys, ValidationPlane plane, PlaneCCensus census)
+    {
+        _ = For(checkId, plane);
+        var applicable = census.Exceptions
+            .Where(e => e.Check == checkId && e.Kind == ExceptionKind.OriginAnomaly)
+            .ToList();
+        return ApplyOriginAnomalyCore(applicable, violatingKeys);
+    }
+
+    private static (IReadOnlyList<string> UnresolvedViolations, IReadOnlyList<Outcome> Outcomes) ApplyOriginAnomalyCore(
+        List<KnownException> applicable, IReadOnlySet<string> violatingKeys)
+    {
         var declared = applicable.Select(e => e.BusinessKey).ToHashSet(StringComparer.Ordinal);
         var outcomes = new List<Outcome>();
 

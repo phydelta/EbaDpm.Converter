@@ -76,6 +76,13 @@ internal sealed class DimensionMemberResolver
     /// </summary>
     public int UnresolvedOpenAxisRestrictions;
 
+    /// <summary>
+    /// Non-key headers whose metric carries a non-null <c>SubCategoryVID</c> whose chain
+    /// <c>SubCategoryVID → SubCategoryVersion.SubCategoryID → mHierarchy</c> does NOT resolve, so no
+    /// <c>mOrdinateMetricRestriction</c> row is written for their ordinate (reported, not forced).
+    /// </summary>
+    public int UnresolvedMetricRestrictions;
+
     public static DimensionMemberResolver Build(IDpm20AxisAndCellSource reader, SqliteConnection destination, List<string> structuralAnomalies)
     {
         var categories = reader.ReadCategories().ToList();

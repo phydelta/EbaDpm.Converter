@@ -7,6 +7,11 @@ namespace EbaDpm.Converter.Core.Validation.Checks;
 /// the 3.2/4.0 never do). Compares tables and columns (name and declared type) via
 /// <c>pragma_table_info</c>, without opening <c>dpm-distribution-schema.sql</c> again: the 4.2
 /// reference IS the contract.
+///
+/// The generated output also carries the extension table
+/// <see cref="IntegrityChecks.ExtensionTable"/> (<c>mOrdinateMetricRestriction</c>), which no
+/// reference export has: it is named here, so it is neither reported as missing from the reference
+/// nor tolerated by pattern. Any OTHER table of the output that the reference lacks is a failure.
 /// </summary>
 public static class SchemaCensusChecks
 {
@@ -41,6 +46,12 @@ public static class SchemaCensusChecks
                 var extra = generatedColumns.Except(referenceColumns).Select(c => $"+{c}");
                 failures.Add(new CheckSample($"{table}: {string.Join(" ", missing.Concat(extra))}"));
             }
+        }
+
+        foreach (var table in generatedTables.Where(t => !referenceTables.Contains(t)
+            && !string.Equals(t, IntegrityChecks.ExtensionTable, StringComparison.OrdinalIgnoreCase)))
+        {
+            failures.Add(new CheckSample($"table '{table}' of the generated output is absent from the reference and is not the declared extension table"));
         }
         sw.Stop();
 
