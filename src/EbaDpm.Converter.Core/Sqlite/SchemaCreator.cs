@@ -5,7 +5,8 @@ using Microsoft.Data.Sqlite;
 namespace EbaDpm.Converter.Core.Sqlite;
 
 /// <summary>
-/// Creates the target SQLite schema (the 45 tables of
+/// Creates the target SQLite schema (the 45 tables of the distribution schema plus the extension
+/// table <c>mOrdinateMetricRestriction</c>, all in
 /// <c>src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql</c>, the exact output
 /// contract) from the DDL file itself, embedded as a resource in this assembly. The
 /// <c>CREATE TABLE</c> statements are not rewritten by hand.
@@ -16,7 +17,7 @@ public static class SchemaCreator
 
     /// <summary>
     /// Creates the SQLite database at <paramref name="outputPath"/> with the 45 tables of the
-    /// target schema, empty.
+    /// target schema plus the extension table, empty.
     /// </summary>
     /// <param name="outputPath">Path of the .db file to create.</param>
     /// <param name="overwrite">If <c>false</c> and the file already exists, throws <see cref="IOException"/>.</param>

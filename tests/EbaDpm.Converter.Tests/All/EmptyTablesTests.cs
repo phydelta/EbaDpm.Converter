@@ -52,18 +52,24 @@ public sealed class EmptyTablesTests
     }
 
     /// <summary>
-    /// A-VAC-03: the schema has exactly 45 tables and 12 indexes (the <c>sqlite_autoindex_*</c> of
+    /// A-VAC-03: the schema has exactly 46 tables (the 45 of the distribution schema plus the extension
+    /// table <c>mOrdinateMetricRestriction</c>, by name, issue 61) and 12 indexes (the <c>sqlite_autoindex_*</c> of
     /// the composite PKs). The 8 AUXILIARY indexes that <see cref="AllFixture"/> itself creates so
     /// that the invariant battery finishes in a reasonable time are filtered out: they are test
     /// hygiene, never part of the schema contract, and must not be counted here.
     /// </summary>
     [DataFact]
-    public void Schema_Has45Tables_And12AutoIndexes_ExcludingTestOnlyIndexes()
+    public void Schema_Has45Tables_PlusTheExtension_And12AutoIndexes_ExcludingTestOnlyIndexes()
     {
         var tableCount = QueryHelpers.Scalar(
             _fixture.GeneratedConnection,
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
-        Assert.True(tableCount == 45, $"The schema has {tableCount} tables (exactly 45 expected, A-VAC-03).");
+        Assert.True(tableCount == 46, $"The schema has {tableCount} tables (exactly 46 expected: 45 + the extension, A-VAC-03).");
+
+        var extensionTables = QueryHelpers.Scalar(
+            _fixture.GeneratedConnection,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'mOrdinateMetricRestriction'");
+        Assert.True(extensionTables == 1, "The extension table mOrdinateMetricRestriction is not in the schema (A-VAC-03).");
 
         var autoIndexCount = QueryHelpers.Scalar(
             _fixture.GeneratedConnection,

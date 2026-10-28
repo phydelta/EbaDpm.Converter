@@ -48,7 +48,16 @@ namespace EbaDpm.Converter.Core.Validation.Checks;
 public static class PlaneCChecks
 {
     public static IEnumerable<CheckResult> Run(
-        SqliteConnection generated, SqliteConnection layouts, List<KnownExceptions.Outcome> exceptionSink)
+        SqliteConnection generated, SqliteConnection layouts, List<KnownExceptions.Outcome> exceptionSink) =>
+        Run(generated, layouts, exceptionSink, null);
+
+    /// <summary>
+    /// As the public overload; <paramref name="mhrCensus"/>, when not <see langword="null"/>, replaces the embedded
+    /// census for C-MHR-01 only (its release scope and its DD-27 entries). C-DPS-01 keeps the embedded one.
+    /// </summary>
+    internal static IEnumerable<CheckResult> Run(
+        SqliteConnection generated, SqliteConnection layouts, List<KnownExceptions.Outcome> exceptionSink,
+        KnownExceptions.PlaneCCensus? mhrCensus)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var result = PlaneCComparer.Compare(generated, layouts);
@@ -172,6 +181,118 @@ public static class PlaneCChecks
             CheckStatus.Info, equResult.Coverage.SheetsMatchedByPointReleaseTolerance,
             equResult.Coverage.SheetsMatchedByPointReleaseTolerance, 0, equSw.ElapsedMilliseconds,
             equResult.Coverage.PointReleaseToleranceSamples.Select(s => new CheckSample(s)).ToList());
+
+        // The per-use hierarchy restriction of enumerated metrics (the "[domain:hierarchy]" bracket of
+        // the metric annotation): compared with mOrdinateMetricRestriction / mMetric by business key.
+        var mhrSw = System.Diagnostics.Stopwatch.StartNew();
+        var mhrResult = PlaneCMetricHierarchyChecker.Check(generated, layouts);
+        mhrSw.Stop();
+
+        yield return BuildCMhr01(generated, mhrResult, mhrSw.ElapsedMilliseconds, exceptionSink, mhrCensus);
+        yield return BuildCMhr02(mhrResult, mhrSw.ElapsedMilliseconds);
+    }
+
+    private const string CMhr01Statement =
+        "for every metric (MET) value of the Annotated Table Layouts with a hierarchy bracket \"[domain:hierarchy]\" on an " +
+        "ordinate, the generated hierarchy of that use (mOrdinateMetricRestriction of the ordinate, else " +
+        "mMetric.ReferencedHierarchyID) has the same hierarchy and domain code; units whose ordinate cannot be matched " +
+        "or that have no generated hierarchy are not compared (see C-MHR-02); violations NOT named in the plane C census " +
+        "of known divergences (type hierarchy)";
+
+    private static CheckResult BuildCMhr01(
+        SqliteConnection generated, PlaneCMetricHierarchyChecker.Result result, long elapsedMs,
+        List<KnownExceptions.Outcome> exceptionSink, KnownExceptions.PlaneCCensus? injectedCensus)
+    {
+        if (result.SkipReason is not null)
+        {
+            return CheckResult.Skip(
+                "C-MHR-01", ValidationPlane.C, ValidationLayer.Critical, PlaneCMetricHierarchyChecker.RestrictionTable,
+                CMhr01Statement, result.SkipReason);
+        }
+
+        var census = result.Census;
+
+        // Empty universe: a pass over zero compared units would be hollow.
+        if (census.Compared == 0)
+        {
+            return CheckResult.Skip(
+                "C-MHR-01", ValidationPlane.C, ValidationLayer.Critical, PlaneCMetricHierarchyChecker.RestrictionTable,
+                CMhr01Statement,
+                $"0 units compared out of {census.UnitsTotal} layout metric bracket(s): nothing to evaluate over an empty " +
+                "universe, and nothing can have expired. See C-MHR-02 for the reason (no metric bracket in the layouts, " +
+                "or none matched an ordinate with a generated hierarchy, e.g. an output of a different release).");
+        }
+
+        var statement = CMhr01Statement;
+        var violationByKey = result.Violations.ToDictionary(v => v.Unit.BusinessKey, StringComparer.Ordinal);
+        IReadOnlyList<string> unresolved;
+
+        // The census is tied to the release it was measured on (same scope as C-DPS-01). Against another
+        // release, or an output that does not resolve a single cutoff release (DPM 1.0), it is NOT
+        // consulted: every violation is a real failure of this run; an empty census is not invented.
+        var censusRelease = injectedCensus is null ? KnownExceptions.PlaneCCensusRelease : injectedCensus.CorpusRelease;
+        var generatedRelease = DetectCutoffRelease(generated);
+        if (censusRelease is not null && generatedRelease is not null && generatedRelease == censusRelease)
+        {
+            var violatingKeys = violationByKey.Keys.ToHashSet(StringComparer.Ordinal);
+            var (resolved, outcomes) = injectedCensus is null
+                ? KnownExceptions.ApplyOriginAnomalyExceptions("C-MHR-01", violatingKeys, ValidationPlane.C)
+                : KnownExceptions.ApplyOriginAnomalyExceptions("C-MHR-01", violatingKeys, ValidationPlane.C, injectedCensus);
+            exceptionSink.AddRange(outcomes);
+            unresolved = resolved;
+        }
+        else
+        {
+            unresolved = violationByKey.Keys.ToList();
+            statement += $"; plane C census (measured on release {censusRelease}) NOT CONSULTED: the cutoff release of " +
+                         $"this output is {generatedRelease ?? "not a single one"}, so every violation is a real failure of this run";
+        }
+
+        var samples = unresolved
+            .Select(key => violationByKey.TryGetValue(key, out var v)
+                ? new CheckSample(
+                    v.Unit.BusinessKey,
+                    Generated: $"{v.GeneratedHierarchy} (from {v.Source})",
+                    Reference: v.Unit.LayoutHierarchy)
+                : new CheckSample(key)) // "(absent, DD-27 no longer violates) ..." - a declared exception that expired.
+            .ToList();
+
+        return CheckResult.FromViolationCount(
+            "C-MHR-01", ValidationPlane.C, ValidationLayer.Critical, PlaneCMetricHierarchyChecker.RestrictionTable, statement,
+            census.Compared, unresolved.Count, elapsedMs, samples);
+    }
+
+    private static CheckResult BuildCMhr02(PlaneCMetricHierarchyChecker.Result result, long elapsedMs)
+    {
+        const string statement =
+            "C-MHR-01 census, unit = layout metric value with a hierarchy bracket on an ordinate";
+
+        if (result.SkipReason is not null)
+        {
+            return CheckResult.Skip(
+                "C-MHR-02", ValidationPlane.C, ValidationLayer.Informative, PlaneCMetricHierarchyChecker.RestrictionTable,
+                statement, result.SkipReason);
+        }
+
+        var c = result.Census;
+        var reasons = string.Join(
+            ", ", c.NotMatchedByReason.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => $"{kv.Key}: {kv.Value}"));
+        var full =
+            $"{statement}: {c.UnitsTotal} total units, {c.Compared} matched and compared, " +
+            $"{c.MatchedWithoutHierarchy.Count} matched with no generated hierarchy (not violations: e.g. a metric on a " +
+            $"key/open axis), {c.NotMatched} not matched ({(reasons.Length == 0 ? "no reason" : reasons)}), " +
+            $"{c.SheetLevelNotExamined} sheet-level value(s) (no ordinate) not examined; " +
+            $"{c.SheetsMatchedByPointReleaseTolerance} sheet(s) matched ONLY by the REL.n -> REL release tolerance";
+
+        var samples = c.MatchedWithoutHierarchy
+            .Take(CheckResult.MaxSamples)
+            .Select(u => new CheckSample(u.BusinessKey, Generated: "matched, no generated hierarchy", Reference: u.LayoutHierarchy))
+            .Concat(c.NotMatchedSamples.Take(10).Select(s => new CheckSample(s, Generated: "not matched")))
+            .ToList();
+
+        return new CheckResult(
+            "C-MHR-02", ValidationPlane.C, ValidationLayer.Informative, PlaneCMetricHierarchyChecker.RestrictionTable, full,
+            CheckStatus.Info, c.UnitsTotal, c.Compared, 0, elapsedMs, samples);
     }
 
     private static CheckResult BuildCEqu01(

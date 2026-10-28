@@ -22,6 +22,42 @@ internal sealed record ReleasePin(string Release, string Database, string Measur
 /// </summary>
 internal static class ReleasePins
 {
+    // ------------------------------------------------------------------
+    // mOrdinateMetricRestriction and the DPM 2.0 mMetric hierarchy (issue 61). Rules, so pinned;
+    // measured 2026-10-27 on the outputs of the code under test and cross-checked against the
+    // figures the developers measured on the Access databases.
+    // ------------------------------------------------------------------
+
+    /// <summary>Rows of <c>mOrdinateMetricRestriction</c> of <see cref="Dpm10All41"/>: metric categorisations with a RestrictionID.</summary>
+    public const int Dpm10All41OrdinateMetricRestrictionRows = 745;
+
+    /// <summary>Of <see cref="Dpm10All41OrdinateMetricRestrictionRows"/>, those with a starting member (IgnoreMemberID = 0).</summary>
+    public const int Dpm10All41OrdinateMetricRestrictionWithStartingMember = 21;
+
+    /// <summary>Of <see cref="Dpm10All41OrdinateMetricRestrictionRows"/>, those whose hierarchy code differs from the one of <c>mMetric</c> (the rest repeat it).</summary>
+    public const int Dpm10All41OrdinateMetricRestrictionDifferingFromMetric = 48;
+
+    /// <summary>Rows of <c>mOrdinateMetricRestriction</c> of <see cref="Dpm20Cutoff42"/>.</summary>
+    public const int Dpm20Cutoff42OrdinateMetricRestrictionRows = 463;
+
+    /// <summary>Rows of <c>mOrdinateMetricRestriction</c> of <see cref="Dpm20Natural421"/>.</summary>
+    public const int Dpm20Natural421OrdinateMetricRestrictionRows = 471;
+
+    /// <summary>Rows of <c>mOrdinateMetricRestriction</c> of <see cref="Dpm20Natural43"/>.</summary>
+    public const int Dpm20Natural43OrdinateMetricRestrictionRows = 507;
+
+    /// <summary><c>mMetric</c> rows with a <c>ReferencedHierarchyID</c> in <see cref="Dpm20Natural421"/> (271 from current table versions + 155 from the history).</summary>
+    public const int Dpm20Natural421MetricsWithHierarchy = 426;
+
+    /// <summary><c>mMetric</c> rows with a domain and no hierarchy in <see cref="Dpm20Natural421"/>.</summary>
+    public const int Dpm20Natural421MetricsWithDomainOnly = 12;
+
+    /// <summary><c>mMetric</c> rows with a <c>ReferencedHierarchyID</c> in <see cref="Dpm20Natural43"/> (278 from current table versions + 155 from the history).</summary>
+    public const int Dpm20Natural43MetricsWithHierarchy = 433;
+
+    /// <summary><c>mMetric</c> rows with a domain and no hierarchy in <see cref="Dpm20Natural43"/>.</summary>
+    public const int Dpm20Natural43MetricsWithDomainOnly = 17;
+
     /// <summary>
     /// The DPM 2.0 database of the 4.2.1 publication read with cutoff release 4.2. The populations
     /// that depend on the taxonomy rule (a module version hangs from the taxonomy of its
@@ -123,8 +159,20 @@ internal static class ReleasePins
     /// <summary><c>COUNT(1)</c> of <c>mDimension</c> (includes the <c>MET</c> dimension, <c>DimensionID</c> 9999).</summary>
     public const int Dpm20Cutoff42MDimensionRows = 1100;
 
-    /// <summary>Metrics of <c>mMetric</c> with a non-NULL <c>ReferencedHierarchyID</c>.</summary>
-    public const int Dpm20Cutoff42MetricsWithHierarchy = 427;
+    /// <summary>
+    /// Metrics of <c>mMetric</c> with a non-NULL <c>ReferencedHierarchyID</c>. Was 427 under the rule
+    /// "first header by HeaderVID, key headers and superseded versions included"; 426 since issue 61
+    /// (non-key headers of the current table versions, history only for a metric no current table
+    /// uses). Measured 2026-10-27.
+    /// </summary>
+    public const int Dpm20Cutoff42MetricsWithHierarchy = 426;
+
+    /// <summary>
+    /// Enumerated metrics of <c>mMetric</c> with a <c>ReferencedDomainID</c> (from
+    /// <c>PropertyCategory</c>) and no <c>ReferencedHierarchyID</c> (issue 61; before it, such a metric
+    /// had neither). Measured 2026-10-27.
+    /// </summary>
+    public const int Dpm20Cutoff42MetricsWithDomainOnly = 12;
 
     /// <summary>Distinct codes present in both <c>mMetric</c> (member code) and <c>mDimension</c>.</summary>
     public const int Dpm20Cutoff42CodesInBothMetricAndDimension = 45;

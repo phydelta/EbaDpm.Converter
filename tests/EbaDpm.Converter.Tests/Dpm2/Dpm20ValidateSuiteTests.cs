@@ -53,9 +53,10 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
         Assert.Equal(0, result.Report.Summary.Critical.Failed);
 
         // Run WITHOUT a reference (referencePath: null above). A drop would be the harness silently
-        // losing coverage; a rise is a new critical check, to be re-measured (216 -> 217: A-MOD-10, issue 66).
+        // losing coverage; a rise is a new critical check, to be re-measured (216 -> 217: A-MOD-10, issue 66;
+        // 217 -> 224: A-OMR-01..04 and I-REF-17.1..3, the seven critical checks of mOrdinateMetricRestriction, issue 61).
         ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "critical checks run without a reference", 217, result.Report.Summary.Critical.Checks);
+            ReleasePins.Dpm20Cutoff42, "critical checks run without a reference", 224, result.Report.Summary.Critical.Checks);
         Assert.Equal(0, result.ExitCode);
 
         // Explicit protection of the merge of the ABSTRACT ordinate with its own cells: without it,

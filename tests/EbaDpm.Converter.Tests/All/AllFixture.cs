@@ -116,7 +116,8 @@ public sealed class AllFixture : IDisposable
         Skeleton = SkeletonLoader.Load(AccessReader, GeneratedConnection, AllTaxonomies, SelectedTaxonomies);
         DictionaryResult = DictionaryLoader.Load(AccessReader, GeneratedConnection, AllTaxonomies, SelectedTaxonomies);
         TemplateOrTableResult = TemplateOrTableLoader.Load(AccessReader, GeneratedConnection, SelectedTaxonomies);
-        AxisAndCellResult = AxisAndCellLoader.Load(AccessReader, GeneratedConnection, TemplateOrTableResult.TableIdByTableVId);
+        AxisAndCellResult = AxisAndCellLoader.Load(
+            AccessReader, GeneratedConnection, TemplateOrTableResult.TableIdByTableVId, DictionaryResult.MemberIdRenumbering);
         ModuleResult = ModuleLoader.Load(AccessReader, GeneratedConnection, SelectedTaxonomies);
 
         // The "clean" copy is taken HERE: loaders finished, no auxiliary indexes yet, and BEFORE

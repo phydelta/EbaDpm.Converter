@@ -142,6 +142,10 @@ public static class AxisAndCellLoader
     /// One line per sentinel counted in <paramref name="AmbiguousSentinelFixedPairSkips"/>: table,
     /// ordinate, axis, split factor and the fixed dimensions involved.
     /// </param>
+    /// <param name="OrdinateMetricRestrictionRows">
+    /// Rows written to the extension table <c>mOrdinateMetricRestriction</c>: one per emitted
+    /// metric categorisation that declares a <c>RestrictionID</c>.
+    /// </param>
     public sealed record Result(
         int AxisRows,
         int TableAxisRows,
@@ -154,14 +158,17 @@ public static class AxisAndCellLoader
         int MetricInheritedFromAncestorCellCount,
         int TransferredSentinelFixedPairs,
         int AmbiguousSentinelFixedPairSkips,
-        IReadOnlyList<string> AmbiguousSentinelFixedPairDetails);
+        IReadOnlyList<string> AmbiguousSentinelFixedPairDetails,
+        int OrdinateMetricRestrictionRows = 0);
 
     public static Result Load(
         IDpmSourceReader source,
         SqliteConnection destination,
-        IReadOnlyDictionary<int, int> tableIdByTableVId)
+        IReadOnlyDictionary<int, int> tableIdByTableVId,
+        MemberIdRenumbering memberIdRenumbering)
     {
         ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(memberIdRenumbering);
         ArgumentNullException.ThrowIfNull(destination);
         ArgumentNullException.ThrowIfNull(tableIdByTableVId);
 
@@ -261,6 +268,16 @@ public static class AxisAndCellLoader
         WriteAxisTables(destination, accumulator);
         var categorisationRows = WriteOrdinateCategorisations(destination, categorisationSignatures);
         WriteOpenAxisValueRestrictions(destination, openAxisValueRestrictionRows);
+        var ordinateMetricRestrictionRows = ResolveOrdinateMetricRestrictions(
+            minimizedClosedCategorisations,
+            accumulator.OpenAxisCategorisationRows,
+            metricDimensionIds,
+            categorisationsByOrdinateId,
+            openMemberRestrictionsById,
+            hierarchiesById,
+            membersById,
+            memberIdRenumbering);
+        WriteOrdinateMetricRestrictions(destination, ordinateMetricRestrictionRows);
         WriteMintedConcepts(destination, accumulator.MintedConcepts, accessOwnerId);
         WriteConceptTranslations(destination, accumulator);
 
@@ -301,7 +318,8 @@ public static class AxisAndCellLoader
                 .OrderBy(s => s.TableVId)
                 .Select(s => $"TableVID={s.TableVId} OrdinateID={s.SentinelOrdinateId} Axis={s.AxisOrientation} " +
                     $"SplitFactor={s.SplitFactor} FixedPairs={s.FixedPairCount} DimensionIDs=[{s.FixedDimensionIds}]")
-                .ToList());
+                .ToList(),
+            OrdinateMetricRestrictionRows: ordinateMetricRestrictionRows.Count);
     }
 
     private sealed record MintingCounters(int NextAxisId, int NextOrdinateId, int NextConceptId)
@@ -688,7 +706,7 @@ public static class AxisAndCellLoader
                             }
 
                             acc.OpenAxisCategorisationRows.Add(
-                                (ordinate.OrdinateId, fixedPair.DimensionId, fixedPair.MemberId, null));
+                                (ordinate.OrdinateId, fixedPair.DimensionId, fixedPair.MemberId, fixedPair.RestrictionId));
                             acc.TransferredSentinelFixedPairs++;
                         }
                     }
@@ -1072,6 +1090,119 @@ public static class AxisAndCellLoader
     }
 
     // ------------------------------------------------------------------
+    // mOrdinateMetricRestriction (extension table).
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// One row per EMITTED metric categorisation (the MET dimension case of
+    /// <see cref="ComputeCategorisationSignature"/>) whose <c>OrdinateCategorisation.RestrictionID</c>
+    /// is not null, resolved through <c>OpenMemberRestriction</c>: the hierarchy is the restriction's
+    /// <c>HierarchyID</c> (mapped like <c>mOpenAxisValueRestriction</c>); the starting member is its
+    /// <c>MemberID</c> only when <c>IgnoreMemberID = 0</c> (with <c>IsStartingMemberIncluded</c> =
+    /// <c>MemberIncluded</c>), otherwise both are NULL. Every declared restriction is emitted,
+    /// including those equal to <c>Metric.CodeSubdomainID</c> (no selective omission). The
+    /// signature of the categorisation is unchanged: a metric never produces brackets. The
+    /// starting member goes through <see cref="MemberIdRenumbering"/> because the member itself
+    /// does (<c>mMember</c>).
+    /// </summary>
+    private static List<(int OrdinateId, int HierarchyId, int? StartMemberId, bool? StartIncluded)> ResolveOrdinateMetricRestrictions(
+        List<(int OrdinateId, int DimensionId, int MemberId)> closedRows,
+        List<(int OrdinateId, int DimensionId, int MemberId, int? RestrictionId)> openAxisRows,
+        IReadOnlySet<int> metricDimensionIds,
+        IReadOnlyDictionary<int, List<AccessOrdinateCategorisationRow>> categorisationsByOrdinateId,
+        IReadOnlyDictionary<int, AccessOpenMemberRestrictionRow> openMemberRestrictionsById,
+        IReadOnlyDictionary<int, AccessHierarchyRow> hierarchiesById,
+        IReadOnlyDictionary<int, AccessMemberRow> membersById,
+        MemberIdRenumbering memberIdRenumbering)
+    {
+        // (ordinate, dimension) -> RestrictionID of the metric categorisations that are emitted.
+        // Closed rows lose the RestrictionID on their way (the safe form carries only the member),
+        // so it is looked up in the Access categorisation the row came from; the rows of the open
+        // axes (transferred sentinel pairs) carry it.
+        var candidates = new List<(int OrdinateId, int DimensionId, int RestrictionId)>();
+
+        foreach (var (ordinateId, dimensionId, memberId) in closedRows)
+        {
+            if (!metricDimensionIds.Contains(dimensionId))
+            {
+                continue;
+            }
+
+            var restrictionId = categorisationsByOrdinateId
+                .GetValueOrDefault(ordinateId, EmptyCategorisations)
+                .Where(c => c.DimensionId == dimensionId && c.MemberId == memberId)
+                .Select(c => c.RestrictionId)
+                .FirstOrDefault();
+
+            if (restrictionId is { } rid)
+            {
+                candidates.Add((ordinateId, dimensionId, rid));
+            }
+        }
+
+        foreach (var (ordinateId, dimensionId, _, restrictionId) in openAxisRows)
+        {
+            if (metricDimensionIds.Contains(dimensionId) && restrictionId is { } rid)
+            {
+                candidates.Add((ordinateId, dimensionId, rid));
+            }
+        }
+
+        var result = new List<(int, int, int?, bool?)>(candidates.Count);
+        var seenOrdinateIds = new HashSet<int>();
+
+        foreach (var (ordinateId, _, rid) in candidates.OrderBy(c => c.OrdinateId))
+        {
+            if (!seenOrdinateIds.Add(ordinateId))
+            {
+                throw new InvalidOperationException(
+                    $"OrdinateID={ordinateId} carries more than one metric categorisation with a " +
+                    "RestrictionID: mOrdinateMetricRestriction has one row per ordinate.");
+            }
+
+            var restriction = openMemberRestrictionsById.TryGetValue(rid, out var r)
+                ? r
+                : throw new InvalidOperationException(
+                    $"Metric categorisation (OrdinateID={ordinateId}) references RestrictionID={rid}, " +
+                    "which is missing from OpenMemberRestriction.");
+
+            var hierarchyId = restriction.HierarchyId
+                ?? throw new InvalidOperationException(
+                    $"RestrictionID={rid} (metric categorisation, OrdinateID={ordinateId}) has no " +
+                    "HierarchyID: mOrdinateMetricRestriction requires it.");
+
+            if (!hierarchiesById.ContainsKey(hierarchyId))
+            {
+                throw new InvalidOperationException(
+                    $"RestrictionID={rid} (metric categorisation, OrdinateID={ordinateId}) references " +
+                    $"HierarchyID={hierarchyId}, which is missing from Hierarchy.");
+            }
+
+            if (restriction.IgnoreMemberId)
+            {
+                result.Add((ordinateId, hierarchyId, null, null));
+                continue;
+            }
+
+            var startMemberId = restriction.MemberId
+                ?? throw new InvalidOperationException(
+                    $"RestrictionID={rid} (metric categorisation, OrdinateID={ordinateId}) has " +
+                    "IgnoreMemberID=0 but MemberID is NULL: unsupported anomaly.");
+
+            if (!membersById.ContainsKey(startMemberId))
+            {
+                throw new InvalidOperationException(
+                    $"RestrictionID={rid} (metric categorisation, OrdinateID={ordinateId}) references " +
+                    $"MemberID={startMemberId} as the starting member, which is missing from Member.");
+            }
+
+            result.Add((ordinateId, hierarchyId, memberIdRenumbering.Translate(startMemberId), restriction.MemberIncluded));
+        }
+
+        return result;
+    }
+
+    // ------------------------------------------------------------------
     // Data point signatures.
     // ------------------------------------------------------------------
 
@@ -1097,7 +1228,9 @@ public static class AxisAndCellLoader
     /// <summary>
     /// Signature of a (dimension, member) pair. Priority of cases: metric first (note that
     /// <c>RestrictionID</c> can accompany a metric categorisation, 1187/1177 in R 22.03, and there
-    /// it does NOT produce brackets, so it is not even looked at), then the target open-value
+    /// it does NOT produce brackets: the signature does not look at it; it feeds
+    /// <c>mOrdinateMetricRestriction</c> instead, see
+    /// <see cref="ResolveOrdinateMetricRestrictions"/>), then the target open-value
     /// sentinel (open or semi-open depending on <paramref name="restrictionId"/>), and finally the
     /// explicit case. All XBRL codes are emitted VERBATIM: a release suffix is never composed here.
     /// </summary>
@@ -1426,6 +1559,20 @@ public static class AxisAndCellLoader
         foreach (var row in rows)
         {
             writer.AddRow(row.AxisId, row.HierarchyId, row.StartMemberId, row.StartIncluded);
+        }
+    }
+
+    private static void WriteOrdinateMetricRestrictions(
+        SqliteConnection destination,
+        List<(int OrdinateId, int HierarchyId, int? StartMemberId, bool? StartIncluded)> rows)
+    {
+        using var writer = new SqliteBatchWriter(
+            destination, "mOrdinateMetricRestriction",
+            ["OrdinateID", "HierarchyID", "HierarchyStartingMemberID", "IsStartingMemberIncluded"]);
+
+        foreach (var row in rows)
+        {
+            writer.AddRow(row.OrdinateId, row.HierarchyId, row.StartMemberId, row.StartIncluded);
         }
     }
 

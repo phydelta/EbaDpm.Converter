@@ -479,9 +479,13 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
             }
         }
 
-        // The rows with a ReferencedDomainID are exactly the metrics with a ReferencedHierarchyID
-        // (asserted separately: all three or none), a second measurement of the same table.
-        Assert.Equal(ScalarLong("SELECT COUNT(*) FROM mMetric WHERE ReferencedHierarchyID IS NOT NULL"), rows.Count);
+        // The rows with a ReferencedDomainID are the metrics with a ReferencedHierarchyID plus the
+        // enumerated metrics with a domain only (issue 61; asserted separately), a second measurement
+        // of the same table: the two populations are disjoint.
+        Assert.Equal(
+            ScalarLong("SELECT COUNT(*) FROM mMetric WHERE ReferencedHierarchyID IS NOT NULL")
+            + ScalarLong("SELECT COUNT(*) FROM mMetric WHERE ReferencedHierarchyID IS NULL AND ReferencedDomainID IS NOT NULL"),
+            rows.Count);
 
         var mismatches = new List<string>();
         foreach (var (metricCode, hierarchyDomainCode) in rows)
@@ -513,27 +517,40 @@ public sealed class Dpm20MetricDimensionTests(Dpm20SkeletonFixture fixture)
     }
 
     /// <summary>
-    /// <c>ReferencedDomainID</c> and <c>IsStartingMemberIncluded</c> go with
-    /// <c>ReferencedHierarchyID</c>: either all three are present or none is, and
-    /// <c>IsStartingMemberIncluded</c> = 1 exactly when there is a hierarchy.
+    /// <c>ReferencedDomainID</c> and <c>IsStartingMemberIncluded</c> and <c>ReferencedHierarchyID</c>
+    /// (docs/mapping-dpm2.md, "mMetric", issue 61). A hierarchy always comes with its domain;
+    /// a domain WITHOUT a hierarchy exists only for enumerated metrics (<c>Enumeration/Code</c>:
+    /// no single hierarchy, the domain taken from <c>PropertyCategory</c>); and
+    /// <c>IsStartingMemberIncluded</c> = 1 exactly when there is a hierarchy. Before issue 61 the rule
+    /// was "all three or none" (domain IS NULL = hierarchy IS NULL, 0 violations).
     /// </summary>
     [DataFact]
-    public void MMetric_DomainAndStartingInclusion_AlwaysGoWithTheHierarchy_AllThreeOrNone()
+    public void MMetric_HierarchyImpliesDomain_DomainWithoutHierarchyOnlyForEnumerated_StartingInclusionIffHierarchy()
     {
-        var domainWithoutHierarchyOrViceversa = ScalarLong(
-            "SELECT COUNT(*) FROM mMetric WHERE (ReferencedDomainID IS NULL) <> (ReferencedHierarchyID IS NULL)");
-        Assert.Equal(0, domainWithoutHierarchyOrViceversa);
+        var hierarchyWithoutDomain = ScalarLong(
+            "SELECT COUNT(*) FROM mMetric WHERE ReferencedHierarchyID IS NOT NULL AND ReferencedDomainID IS NULL");
+        Assert.Equal(0, hierarchyWithoutDomain);
+
+        var domainWithoutHierarchyNotEnumerated = ScalarLong(
+            "SELECT COUNT(*) FROM mMetric WHERE ReferencedHierarchyID IS NULL AND ReferencedDomainID IS NOT NULL AND DataType <> 'Enumeration/Code'");
+        Assert.Equal(0, domainWithoutHierarchyNotEnumerated);
 
         var startingMemberMismatch = ScalarLong(
             "SELECT COUNT(*) FROM mMetric WHERE (IsStartingMemberIncluded = 1) <> (ReferencedHierarchyID IS NOT NULL)");
         Assert.Equal(0, startingMemberMismatch);
 
-        // And it is not an empty case: the rows with all three present are the pinned census.
+        // And neither population is empty: both are pinned censuses (positive control of the two
+        // assertions above, which would also pass over an empty population).
         ReleasePins.AssertPinned(
             ReleasePins.Dpm20Cutoff42,
             "mMetric rows with a ReferencedHierarchyID",
             ReleasePins.Dpm20Cutoff42MetricsWithHierarchy,
             ScalarLong("SELECT COUNT(*) FROM mMetric WHERE ReferencedHierarchyID IS NOT NULL"));
+        ReleasePins.AssertPinned(
+            ReleasePins.Dpm20Cutoff42,
+            "mMetric rows with a ReferencedDomainID and no ReferencedHierarchyID",
+            ReleasePins.Dpm20Cutoff42MetricsWithDomainOnly,
+            ScalarLong("SELECT COUNT(*) FROM mMetric WHERE ReferencedHierarchyID IS NULL AND ReferencedDomainID IS NOT NULL"));
     }
 
     /// <summary>

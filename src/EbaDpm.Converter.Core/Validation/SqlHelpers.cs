@@ -60,6 +60,19 @@ public static class SqlHelpers
         command.ExecuteNonQuery();
     }
 
+    /// <summary>Reason reported when the extension table <c>mOrdinateMetricRestriction</c> is absent.</summary>
+    public const string ExtensionTableAbsentReason =
+        "output without the extension table mOrdinateMetricRestriction (produced by an older converter version)";
+
+    /// <summary>Whether <paramref name="table"/> exists in the database (probe on <c>sqlite_master</c>).</summary>
+    public static bool TableExists(SqliteConnection connection, string table)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """SELECT COUNT(1) FROM "sqlite_master" WHERE "type" = 'table' AND "name" = $name""";
+        cmd.Parameters.AddWithValue("$name", table);
+        return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+    }
+
     /// <summary>
     /// Runs <paramref name="violationSql"/> (it must return a single column with the business key
     /// of each row that violates the invariant) and builds a <see cref="CheckResult"/>. The total

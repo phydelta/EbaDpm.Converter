@@ -1,4 +1,5 @@
--- DPM distribution schema (EBA 4.2 layout): 45 tables.
+-- DPM distribution schema (EBA 4.2 layout): 45 tables, plus the extension table
+-- mOrdinateMetricRestriction (46 in total).
 -- This is the output contract of the converter: the generated database must
 -- reproduce this structure (tables, columns, types, PK/FK, indexes).
 --
@@ -497,6 +498,16 @@ CREATE TABLE mOrdinateCategorisation
                  MemberID
         )
         REFERENCES mMember (MemberID)
+);
+
+-- mOrdinateMetricRestriction
+-- EXTENSION of the 45-table distribution schema (no reference export has it): the hierarchy an
+-- enumerated metric is restricted to on the ordinate that carries its MET categorisation.
+CREATE TABLE mOrdinateMetricRestriction (
+    OrdinateID                INTEGER PRIMARY KEY REFERENCES mAxisOrdinate (OrdinateID),
+    HierarchyID               INTEGER NOT NULL REFERENCES mHierarchy (HierarchyID),
+    HierarchyStartingMemberID INTEGER REFERENCES mMember (MemberID),
+    IsStartingMemberIncluded  BOOLEAN
 );
 
 -- mOwner

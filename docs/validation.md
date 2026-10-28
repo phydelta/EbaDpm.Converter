@@ -63,9 +63,16 @@ Plane A needs nothing but the generated database and always runs. Its check code
 | `A-CEL` | Cells and positions: the `BusinessCode` rebuilt from `mCellPosition` equals the emitted one byte for byte, every cell has at least two positions on axes of its own table, abstract headers imply shaded cells, a dimension belongs to exactly one axis of a table, a cell never receives two members of the same dimension |
 | `A-OCA` | Ordinate categorisation: the effective (inherited) categorisation of every closed, non-abstract ordinate is consistent with its own set; members belong to the dimension's domain; open axes are categorised with the sentinel |
 | `A-OAR` | Open-axis value restrictions: column conventions of `mOpenAxisValueRestriction` |
+| `A-OMR` | Per-ordinate metric restrictions (`mOrdinateMetricRestriction`): the ordinate carries exactly one `MET` categorisation, that metric is enumerated (`Enumeration/Code` in DPM 2.0, `Code` in DPM 1.0), the hierarchy belongs to the metric's `ReferencedDomainID`, and a starting member, when present, is a node of the hierarchy (with `IsStartingMemberIncluded` set exactly when it is) |
 | `A-MOD` | Modules: template links point to first-level table groups of the same taxonomy, one conceptual module per module, `XBRLSchemaRef` shape, dense ordering, one-to-one taxonomy keys; for DPM 2.0 (`A-MOD-10`), every taxonomy has at least one module and each module's `XBRLSchemaRef` framework and release equal its taxonomy's |
 | `A-CPT` | Concepts: `ConceptType` belongs to the target vocabulary, concept counts per type match their entities, every concept has a label translation, `ReleaseID` only where the schema expects it |
 | `A-VAC` | Tables that must be empty are empty (for example the validation-rule tables, references and instance tables), and the tables populated with fixed rows have exactly those rows |
+
+An output produced by a converter version without the extension table `mOrdinateMetricRestriction`
+is still validated: the `A-OMR` checks and the orphan checks on that table are reported as skipped,
+naming the reason, and `A-VAC-03` fails because the schema is not the expected one. Plane C does the
+same with `C-MHR-01` and `C-MHR-02`, and also with a layout repository built before the metric
+bracket was stored.
 
 ## Plane B — comparison against a reference export (informational)
 
@@ -119,6 +126,8 @@ violation is reported once, naming the sheet releases where it failed.
 | `C-COB-01` | Informative | Coverage: tables and signatures compared, and what was excluded and why. Always reported, even when nothing fails |
 | `C-CLS-01` | Informative | Breakdown of compared tables by class (regular, open axis, true Z axis) |
 | `C-REL-01` | Informative | Layout sheets matched only through the point-release tolerance (a layout for release `4.2.1` matched to a `4.2` table) |
+| `C-MHR-01` | Critical | Every metric annotated in the layout with a hierarchy (`(qAYV) …[qCO:new_CO5]`) has, on the matching ordinate of the output (same table, axis and ordinate code, same metric), the same hierarchy and domain: the per-ordinate restriction in `mOrdinateMetricRestriction`, or else `mMetric.ReferencedHierarchyID`. Violations listed in the known-divergences file are excluded |
+| `C-MHR-02` | Informative | Coverage of `C-MHR-01`: annotated metrics compared, matched without any hierarchy in the output (for example a metric on an open axis), not matched, and sheet-level annotations not examined |
 | `C-KEY-01` | Informative | Layout signatures excluded because they describe the key column of an open table: the layout draws it as a grid column, while in the distribution schema it is the open axis itself |
 
 Plane C reports its coverage even when everything passes, so that "zero violations" is always
@@ -156,7 +165,9 @@ The layout comparison has its own list of known divergences, kept as data rather
 [`plane-c-known-divergences-4.2.tsv`](../src/EbaDpm.Converter.Core/Resources/plane-c-known-divergences-4.2.tsv),
 embedded in the assembly. Each line names a table code, the divergence type (`contradicts`: the
 layout gives a dimension another member; `no-match`: no output signature contains the layout
-signature) and the exact layout signature. The entries are cases arbitrated against the Access
+signature) and the exact layout signature. A `C-MHR-01` divergence has its own type, `hierarchy`,
+and names one annotated metric by `{release}|{axis}|{ordinate code}|{metric code}`, with a
+mandatory reason. The entries are cases arbitrated against the Access
 database in which the **layout** is wrong: for example, a sheet draws ordinates that the Access
 database does not assign to that table.
 

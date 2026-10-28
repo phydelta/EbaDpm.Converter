@@ -17,7 +17,7 @@ Loaders run in this order (`src/EbaDpm.Converter.Core/Mapping/Dpm20/`):
 | `Dpm20DictionaryLoader` | `mDomain`, `mDomainUnion`, `mMember`, `mHierarchy`, `mMetric`, `mDimension` |
 | `Dpm20HierarchyNodeLoader` | `mHierarchyNode` |
 | `Dpm20StructureLoader` | `mTemplateOrTable`, `mTable`, `mTaxonomyTable` |
-| `Dpm20AxisAndCellLoader` | `mAxis`, `mTableAxis`, `mAxisOrdinate`, `mOrdinateCategorisation`, `mOpenAxisValueRestriction`, `mTableCell`, `mCellPosition` |
+| `Dpm20AxisAndCellLoader` | `mAxis`, `mTableAxis`, `mAxisOrdinate`, `mOrdinateCategorisation`, `mOpenAxisValueRestriction`, `mOrdinateMetricRestriction`, `mTableCell`, `mCellPosition` |
 | `Dpm20ModuleLoader` | `mModule`, `mConceptualModule`, `mModuleBusinessTemplate` |
 | `Dpm20ConceptLoader` | `mConcept`, `mConceptTranslation`, and every `ConceptID` column |
 
@@ -230,9 +230,37 @@ One row per `MET` member, in the same order, `CorrespondingMemberID` pointing to
 |---|---|
 | `DataType` | from `DataType.Code` of the property: `i` Integer, `r` Decimal, `b` Boolean, `t` BooleanTrue, `d` Date, `e` Enumeration/Code, `m` Monetary, `p` Percent. For string types (`s`, `es`) the source code does not distinguish the two target types; the naming convention does: `String` if the property code matches `<letter><letter><digits>`, otherwise `NotEmptyString`. Unknown codes are reported and the metric is skipped. |
 | `FlowType` | `STOCK` |
-| `ReferencedHierarchyID`, `ReferencedDomainID` | the hierarchy of the first header (by `HeaderVID`) that uses the property with a `SubCategoryVID`, and that hierarchy's domain |
-| `IsStartingMemberIncluded` | `1` when a hierarchy is referenced |
+| `ReferencedHierarchyID`, `ReferencedDomainID` | see below |
+| `IsStartingMemberIncluded` | `1` when a hierarchy is referenced, otherwise `0` |
 | `BalanceType`, `HierarchyStartingMemberID`, `IsAbstract`, `CustomDataTypeID` | `NULL` |
+
+The hierarchy is declared per use, not per metric: only `HeaderVersion.SubCategoryVID` carries
+it (`PropertyCategory` gives the domain only, and no `VariableVersion` has a `SubCategoryVID`).
+The candidates of a metric are the sub-categories of the **non-key** headers that use its property
+in the table versions current at the cutoff, resolved to the stable `SubCategoryID` through
+`SubCategoryVersion` (a re-versioned sub-category names the same hierarchy). Key headers are
+excluded: they are open axes, whose restriction goes to `mOpenAxisValueRestriction`. The
+selection of taxonomies (`--releases`) does not change the candidates.
+
+For backward compatibility, a metric that no current table uses keeps the hierarchy of its past
+uses: when the current table versions give no candidate, the candidates are taken from **every**
+non-key header version that uses the property, in any table version. A metric that the current
+tables restrict to more than one hierarchy never falls back to the history.
+
+| Candidates | `ReferencedHierarchyID` | `ReferencedDomainID` |
+|---|---|---|
+| exactly one | that hierarchy | its domain |
+| none, or more than one | `NULL` | for an `Enumeration/Code` metric, the domain of its `PropertyCategory` row in force at the cutoff; otherwise `NULL` |
+
+In the 4.3 database (20260622), 155 metrics take their hierarchy from the history: no current
+table uses them, and most were last used in tables of 3.x to 4.1.
+
+With more than one hierarchy, any single choice would be wrong for some tables and is not
+declared by the source, so none is made: the per-use restriction is in
+`mOrdinateMetricRestriction`, and the metrics in this case are listed in the conversion log. In
+the 4.3 database (20260622) they are `ei351`, `GXI`, `qAPH`, `qAYV` and `qAZC` in current
+tables, plus `ei794` (`AP29`, `qAP31`) in the history only; in 4.2.1, one metric in the history
+only. Frameworks change between releases, so this list is a measurement, not a property.
 
 ### mDimension
 
@@ -406,6 +434,18 @@ longer current at the cutoff (a sub-category re-versioned without updating every
 used it), the version is resolved without the cutoff; the hierarchy is the same, and the case is
 logged. `HierarchyStartingMemberID` is `NULL` and `IsStartingMemberIncluded` is `0`: DPM 2.0 does
 not model a starting member.
+
+### mOrdinateMetricRestriction
+
+Extension table (see [target-schema.md](target-schema.md#mordinatemetricrestriction)). One row
+per emitted ordinate whose `MET` pair comes from a **non-key** header with a
+`HeaderVersion.SubCategoryVID`: the sub-category is resolved to its `mHierarchy` row exactly as
+for `mOpenAxisValueRestriction` (including the logged fallback for a version that is no longer
+current). `HierarchyStartingMemberID` and `IsStartingMemberIncluded` are `NULL`.
+
+Example, 4.3 (20260622): `qAYV` is restricted to `new_CO4` in C_67.00.a/C_67.00.w (column 0016)
+and to `new_CO5` in E_04.01, E_04.02 (0020) and E_08.01 (0050). The two member lists have nothing
+in common, and the layout of TCB_CORE annotates the column as `[qCO:new_CO5]`.
 
 ### Signatures
 

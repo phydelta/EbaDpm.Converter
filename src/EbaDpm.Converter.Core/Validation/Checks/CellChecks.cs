@@ -175,6 +175,11 @@ public static class CellChecks
             WHERE d."IsTypedDomain" = 1
             """);
 
+        foreach (var check in OrdinateMetricRestrictionChecks(c, model))
+        {
+            yield return check;
+        }
+
         // ONE DIMENSION, ONE AXIS: two plane A invariants that need no reference (the statement
         // goes in the property, never in the figure). IDs "A-OCA-10"/"A-CEL-10" are used because
         // "A-OCA-02"/"A-CEL-06" already exist with a different statement.
@@ -337,6 +342,89 @@ public static class CellChecks
             "A-OCA-01", ValidationPlane.A, ValidationLayer.Critical, "mOrdinateCategorisation",
             "Effective closure == own set, for every non-abstract closed ordinate (100.0000% expected)",
             closure.LeafOrdinateIds.Count, failures.Count, sw.ElapsedMilliseconds, failures);
+    }
+
+    /// <summary>
+    /// A-OMR-01..04: the extension table <c>mOrdinateMetricRestriction</c> (the hierarchy an
+    /// enumerated metric is restricted to on the ordinate that carries its MET categorisation).
+    /// The MET categorisation is the <c>mOrdinateCategorisation</c> row whose dimension has
+    /// <c>DimensionXBRLCode = 'MET'</c>. Every population is the row count of the extension
+    /// table, so that a 0 on an empty table is visible as such.
+    /// </summary>
+    private static IEnumerable<CheckResult> OrdinateMetricRestrictionChecks(SqliteConnection c, ValidationSourceModel model)
+    {
+        // The enumerated data type is spelled by each source model: DPM 1.0 carries the Access
+        // DataType label 'Code' (measured: all 745 metric categorisations of 4.1 with a
+        // restriction are of 'Code' metrics), DPM 2.0 maps DataType.Code 'e' to 'Enumeration/Code'.
+        var enumeratedDataType = model == ValidationSourceModel.Dpm2 ? "Enumeration/Code" : "Code";
+        const string table = "mOrdinateMetricRestriction";
+        const string total = "SELECT COUNT(*) FROM \"mOrdinateMetricRestriction\"";
+
+        // An output of an older converter version lacks the table: Skipped, probed once (A-VAC-03 still fails).
+        if (!SqlHelpers.TableExists(c, table))
+        {
+            var absent = new (string Id, string Statement)[]
+            {
+                ("A-OMR-01", "The ordinate carries exactly one MET categorisation"),
+                ("A-OMR-02", "The metric of the ordinate is enumerated"),
+                ("A-OMR-03", "The domain of the hierarchy equals the ReferencedDomainID of the metric of the ordinate"),
+                ("A-OMR-04", "IsStartingMemberIncluded NULL <=> HierarchyStartingMemberID NULL, and a starting member, when present, is a node of the hierarchy"),
+            };
+            foreach (var (id, statement) in absent)
+            {
+                yield return CheckResult.Skip(
+                    id, ValidationPlane.A, ValidationLayer.Critical, table, statement, SqlHelpers.ExtensionTableAbsentReason);
+            }
+
+            yield break;
+        }
+
+        yield return SqlHelpers.CountCheck(
+            c, "A-OMR-01", ValidationLayer.Critical, table, "The ordinate carries exactly one MET categorisation",
+            total,
+            """
+            SELECT COUNT(*) FROM "mOrdinateMetricRestriction" r
+            WHERE (SELECT COUNT(*) FROM "mOrdinateCategorisation" oc
+                   JOIN "mDimension" dim ON dim."DimensionID" = oc."DimensionID"
+                   WHERE oc."OrdinateID" = r."OrdinateID" AND dim."DimensionXBRLCode" = 'MET') <> 1
+            """);
+
+        yield return SqlHelpers.CountCheck(
+            c, "A-OMR-02", ValidationLayer.Critical, table, "The metric of the ordinate (CorrespondingMemberID = the MET categorisation member) is enumerated (DataType 'Enumeration/Code' in DPM 2.0, 'Code' in DPM 1.0)",
+            total,
+            $"""
+            SELECT COUNT(*) FROM "mOrdinateMetricRestriction" r
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "mOrdinateCategorisation" oc
+                JOIN "mDimension" dim ON dim."DimensionID" = oc."DimensionID"
+                JOIN "mMetric" met ON met."CorrespondingMemberID" = oc."MemberID"
+                WHERE oc."OrdinateID" = r."OrdinateID" AND dim."DimensionXBRLCode" = 'MET'
+                  AND met."DataType" = '{enumeratedDataType}')
+            """);
+
+        yield return SqlHelpers.CountCheck(
+            c, "A-OMR-03", ValidationLayer.Critical, table, "The domain of the hierarchy equals the ReferencedDomainID of the metric of the ordinate (a NULL ReferencedDomainID is a violation)",
+            total,
+            """
+            SELECT COUNT(*) FROM "mOrdinateMetricRestriction" r
+            JOIN "mHierarchy" h ON h."HierarchyID" = r."HierarchyID"
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "mOrdinateCategorisation" oc
+                JOIN "mDimension" dim ON dim."DimensionID" = oc."DimensionID"
+                JOIN "mMetric" met ON met."CorrespondingMemberID" = oc."MemberID"
+                WHERE oc."OrdinateID" = r."OrdinateID" AND dim."DimensionXBRLCode" = 'MET'
+                  AND met."ReferencedDomainID" IS NOT NULL AND met."ReferencedDomainID" = h."DomainID")
+            """);
+
+        yield return SqlHelpers.CountCheck(
+            c, "A-OMR-04", ValidationLayer.Critical, table, "IsStartingMemberIncluded NULL <=> HierarchyStartingMemberID NULL, and a starting member, when present, is a node of the hierarchy",
+            total,
+            """
+            SELECT COUNT(*) FROM "mOrdinateMetricRestriction" r
+            WHERE ("HierarchyStartingMemberID" IS NULL) IS NOT ("IsStartingMemberIncluded" IS NULL)
+               OR ("HierarchyStartingMemberID" IS NOT NULL
+                   AND NOT EXISTS (SELECT 1 FROM "mHierarchyNode" n WHERE n."HierarchyID" = r."HierarchyID" AND n."MemberID" = r."HierarchyStartingMemberID"))
+            """);
     }
 
     private static CheckResult OpenAxisRestrictionIffUntypedDomain(SqliteConnection c)

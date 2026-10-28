@@ -370,7 +370,8 @@ public static class CliRunner
             var skeleton = SkeletonLoader.Load(accessReader, destination, allTaxonomies, selectedTaxonomies);
             var dictionary = DictionaryLoader.Load(accessReader, destination, allTaxonomies, selectedTaxonomies);
             var templates = TemplateOrTableLoader.Load(accessReader, destination, selectedTaxonomies);
-            var axesAndCells = AxisAndCellLoader.Load(accessReader, destination, templates.TableIdByTableVId);
+            var axesAndCells = AxisAndCellLoader.Load(
+                accessReader, destination, templates.TableIdByTableVId, dictionary.MemberIdRenumbering);
             var modules = ModuleLoader.Load(accessReader, destination, selectedTaxonomies);
 
             var vacuumElapsedMilliseconds = VacuumWithTiming(destination);
@@ -391,7 +392,8 @@ public static class CliRunner
                 $"Axes and cells loaded: {axesAndCells.AxisRows} axes, {axesAndCells.AxisOrdinateRows} ordinates, "
                 + $"{axesAndCells.OrdinateCategorisationRows} categorisations, {axesAndCells.TableCellRows} cells, "
                 + $"{axesAndCells.CellPositionRows} positions, {axesAndCells.OpenAxisValueRestrictionRows} open-axis "
-                + $"restrictions, {axesAndCells.SkippedDefaultMemberResets} resets skipped, "
+                + $"restrictions, {axesAndCells.OrdinateMetricRestrictionRows} metric restrictions, "
+                + $"{axesAndCells.SkippedDefaultMemberResets} resets skipped, "
                 + $"{axesAndCells.MetricInheritedFromAncestorCellCount} cells with a metric inherited from an "
                 + "ancestor (expected 0).");
             stdout.WriteLine(
@@ -537,7 +539,9 @@ public static class CliRunner
             + $"{axesAndCells.TableCellRows} mTableCell, {axesAndCells.CellPositionRows} mCellPosition, "
             + $"{axesAndCells.OrdinateCategorisationRows} mOrdinateCategorisation (informative, not "
             + $"compared by count), {axesAndCells.OpenAxisValueRestrictionRows} "
-            + "mOpenAxisValueRestriction.");
+            + "mOpenAxisValueRestriction, "
+            + $"{axesAndCells.OrdinateMetricRestrictionRows} mOrdinateMetricRestriction ("
+            + $"{axesAndCells.UnresolvedMetricRestrictions} unresolved).");
         stdout.WriteLine(
             $"  Categorisation: {axesAndCells.UnresolvedContextPairs} unresolved context pairs, "
             + $"{axesAndCells.UnresolvedMetricPairs} unresolved metric pairs, "
@@ -606,6 +610,7 @@ public static class CliRunner
         TextWriter stdout, EbaDpm.Converter.Core.Mapping.Dpm20.Dpm20DictionaryLoader.Diagnostics diagnostics)
     {
         WriteDiagnosticList(stdout, "mMetric.DataType without a known translation", diagnostics.UnresolvedMetricDataTypeCases);
+        WriteDiagnosticList(stdout, "mMetric with several hierarchies in its non-key headers (mMetric.ReferencedHierarchyID NULL; the hierarchy is per ordinate in mOrdinateMetricRestriction)", diagnostics.MetricsWithSeveralHierarchies);
         WriteDiagnosticList(stdout, "mDomain.DataType unresolved", diagnostics.UnresolvedDomainDataTypeCases);
         WriteDiagnosticList(stdout, "mDimension without its own code in ItemCategory/_PR", diagnostics.DimensionsWithoutCode);
         WriteDiagnosticList(stdout, "mDimension without a row in PropertyCategory", diagnostics.DimensionsWithoutPropertyCategory);

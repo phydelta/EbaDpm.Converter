@@ -102,7 +102,7 @@ public static class LayoutExtractor
         using var declInsert = new PreparedInsert(connection, "LayoutDeclaration", ["DeclId", "SheetId", "Region", "CellRef", "DimensionCode", "DomainCode", "HierarchyCode", "Label", "IsKey"]);
         using var ordinateInsert = new PreparedInsert(connection, "LayoutOrdinate", ["OrdinateId", "SheetId", "Axis", "OrdinateCode", "IsFallbackCode", "Label"]);
         using var cellInsert = new PreparedInsert(connection, "LayoutCell", ["CellId", "SheetId", "RowOrdinateId", "ColumnOrdinateId", "CellRef", "DatapointId", "DataType", "IsShaded"]);
-        using var valueInsert = new PreparedInsert(connection, "LayoutValue", ["ValueId", "SheetId", "DeclId", "OrdinateId", "DomainCode", "MemberCode", "Label", "CellRef"]);
+        using var valueInsert = new PreparedInsert(connection, "LayoutValue", ["ValueId", "SheetId", "DeclId", "OrdinateId", "DomainCode", "MemberCode", "Label", "CellRef", "HierarchyDomainCode", "HierarchyCode"]);
         using var rawInsert = new PreparedInsert(connection, "LayoutRaw", ["SheetId", "CellRef", "Value"]);
         using var unparsedInsert = new PreparedInsert(connection, "LayoutUnparsed", ["SheetId", "CellRef", "Value", "Kind", "Reason"]);
         using var extractionInsert = new PreparedInsert(connection, "LayoutExtraction", ["ExtractionId", "DictionaryPath", "DictionarySha256", "ExtractedAtUtc"]);
@@ -298,7 +298,7 @@ public static class LayoutExtractor
                 {
                     valueId++;
                     var link = LayoutValueOrdinateLinker.Resolve(value, result, ordinateIndex);
-                    valueInsert.Insert(valueId, sheetId, declIds[value.Declaration], link.OrdinateId, value.DomainCode, value.MemberCode, value.Label, value.CellRef);
+                    valueInsert.Insert(valueId, sheetId, declIds[value.Declaration], link.OrdinateId, value.DomainCode, value.MemberCode, value.Label, value.CellRef, value.HierarchyDomainCode, value.HierarchyCode);
                     valuesWritten++;
 
                     if (link.IsLinked)
