@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.15" />
-    <PackageReference Include="System.Data.OleDb" Version="10.0.15" />
+    <PackageReference Include="System.Data.OleDb" Version="11.0.0" />
   </ItemGroup>
 
   <ItemGroup>
