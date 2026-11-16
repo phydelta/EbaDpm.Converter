@@ -584,7 +584,7 @@ public static class CliRunner
             }
 
             var safeCode = new string(release.Code.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
-            targets.Add((release, Path.Combine(output, $"dpm-{safeCode}.db")));
+            targets.Add((release, Path.Join(output, $"dpm-{safeCode}.db")));
         }
 
         if (targets.Count == 0)
