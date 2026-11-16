@@ -145,10 +145,11 @@ an enumerated cell is resolved in this order: `mOrdinateMetricRestriction` →
 `mMetric.ReferencedHierarchyID` (cut to the starting member when declared) → every member of
 `mMetric.ReferencedDomainID`.
 
-Known limitation: `HierarchyID` references an `mHierarchy` row, whose nodes are those of the
-hierarchy's version in force at the cutoff. A DPM 2.0 header can still point to an older version
-of the sub-category with other members, so the restriction names the right hierarchy but not
-necessarily the right member list (accepted loss, tracked in #62).
+`HierarchyID` references an `mHierarchy` row, whose nodes are those of the hierarchy's version in
+force at the release of the file. A DPM 2.0 header could point to another version of the
+sub-category, with other members; since each file holds only the module versions published in
+its release, no header does so on the published data (0 on the 4.4 database, measured
+2026-11-16; see [mapping-dpm2.md](mapping-dpm2.md#mhierarchynode)).
 
 ## Conventions in the data
 

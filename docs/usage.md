@@ -29,10 +29,48 @@ When running from source, replace `EbaDpm.Converter` with
 
 ## Convert
 
+The options depend on the source model, which is detected automatically and printed on the first
+line of output.
+
+### DPM 2.0 sources
+
+```text
+EbaDpm.Converter --source "<input.accdb>" --output <path>
+                 [--release <code>] [--overwrite] [--report <path>] [--verbose]
+```
+
+| Option | Required | Description |
+|---|---|---|
+| `--source <path>` | yes | The Access DPM database (`.accdb`). Opened read-only |
+| `--output <path>` | yes | With `--release`: the SQLite file to create. Without it: the directory that receives one file per release, created if needed |
+| `--release <code>` | no | Convert only the release with that `Release.Code` (e.g. `4.3`). An unknown code is an error that lists the available codes. A release in which no module version is published is an error and writes nothing |
+| `--overwrite` | no | Replace output files that exist. Without it, an existing output file is an error, and nothing is written |
+| `--report <path>` | no | Accepted for compatibility; the conversion summary is currently written to standard output only |
+| `--verbose` | no | Accepted for compatibility; currently has no additional effect |
+
+> **What a DPM 2.0 export contains.** Each SQLite file is one EBA release: the dictionary,
+> hierarchies and table layouts as of that release, and only the module versions first published
+> in it. A module that did not change in a release stays in the file of the release that published
+> it (in the 4.4 database, COREP is in the 4.2 file). Without `--release`, one file is written per
+> release; releases with no new module versions are skipped. Later Access databases correct
+> earlier data, so the file of a release can differ slightly depending on the database it is
+> produced from.
+
+Without `--release`, the files are named `dpm-<release>.db` (for example `dpm-4.2.1.db`) and are
+written in release order. Every target file is checked before the first one is written. A
+consumer that maps returns to cells loads the files of every release it needs, and picks for each
+module the file of the release in its `XBRLSchemaRef` (`.../fws/<framework>/<release>/mod/...`).
+
+The DPM 1.0 selectors (`--all`, `--taxonomies`, `--taxonomykeys`, `--releases`) are errors with a
+DPM 2.0 source: a DPM 2.0 taxonomy code already carries its release (`corep 4.2`), and the release
+is chosen with `--release`. The `--cutoff-release` option of earlier versions no longer exists.
+
+### DPM 1.0 sources
+
 ```text
 EbaDpm.Converter --source "<input.accdb>" --output "<output.db>"
                  (--taxonomies "..." | --taxonomykeys "..." | --releases "..." | --all)
-                 [--cutoff-release <code>] [--overwrite] [--report <file.json>] [--verbose]
+                 [--overwrite] [--report <file.json>] [--verbose]
 ```
 
 | Option | Required | Description |
@@ -40,55 +78,48 @@ EbaDpm.Converter --source "<input.accdb>" --output "<output.db>"
 | `--source <path>` | yes | The Access DPM database (`.accdb`). Opened read-only |
 | `--output <path>` | yes | The SQLite database to create. Parent directories are created if needed |
 | `--all` | one selector | Convert every taxonomy in the source |
-| `--taxonomies <list>` | one selector | Select by `TaxonomyCode`, as printed by `--list-taxonomies` (e.g. `COREP 3.2` for DPM 1.0, `corep 4.2` for DPM 2.0) |
+| `--taxonomies <list>` | one selector | Select by `TaxonomyCode`, as printed by `--list-taxonomies` (e.g. `COREP 3.2`) |
 | `--taxonomykeys <list>` | one selector | Select by `TaxonomyKey`, a derived identifier (e.g. `corep/its-005-2020/2022-03-01` up to 3.x, `sbp/4.0` from 4.0) |
 | `--releases <list>` | one selector | Select by DPM release (`DpmPackageCode`, e.g. `4.0,4.1`) |
-| `--cutoff-release <code>` | no | DPM 2.0 sources only: convert as of the release with that `Release.Code` (e.g. `4.2`) instead of the latest one. An unknown code is an error that lists the available codes; with a DPM 1.0 source the option is an error |
-| `--overwrite` | no | Replace the output file if it exists. Without it, an existing output is an error |
-| `--report <path>` | no | Accepted for compatibility; the conversion summary is currently written to standard output only |
-| `--verbose` | no | Accepted for compatibility; currently has no additional effect |
+| `--overwrite`, `--report`, `--verbose` | no | As for DPM 2.0 sources |
 
 **Exactly one selector is mandatory.** With none, the command fails and prints the available
 taxonomies; with more than one, it fails as well. Unknown codes, keys or releases are reported by
-name together with the valid values.
+name together with the valid values. `--release` is an error with a DPM 1.0 source.
 
-The source model (DPM 1.0 or DPM 2.0) is detected automatically and printed on the first line of
-output. For a DPM 2.0 source the conversion is made as of the **cutoff release**, the latest
-release declared in the database, which is also printed. `--cutoff-release` selects an earlier
-release instead (for example `4.2` on the 4.2.1 database), and the printed line marks it as
-requested. The run ends with a per-area summary
-(rows written per table group, plus any unresolved cases listed by name) and a final `VACUUM`.
+### Output
+
+Each conversion ends with a per-area summary (rows written per table group, plus any unresolved
+cases listed by name) and a final `VACUUM`. For DPM 2.0 the release of each file is printed
+before its summary, and each skipped release is named.
 
 Examples:
 
 ```powershell
-# Everything
-EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output eba-4.2.db --all
+# DPM 2.0: one file per release, in the directory "eba"
+EbaDpm.Converter --source "DPM2 Database_v 4_4.accdb" --output eba
 
-# Two taxonomies, replacing a previous output
-EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output corep.db `
-  --taxonomies "corep 4.2,if 4.2" --overwrite
+# DPM 2.0: the 4.2 release only, replacing a previous output
+EbaDpm.Converter --source "DPM2 Database_v 4_4.accdb" --output eba-4.2.db --release 4.2 --overwrite
 
-# By taxonomy key
-EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output corep.db --taxonomykeys corep/4.2
-
-# The 4.2.1 publication as of release 4.2
-EbaDpm.Converter --source "DPM2 Database_v 4_2_1.accdb" --output eba-4.2.db --all --cutoff-release 4.2
-
-# By release, from a DPM 1.0 source
+# DPM 1.0: by release
 EbaDpm.Converter --source "DPM 1.0 Database_v4_1.accdb" --output dpm1.db --releases 4.0,4.1
 ```
 
 ## List taxonomies
 
 ```text
-EbaDpm.Converter --list-taxonomies --source "<input.accdb>" [--cutoff-release <code>]
+EbaDpm.Converter --list-taxonomies --source "<input.accdb>" [--release <code>]
 ```
 
 Prints the detected source model and one row per taxonomy with its `TaxonomyKey`, `TaxonomyCode`,
-DPM package (release), publication date and number of tables. Use it to find the values to pass to
-`--taxonomies`, `--taxonomykeys` or `--releases`. For DPM 2.0 sources taxonomies are derived
-(framework plus release), so the publication date column shows `-`; `--cutoff-release` lists them as of an earlier release.
+DPM package (release), publication date and number of tables. For DPM 1.0 sources, use it to find
+the values to pass to `--taxonomies`, `--taxonomykeys` or `--releases`.
+
+For DPM 2.0 sources the taxonomies are derived (framework plus release), so the publication date
+column shows `-`. Without `--release` the taxonomies are grouped by release, in release order, and
+the releases that a conversion would skip are marked; with `--release` only that release is
+listed. `--release` is an error with a DPM 1.0 source.
 
 ## Schema only
 
@@ -169,6 +200,6 @@ recognised, why the dictionary is needed and the structure of the repository.
 | Code | Meaning |
 |---|---|
 | `0` | Success. For `--validate`: no critical failure in planes A or C, and no stale known exception in those planes (plane B differences and informative differences do not count) |
-| `1` | Missing or invalid arguments, or an input/output error: unknown option, missing value, file not found, output already exists without `--overwrite`, source that is not a recognisable DPM Access database, unknown taxonomy or release |
+| `1` | Missing or invalid arguments, or an input/output error: unknown option, missing value, file not found, output already exists without `--overwrite`, source that is not a recognisable DPM Access database, unknown taxonomy or release, a DPM 2.0 release with no module version published in it |
 | `2` | Reserved for a recognised but unimplemented mode. Not returned by the current version |
 | `3` | `--validate` only: at least one critical check failed in plane A or C, or a known exception in those planes became stale |

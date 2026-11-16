@@ -452,6 +452,36 @@ public static class KnownExceptions
         "The converter emits only used dimension properties; the Access database has 15 properties in the same situation (measured 2026-10-08 on 4.2.1 and 4.3) " +
         "and nothing distinguishes TNS from the other 14, so the reference choice is not derivable from the source.";
 
+    /// <summary>
+    /// AO-4: (taxonomy, table, dimension) triples for which the Access database declares the SAME
+    /// member on ordinates of more than one axis of the table (check <c>A-OCA-10</c>). Key
+    /// <c>TaxonomyCode|TableCode|DimensionXBRLCode</c>: a table code is not unique across the
+    /// per-release files, its business key includes the taxonomy. Two-sided: a triple absent from the
+    /// validated file does not apply; one present that no longer violates is stale. Measured on the
+    /// 4.4 database 2026-11-16: <c>K_04.00.b</c> in the 3.4 and 4.0 files, the other two in 4.0 only.
+    /// </summary>
+    private static readonly string[] DimensionOnSeveralAxesKeys =
+    [
+        "pillar3 3.4|K_04.00.b|eba_dim_3.4:PDR", // Y, X, Z axes, member eba_PC:x416
+        "pillar3 4.0|K_04.00.b|eba_dim_3.4:PDR",
+        "pillar3 4.0|K_05.00.b|eba_dim_3.4:BAS", // Y, X axes, member eba_BA:x17
+        "pillar3 4.0|K_26.00.b|eba_dim_3.4:TRI", // Y, X, Z axes, member eba_TR:x3
+    ];
+
+    /// <summary>
+    /// AO-5: <c>C_96.05.2</c> in the 3.5 file (taxonomy <c>corep 3.5</c>), check <c>I-SIG-07</c>. Key
+    /// <c>TaxonomyCode|TableCode</c>. Two-sided.
+    /// </summary>
+    private static readonly string[] TableMetricBeforeItemCategoryKeys = ["corep 3.5|C_96.05.2"];
+
+    private const string TableMetricBeforeItemCategoryReason =
+        "AO-5: the source uses property qCFB (TableVersion.PropertyID) in release 3.5, before its ItemCategory row starts (4.0), " +
+        "so no metric member exists as of 3.5 (measured on the 4.4 database 2026-11-16).";
+
+    private const string DimensionOnSeveralAxesReason =
+        "AO-4: the source declares the dimension with the same member on ordinates of more than one axis of the table " +
+        "(measured on the 4.4 database 2026-11-16; present in the 3.4 and 4.0 files). Reported as a structural anomaly (docs/mapping-dpm2.md, Signatures).";
+
     private const string PlaneCTsvResourceName = "EbaDpm.Converter.Core.Resources.plane-c-known-divergences-4.2.tsv";
 
     /// <summary>The <c>Type</c> value of a census row that names a <c>C-MHR-01</c> unit instead of a
@@ -593,6 +623,8 @@ public static class KnownExceptions
         .. LegacyExceptions,
         .. ColonInMemberCodeKeys.Select(k => new KnownException("AO-1", ExceptionKind.OriginAnomaly, k, "-", null, "I-XBR-01c", ColonInMemberCodeReason, ValidationLayer.Critical, Sidedness.TwoSided)),
         .. MembersOutsideHierarchyDomainKeys.Select(k => new KnownException("AO-3", ExceptionKind.OriginAnomaly, k, "-", null, "I-TRE-07b", MembersOutsideHierarchyDomainReason, ValidationLayer.Critical, Sidedness.OneSided)),
+        .. DimensionOnSeveralAxesKeys.Select(k => new KnownException("AO-4", ExceptionKind.OriginAnomaly, k, "-", null, "A-OCA-10", DimensionOnSeveralAxesReason, ValidationLayer.Critical, Sidedness.TwoSided)),
+        .. TableMetricBeforeItemCategoryKeys.Select(k => new KnownException("AO-5", ExceptionKind.OriginAnomaly, k, "-", null, "I-SIG-07", TableMetricBeforeItemCategoryReason, ValidationLayer.Critical, Sidedness.TwoSided)),
         .. LegacyDpm10HierarchyKeys.Select(k => new KnownException("DD-16", ExceptionKind.DeclaredDivergence, k, Ref42, Sha42, "B-DIC-01.8", LegacyDpm10HierarchyReason, ValidationLayer.Critical, Sidedness.TwoSided)),
         .. UnpublishedQioMemberKeys.Select(k => new KnownException("E-7", ExceptionKind.Defect, k, Ref42, Sha42, "B-DIC-01.9", UnpublishedQioMemberReason, ValidationLayer.Critical, Sidedness.TwoSided)),
         .. StaleIsCurrentReleaseKeys.Select(k => new KnownException("DD-17", ExceptionKind.DeclaredDivergence, k, Ref42, Sha42, "B-DIC-mRelease-IsCurrent", StaleIsCurrentReleaseReason, ValidationLayer.Informative, Sidedness.OneSided)),
@@ -757,6 +789,24 @@ public static class KnownExceptions
     {
         var applicable = For(checkId, plane).Where(e => e.Kind == ExceptionKind.OriginAnomaly).ToList();
         return ApplyOriginAnomalyCore(applicable, violatingKeys);
+    }
+
+    /// <summary>
+    /// Same as the public overload, with the set of keys whose object EXISTS in the validated file
+    /// (<paramref name="presentKeys"/>). A declared entry whose object is absent is NOT EVALUATED
+    /// for this file (reported as not applicable, never stale and never a failure: the file is of
+    /// another release). One whose object is present but no longer violates keeps the usual
+    /// semantics (stale, fails if two-sided).
+    /// </summary>
+    public static (IReadOnlyList<string> UnresolvedViolations, IReadOnlyList<Outcome> Outcomes) ApplyOriginAnomalyExceptions(
+        string checkId, IReadOnlySet<string> violatingKeys, ValidationPlane plane, IReadOnlySet<string> presentKeys)
+    {
+        var applicable = For(checkId, plane).Where(e => e.Kind == ExceptionKind.OriginAnomaly).ToList();
+        var present = applicable.Where(e => presentKeys.Contains(e.BusinessKey)).ToList();
+        var (unresolved, outcomes) = ApplyOriginAnomalyCore(present, violatingKeys);
+        var outcomeList = outcomes.ToList();
+        outcomeList.AddRange(applicable.Except(present).Select(e => new Outcome(e, false, 0, false)));
+        return (unresolved, outcomeList);
     }
 
     /// <summary>

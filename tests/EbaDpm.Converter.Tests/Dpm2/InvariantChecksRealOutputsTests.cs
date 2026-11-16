@@ -212,9 +212,28 @@ public sealed class InvariantChecksDpm2042Tests(Dpm20SkeletonFixture fixture)
     }
 
     /// <summary>
+    /// Positive control of the empty-universe test of the 4.3 file: the 4.2 file against the 4.2 reference
+    /// shares taxonomies, so the comparable universe is NOT empty (taxonomies, tables, ordinates, cells
+    /// all above 0) and plane B checks are emitted.
+    /// </summary>
+    [DataFact]
+    public void Dpm20Release42_WithReference42_ComparableUniverseIsNotEmpty()
+    {
+        RepoPaths.EnsureReferenceDatabaseExists();
+        var result = ValidatorRunCache.Run(fixture.ValidatedDatabasePath, RepoPaths.ReferenceDatabasePath);
+        var universe = result.Report.Universe;
+
+        Assert.NotEmpty(universe.ComparableTaxonomies);
+        Assert.True(universe.Tables > 0, "Comparable tables: 0 for the 4.2 file against the 4.2 reference.");
+        Assert.True(universe.Ordinates > 0, "Comparable ordinates: 0 for the 4.2 file against the 4.2 reference.");
+        Assert.True(universe.Cells > 0, "Comparable cells: 0 for the 4.2 file against the 4.2 reference.");
+        Assert.Contains(result.Report.Checks, c => c.Id.StartsWith("B-DIC-01.", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// The publication guard: --validate of the 4.2 output against its OWN reference (same
     /// publication) does NOT trigger the guard - ALL the B-DIC-01.* checks really compare, none is
-    /// skipped. It is the necessary counterpoint of the 4.3 test (which MUST skip them all): if the
+    /// skipped. If the
     /// guard also skipped here, it would protect nothing, it would hide the real comparison.
     ///
     /// No fixed count: the family grew from 8 to 9 with B-DIC-01.9 - the property it protects is
@@ -306,35 +325,38 @@ public sealed class InvariantChecksDpm2043Tests(Dpm2043ValidateFixture fixture)
     }
 
     /// <summary>
-    /// The publication guard: --validate of the 4.3 output against <c>EBA_4.2_Hotfix.db</c> (4.2
-    /// publication) leaves ALL the <c>B-DIC-01.*</c> in <c>Skipped</c>, not in "fail". Before the
-    /// guard was extended to all of them, <c>.3</c> and <c>.6</c> FAILED here over a structurally
-    /// invalid universe - exactly the kind of silent regression this test exists to catch if
-    /// someone "fixes" the guard back to a single one.
+    /// A reference of ANOTHER release: since #73 the 4.3 file holds only taxonomies starting in releases up
+    /// to 4.3 under their own codes and shares no taxonomy code with the 4.2 reference export. The
+    /// validator then reports an empty comparable universe (0 taxonomies, tables, ordinates, cells), emits
+    /// NO plane B check at all (so no <c>B-DIC-01.*</c> is evaluated over a structurally invalid
+    /// universe) and counts no plane B failure. Replaces the previous premise ("the 4.3 file shares
+    /// taxonomies with the 4.2 reference and every B-DIC-01.* is skipped"), which no longer holds.
     ///
-    /// No fixed count: the family grew from 8 to 9 with B-DIC-01.9. What really protects is "EVERY
-    /// B-DIC-01.* is skipped here, without exception" - a floor of 8 to catch an emptied harness,
-    /// never an equality.
+    /// Positive control that a shared universe yields plane B checks: the 4.2 file against the same
+    /// reference, <c>InvariantChecksDpm2042Tests.Dpm20Release42_WithReference42_ComparableUniverseIsNotEmpty</c>
+    /// (and, in that class, <c>Dpm20Release42_WithReference42_NoBDic01IsSkipped</c>).
     /// </summary>
     [DataFact]
-    public void Dpm20Release43_WithReference42_AllBDic01AreSkipped()
+    public void Dpm20Release43_WithReference42_HasAnEmptyComparableUniverse_AndNoPlaneBFailure()
     {
         RepoPaths.EnsureReferenceDatabaseExists();
         var result = ValidatorRunCache.Run(fixture.GeneratedDatabasePath, RepoPaths.ReferenceDatabasePath);
+        var universe = result.Report.Universe;
 
-        var bDic01Checks = result.Report.Checks.Where(c => c.Id.StartsWith("B-DIC-01.", StringComparison.Ordinal)).ToList();
-        Assert.True(bDic01Checks.Count >= 8, $"Only {bDic01Checks.Count} B-DIC-01.* checks (expected floor: 8).");
+        Assert.Empty(universe.ComparableTaxonomies);
+        Assert.Equal(0, universe.Tables);
+        Assert.Equal(0, universe.Ordinates);
+        Assert.Equal(0, universe.Cells);
 
-        var notSkipped = bDic01Checks.Where(c => c.Status != "skipped").ToList();
+        // The universes are really disjoint and non-empty (not "empty because one side is empty").
+        Assert.NotEmpty(universe.GeneratedOnlyTaxonomies);
+        Assert.NotEmpty(universe.ReferenceOnlyTaxonomies);
+
+        var planeB = result.Report.Checks.Where(c => c.Id.StartsWith("B-", StringComparison.Ordinal)).ToList();
         Assert.True(
-            notSkipped.Count == 0,
-            "The following B-DIC-01.* were NOT skipped despite the publication mismatch (generated 4.3 vs reference 4.2): "
-            + string.Join(" | ", notSkipped.Select(c => $"{c.Id}: status={c.Status}")));
-
-        Assert.All(bDic01Checks, c => Assert.False(string.IsNullOrWhiteSpace(c.SkipReason)));
-        Assert.All(bDic01Checks, c => Assert.Contains("publication", c.SkipReason!, StringComparison.OrdinalIgnoreCase));
-
-        // No critical check fails because of the guard - the skipped ones do not count as "fail".
-        Assert.DoesNotContain(bDic01Checks, c => c.Status == "fail");
+            planeB.Count == 0,
+            "Plane B checks were emitted over an empty comparable universe: " + string.Join(" | ", planeB.Select(c => $"{c.Id}: {c.Status}")));
+        Assert.DoesNotContain(result.Report.Checks, c => c.Id.StartsWith("B-DIC-01.", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Report.Checks, c => c.Layer == "critical" && c.Status == "fail" && c.Id.StartsWith("B-", StringComparison.Ordinal));
     }
 }

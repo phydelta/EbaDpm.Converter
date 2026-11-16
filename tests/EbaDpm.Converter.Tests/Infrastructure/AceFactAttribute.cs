@@ -69,3 +69,18 @@ public sealed class AceFactAttribute : FactAttribute
         }
     }
 }
+
+/// <summary>
+/// A <see cref="TheoryAttribute"/> that is skipped when the Access Database Engine (ACE OLEDB 16.0 x64)
+/// is not installed.
+/// </summary>
+public sealed class AceTheoryAttribute : TheoryAttribute
+{
+    public AceTheoryAttribute()
+    {
+        if (!AceRequirement.IsAvailable)
+        {
+            Skip = AceRequirement.SkipReason;
+        }
+    }
+}

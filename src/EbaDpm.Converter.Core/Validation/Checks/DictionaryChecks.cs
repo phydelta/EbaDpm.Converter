@@ -138,10 +138,17 @@ public static class DictionaryChecks
             c, "A-SEN-03", ValidationLayer.Critical, "mHierarchyNode", "No Path of mHierarchyNode keeps the untranslated 9999 segment",
             "SELECT COUNT(*) FROM \"mHierarchyNode\"",
             "SELECT COUNT(*) FROM \"mHierarchyNode\" WHERE \"Path\" = '9999.' OR \"Path\" LIKE '9999.%' OR \"Path\" LIKE '%.9999.' OR \"Path\" LIKE '%.9999.%'");
-        yield return SqlHelpers.CountCheck(
-            c, "A-SEN-04", ValidationLayer.Critical, "mOrdinateCategorisation", "No row uses the SOURCE sentinel MemberID=999",
-            "SELECT COUNT(*) FROM \"mOrdinateCategorisation\"",
-            "SELECT COUNT(*) FROM \"mOrdinateCategorisation\" WHERE \"MemberID\" = 999");
+        // 999 is a DPM 1.0 SOURCE sentinel. In DPM 2.0 MemberID is a minted counter and 999 is an
+        // ordinary member (e.g. eba_PL:x4 in the 4.0 file), so the check is scoped to DPM 1.0 and is
+        // not emitted for DPM 2.0 (same scoping as A-OCA-10).
+        if (model == ValidationSourceModel.Dpm1)
+        {
+            yield return SqlHelpers.CountCheck(
+                c, "A-SEN-04", ValidationLayer.Critical, "mOrdinateCategorisation", "No row uses the SOURCE sentinel MemberID=999",
+                "SELECT COUNT(*) FROM \"mOrdinateCategorisation\"",
+                "SELECT COUNT(*) FROM \"mOrdinateCategorisation\" WHERE \"MemberID\" = 999");
+        }
+
         yield return SqlHelpers.CountCheck(
             c, "A-SEN-05", ValidationLayer.Critical, "mAxisOrdinate", "No OrdinateCode equals '999' or '999 '",
             "SELECT COUNT(*) FROM \"mAxisOrdinate\"",

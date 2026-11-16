@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using EbaDpm.Converter.Core.Access.Dpm20;
 using EbaDpm.Converter.Core.Sqlite;
 using Microsoft.Data.Sqlite;
@@ -17,11 +17,10 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 ///
 /// It runs after <see cref="Dpm20SkeletonLoader.Load"/>, on the same connection.
 ///
-/// No release filter: the dictionary is shared between taxonomies and is not pruned by release
-/// here, as in DPM 1.0. Measured: the counts that match the reference come from
-/// <c>ItemCategory</c>, <c>SuperCategoryComposition</c> and <c>SubCategory</c> WITHOUT applying
-/// <c>StartReleaseID</c>/<c>EndReleaseID</c>. The only exception is
-/// <c>PropertyCategory.StartReleaseID</c>, which IS read — but not to filter: because it IS the
+/// The dictionary is read AS OF the cutoff release R (done in <see cref="Dpm20AccessReader"/>):
+/// rows with <c>StartReleaseID &lt;= R</c> and NO end condition, so renamed codes (<c>old-*</c>)
+/// stay side by side; no row that starts after R contributes. It is shared between taxonomies, so
+/// it is not pruned by the currency predicate. <c>PropertyCategory.StartReleaseID</c> is also the
 /// release suffix of <c>mDimension.DimensionXBRLCode</c>.
 ///
 /// <b>43 properties are metric AND dimension at the same time.</b> No

@@ -31,25 +31,25 @@ internal static class RepoPaths
     public const string AccessDatabaseFileName = "DPM 1.0 Database_v4_1_20250709.accdb";
 
     /// <summary>
-    /// File name of the DPM 2.0 Access database published as 4.2.1 (its [Release] declares 4.2 and
-    /// 4.2.1; natural cutoff "4.2.1"). The tests that mean "the 4.2 release" read it with the
-    /// explicit cutoff <see cref="Cutoff42ReleaseCode"/>; the natural cutoff is exercised by
-    /// <c>Dpm2042_1ValidateFixture</c>. Only read by the tests of the DPM 2.0 pipeline.
+    /// File name of the DPM 2.0 Access database published as 4.2.1 (its [Release] declares 3.4 to 4.2
+    /// and 4.2.1). The tests that mean "the 4.2 release" convert it with
+    /// <c>--release</c> <see cref="Cutoff42ReleaseCode"/> (one SQLite file per release, #73); the 4.2.1
+    /// release is exercised by <c>Dpm2042_1ValidateFixture</c> and every release by
+    /// <c>Dpm20PerReleaseDirectoryFixture</c>. Only read by the tests of the DPM 2.0 pipeline.
     /// </summary>
     public const string AccessDpm20DatabaseFileName = "DPM2 Database_v 4_2_1.accdb";
 
     /// <summary>
-    /// <c>Release.Code</c> of the 4.2 release: the explicit cutoff (<c>--cutoff-release 4.2</c> /
+    /// <c>Release.Code</c> of the 4.2 release: the release (<c>--release 4.2</c>, or the reader cutoff
     /// <c>cutoffReleaseCode: "4.2"</c>) with which the tests that mean "the 4.2 release" read
     /// <see cref="AccessDpm20DatabaseFileName"/>.
     /// </summary>
     public const string Cutoff42ReleaseCode = "4.2";
 
     /// <summary>
-    /// File name of the DPM 2.0 Access database of the 4.3 publication. Its cut-off release is
-    /// derived by <c>Dpm20AccessReader.ResolveCutoffRelease</c> (Max(ReleaseID) = 1.010.000.050 =
-    /// "4.3"), unlike the 4.2.1 file (which derives "4.2.1"). Only read by the tests that exercise
-    /// the later publication.
+    /// File name of the DPM 2.0 Access database of the 4.3 publication. Its last release is
+    /// "4.3" (Max(ReleaseID) = 1.010.000.050), converted by <c>Dpm2043ValidateFixture</c> with
+    /// <c>--release 4.3</c>. Only read by the tests that exercise the later publication.
     /// </summary>
     public const string AccessDpm20Release43DatabaseFileName = "DPM2 Database_v 4_3_20260622.accdb";
 

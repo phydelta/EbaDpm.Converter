@@ -6,7 +6,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 
 /// <summary>
 /// Collection fixture: runs ONCE, through the real CLI (<see cref="CliRunner.Run"/>, exactly the
-/// path a user follows with <c>--all</c>), the conversion of the complete DPM 2.0 skeleton over
+/// path a user follows with <c>--release 4.2</c>), the conversion of the DPM 2.0 4.2 release over
 /// <c>Data/DPM2 Database_v 4_2_1.accdb</c>, and leaves the resulting <c>.db</c> open in
 /// read-only mode so that the count and column-by-column tests query the same file, without
 /// reopening the large DPM 2.0 Access database for every test.
@@ -17,7 +17,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <see cref="Dpm20AccessReaderFixture"/> if xUnit decides to parallelise collections.
 ///
 /// This fixture also covers what used to be a separate validation fixture: both ran the SAME
-/// <c>--all</c> conversion through the real CLI, one to leave the connection OPEN (fast queries)
+/// <c>--release 4.2</c> conversion through the real CLI, one to leave the connection OPEN (fast queries)
 /// and the other to leave the file FREE of any connection (<c>Validator.Run</c>). Here a single
 /// conversion is made and the file is copied to <see cref="ValidatedDatabasePath"/> at the moment
 /// when no connection is open (right after <c>CliRunner.Run</c> + <c>ClearAllPools</c>, before
@@ -32,7 +32,7 @@ public sealed class Dpm20SkeletonFixture : IDisposable
     public string GeneratedDatabasePath { get; } = null!;
 
     /// <summary>
-    /// Copy of the same <c>--all</c> run, taken with NO open connection on top of it -- exactly what
+    /// Copy of the same <c>--release 4.2</c> run, taken with NO open connection on top of it -- exactly what
     /// a second full conversion would have produced.
     /// </summary>
     public string ValidatedDatabasePath { get; } = null!;
@@ -60,7 +60,7 @@ public sealed class Dpm20SkeletonFixture : IDisposable
         using var stderr = new StringWriter();
 
         ExitCode = CliRunner.Run(
-            ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", GeneratedDatabasePath, "--all"],
+            ["--source", RepoPaths.AccessDpm20DatabasePath, "--release", RepoPaths.Cutoff42ReleaseCode, "--output", GeneratedDatabasePath],
             stdout,
             stderr);
 

@@ -71,12 +71,15 @@ DPM 2.0 is a different metamodel (versioned entities, categories and properties 
 domains and dimensions), so it has its own reader and loaders rather than sharing an interface
 with DPM 1.0.
 
-1. Open the source with `Dpm20AccessReader` and resolve the **cutoff release**: the latest release
-   in the database. Every versioned table is read as of that release
-   (`StartRelease <= R AND (EndRelease IS NULL OR EndRelease > R)`); the only extra read is the
-   `ModuleVersion` history up to the cutoff, which describes the derived taxonomies.
+0. List the releases of the database and how many module versions each one publishes
+   (`Dpm20ReleaseCatalog`). The steps below run once per release R to convert: the one given
+   with `--release`, or every release that publishes a module version, each into its own file.
+1. Open the source with `Dpm20AccessReader` as of R. Every versioned structure table is read as
+   of R (`StartRelease <= R AND (EndRelease IS NULL OR EndRelease > R)`); the dictionary and the
+   `ModuleVersion` history (which describes the derived taxonomies) are read up to R
+   (`StartRelease <= R`).
 2. Derive taxonomies from frameworks, modules and releases (`Dpm20TaxonomyDeriver`), since
-   DPM 2.0 has no taxonomy entity, and apply the selector.
+   DPM 2.0 has no taxonomy entity, and keep those of release R.
 3. Create the schema and load, in order: skeleton (`Dpm20SkeletonLoader`), dictionary
    (`Dpm20DictionaryLoader`, with `DimensionMemberResolver`), hierarchy trees
    (`Dpm20HierarchyNodeLoader`), templates and tables (`Dpm20StructureLoader`), axes, ordinates,

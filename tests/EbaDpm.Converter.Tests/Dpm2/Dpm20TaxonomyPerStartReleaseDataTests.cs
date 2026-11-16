@@ -8,11 +8,15 @@ using Microsoft.Data.Sqlite;
 namespace EbaDpm.Converter.Tests.Dpm2;
 
 /// <summary>
-/// DPM 2.0, issue 66, on the REAL natural-cutoff outputs of the 4.2.1 and 4.3 databases: a module
-/// version hangs from the taxonomy (framework, <c>ModuleVersion.StartReleaseID</c>), the taxonomies
-/// are exactly those of the emitted module versions, and every <c>mModule.XBRLSchemaRef</c> release
-/// is the start release of its module version. The expectations are read from the Access database
-/// with independent OLEDB queries (<see cref="AccessCensus"/>); no literal count is pinned.
+/// DPM 2.0, issue 66 and #73, on the REAL one-release outputs of the 4.2.1 and 4.3 databases
+/// (<c>--release 4.2.1</c> and <c>--release 4.3</c>): a module version hangs from the taxonomy
+/// (framework, <c>ModuleVersion.StartReleaseID</c>), the file holds exactly the taxonomies whose
+/// module versions START in its release, and every <c>mModule.XBRLSchemaRef</c> release is the start
+/// release of its module version. A module that did not change in a later release is in the file of
+/// the release that published it, not in the later one. The expectations are read from the Access
+/// database with independent OLEDB queries (<see cref="AccessCensus"/>); no literal count is pinned.
+/// The derivation across several start releases (the deriver itself, at the latest release of each
+/// database) is covered by <c>DeriverAtTheLatestReleaseRealDataTests</c>.
 /// </summary>
 public abstract class TaxonomyPerStartReleaseDataTestsBase
 {
@@ -26,7 +30,11 @@ public abstract class TaxonomyPerStartReleaseDataTestsBase
 
     protected abstract string GeneratedDatabasePath { get; }
 
-    protected Dictionary<string, SortedSet<string>> Expected() => AccessCensus.EmittedModuleCodesByTaxonomy(Accdb, CutoffReleaseCode);
+    /// <summary>The module versions in force at the release, by taxonomy, whatever release their taxonomy belongs to.</summary>
+    protected Dictionary<string, SortedSet<string>> AtTheRelease() => AccessCensus.EmittedModuleCodesByTaxonomy(Accdb, CutoffReleaseCode);
+
+    /// <summary>What the FILE of the release holds: the taxonomies whose release is the file's (#73).</summary>
+    protected Dictionary<string, SortedSet<string>> Expected() => AccessCensus.OfRelease(AtTheRelease(), CutoffReleaseCode);
 
     private SqliteConnection OpenOutput()
     {
@@ -52,14 +60,20 @@ public abstract class TaxonomyPerStartReleaseDataTestsBase
     }
 
     [DataFact]
-    public void TheQueryIsNotDegenerate_AtLeastOneTaxonomyIsNotOnTheCutoffRelease_OrEveryModuleStartsAtIt()
+    public void TheFileOmitsTheTaxonomiesOfEarlierReleases_ThatAreStillInForceAtItsRelease()
     {
         // Positive control of the expectation itself: the query reads the START release of each module
-        // version. If it silently returned the cutoff release for every module (the previous rule),
-        // every expected code would end with the cutoff release; the data must show otherwise.
-        var expected = Expected();
-        Assert.NotEmpty(expected);
-        Assert.Contains(expected.Keys, k => !k.EndsWith(" " + CutoffReleaseCode, StringComparison.Ordinal));
+        // version, and this database has module versions that started before the release and are still
+        // in force at it (if every module started at the release there would be nothing to omit and the
+        // restriction of the file to its own release would not be exercised).
+        var atTheRelease = AtTheRelease();
+        var earlier = atTheRelease.Keys.Where(k => !k.EndsWith(" " + CutoffReleaseCode, StringComparison.Ordinal)).ToList();
+        Assert.NotEmpty(Expected());
+        Assert.NotEmpty(earlier);
+
+        var inTheFile = Rows("SELECT TaxonomyCode FROM mTaxonomy", 1).Select(r => r[0]).ToHashSet(StringComparer.Ordinal);
+        Assert.All(earlier, k => Assert.DoesNotContain(k, inTheFile));
+        Assert.All(inTheFile, k => Assert.EndsWith(" " + CutoffReleaseCode, k, StringComparison.Ordinal));
     }
 
     [DataFact]

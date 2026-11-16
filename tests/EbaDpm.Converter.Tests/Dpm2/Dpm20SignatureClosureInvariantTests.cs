@@ -21,7 +21,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// It is LITERALLY the same check as
 /// <see cref="AxesAndCells.SignatureStructuralTests.CellDps_IsExactlyTheInheritedCompositionOfOrdinateCategorisationDps"/>
 /// does for DPM 1.0, applied here to the DPM 2.0 source: both sources end in the SAME signature
-/// algorithm, so the check has to be the same, only over the complete <c>--all</c> conversion of
+/// algorithm, so the check has to be the same, only over the complete <c>--release 4.2</c> conversion of
 /// <see cref="Dpm20SkeletonFixture"/> instead of the eight-taxonomy subset of
 /// <see cref="AxesAndCells.AxisAndCellFixture"/>.
 ///
@@ -206,7 +206,7 @@ public sealed class Dpm20SignatureClosureInvariantTests(Dpm20SkeletonFixture fix
             }
         }
 
-        // The census is neither pinned to a number (it breaks with --all) nor loosened to a
+        // The census is neither pinned to a number (it changes with the release) nor loosened to a
         // threshold (a threshold does not catch thousands of cells being lost along the way -- e.g.
         // "has no mCellPosition" subtracting from `compared` without anyone noticing). It is
         // DERIVED, over the same database, from the same condition used by the SELECT of `cellRows`

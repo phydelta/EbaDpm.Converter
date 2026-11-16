@@ -6,6 +6,43 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: one SQLite file per release for DPM 2.0 sources.** Each file is the snapshot of one
+  EBA release R and carries only the module versions published in R, read as of R. Without the
+  new `--release <code>` option, `--output` is a directory and one file `dpm-<release>.db` is
+  written for every release that publishes a module version; releases without one are skipped.
+  `--cutoff-release` is removed, and `--all`, `--taxonomies`, `--taxonomykeys` and `--releases`
+  now apply to DPM 1.0 sources only. `--list-taxonomies` groups DPM 2.0 taxonomies by release.
+  DPM 1.0 conversions are unchanged. (#73, #74)
+- **DPM 2.0 output.** The dictionary is read as of the release of the file: members, dimensions,
+  domains, domain unions, hierarchies and hierarchy versions that start after it are no longer
+  exported, and `mRelease` stops at that release. The history up to it is kept (`FGT` and
+  `old-FGT`). (#73)
+- **DPM 2.0 output.** A header that points to an older version of a sub-category no longer gets
+  the members of a newer one: in each release file the version of every header is the one current
+  in that release (0 differences on the 4.4 database, against 68 headers when the 4.3 conversion
+  read every module version as of 4.3). (#62)
+
+- **DPM 2.0 output.** A metric declared on the table version (`TableVersion.PropertyID`) when no
+  header declares one is now part of the categorisation and the signatures (`C_96.05.2`, releases
+  3.5 to 4.2, which no earlier output contained).
+- **Validation.** `A-SEN-04` (the DPM 1.0 source sentinel `999`) applies only to DPM 1.0 outputs,
+  and for DPM 2.0 `A-VAC-01.mDomainUnion` is an informative census: the files of releases before
+  4.0 have no domain unions. `A-OCA-10` has four known exceptions (tables of the `pillar3 3.4` and
+  `pillar3 4.0` taxonomies that declare one dimension on several axes), and `I-SIG-07` one
+  (`C_96.05.2` in `corep 3.5`, whose metric starts in the source only in 4.0). Both checks now
+  consume known exceptions, keyed by taxonomy and table; these exceptions describe the DPM 2.0
+  source and apply to DPM 2.0 outputs only.
+- **CLI.** With `--release`, an `--output` that is an existing directory is an argument error
+  instead of an unhandled exception.
+
+### Added
+
+- **DPM 2.0 output.** The DORA framework is exported like any other framework: its taxonomies,
+  modules, tables and table groups (in the 4.4 database, `DORA` 1.2.0 with 15 tables in the 4.2
+  file). Document modules stay excluded. (#75)
+
 ## 2.0.0 - 2026-10-28
 
 ### Added

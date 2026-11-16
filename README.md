@@ -37,8 +37,9 @@ on any other SQLite edition existing.
 - **Two source models, one command.** DPM 1.0 and DPM 2.0 Access databases are detected from the
   catalog (never from data) and routed to separate conversion pipelines that write the same
   target schema.
-- **Taxonomy selection.** Convert everything, or select by taxonomy code, taxonomy key or DPM
-  release.
+- **One file per release (DPM 2.0).** A DPM 2.0 database is converted into one SQLite file per
+  EBA release, or into the file of a single release with `--release`. DPM 1.0 databases are
+  converted into one file, selecting by taxonomy code, taxonomy key or DPM release.
 - **Exact target schema.** The output is created from an embedded DDL
   ([`dpm-distribution-schema.sql`](src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql))
   and is structurally identical to the distribution schema.
@@ -97,27 +98,37 @@ machine (see [Requirements](#requirements)).
 ## Quick start
 
 ```powershell
-# 1. See which taxonomies the Access database contains
-EbaDpm.Converter --list-taxonomies --source "DPM2 Database_v 4_2.accdb"
+# 1. See which releases and taxonomies the Access database contains
+EbaDpm.Converter --list-taxonomies --source "DPM2 Database_v 4_4.accdb"
 
-# 2. Convert the whole database (the source model is detected automatically)
-EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output eba-4.2.db --all
+# 2. Convert a DPM 2.0 database: one file per release, in a directory...
+EbaDpm.Converter --source "DPM2 Database_v 4_4.accdb" --output eba
+#    ...or the file of one release
+EbaDpm.Converter --source "DPM2 Database_v 4_4.accdb" --output eba-4.4.db --release 4.4
 
-#    ...or only some taxonomies / releases
-EbaDpm.Converter --source "DPM2 Database_v 4_2.accdb" --output corep.db --taxonomies "corep 4.2,if 4.2"
+#    A DPM 1.0 database is converted into one file, with a selector
 EbaDpm.Converter --source "DPM 1.0 Database_v4_1.accdb" --output out.db --releases 4.0,4.1
 
 # 3. Validate the output (internal invariants; no external input needed)
-EbaDpm.Converter --validate eba-4.2.db
+EbaDpm.Converter --validate eba-4.4.db
 
 # 4. Optionally build a layout repository from the EBA Annotated Table Layouts
 #    and validate against it as well
-EbaDpm.Converter --extract-layouts "4.2 table layouts" --out layouts-4.2.db --dictionary eba-4.2.db
-EbaDpm.Converter --validate eba-4.2.db --layouts layouts-4.2.db --report validation.json
+EbaDpm.Converter --extract-layouts "4.4 table layouts" --out layouts-4.4.db --dictionary eba-4.4.db
+EbaDpm.Converter --validate eba-4.4.db --layouts layouts-4.4.db --report validation.json
 ```
 
-Exactly one taxonomy selector is required for a conversion: `--all`, `--taxonomies`,
-`--taxonomykeys` or `--releases`. See [docs/usage.md](docs/usage.md) for every option and exit code.
+The source model is detected automatically. A DPM 1.0 conversion needs exactly one taxonomy
+selector (`--all`, `--taxonomies`, `--taxonomykeys` or `--releases`); a DPM 2.0 conversion takes
+only the optional `--release`. See [docs/usage.md](docs/usage.md) for every option and exit code.
+
+> **What a DPM 2.0 export contains.** Each SQLite file is one EBA release: the dictionary,
+> hierarchies and table layouts as of that release, and only the module versions first published
+> in it. A module that did not change in a release stays in the file of the release that published
+> it (in the 4.4 database, COREP is in the 4.2 file). Without `--release`, one file is written per
+> release; releases with no new module versions are skipped. Later Access databases correct
+> earlier data, so the file of a release can differ slightly depending on the database it is
+> produced from.
 
 ## Validation overview
 

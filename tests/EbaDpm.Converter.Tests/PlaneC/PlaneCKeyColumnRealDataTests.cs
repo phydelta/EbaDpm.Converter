@@ -112,7 +112,7 @@ public sealed class PlaneCKeyColumnRealDataTests(Dpm20SkeletonFixture fixture)
     }
 
     /// <summary>Surface property (not the exact figure): C-KEY-01 excludes a positive number of
-    /// signatures, in more than one table (the figures are pinned to <see cref="ReleasePins.Layouts42"/>).</summary>
+    /// signatures, in more than one table (the figures are pinned to <see cref="ReleasePins.Layouts42AfterDora"/>).</summary>
     [DataFact]
     public void CKey01_OnTheRealDpm2042Corpus_ExcludesAPositiveSetInSeveralTables()
     {
@@ -120,9 +120,11 @@ public sealed class PlaneCKeyColumnRealDataTests(Dpm20SkeletonFixture fixture)
 
         var cKey01 = Assert.Single(result.Report.Checks, c => c.Id == "C-KEY-01");
 
-        ReleasePins.AssertPinned(ReleasePins.Layouts42, "C-KEY-01 key columns excluded", 22, cKey01.Examined);
+        // 22 before #75; 24 since DORA is emitted (re-measured 2026-11-16).
+        ReleasePins.AssertPinned(ReleasePins.Layouts42AfterDora, "C-KEY-01 key columns excluded", 24, cKey01.Examined);
         var tablesNamed = cKey01.Samples.Select(s => s.BusinessKey.Split(' ')[0]).Distinct().ToList();
-        ReleasePins.AssertPinned(ReleasePins.Layouts42, "C-KEY-01 distinct tables named in the samples", 16, tablesNamed.Count);
+        // 16 before #75; 17 since DORA is emitted (re-measured 2026-11-16).
+        ReleasePins.AssertPinned(ReleasePins.Layouts42AfterDora, "C-KEY-01 distinct tables named in the samples", 17, tablesNamed.Count);
 
         // The exclusion reduces SignaturesCompared of C-DPS-01/C-COB-01 by exactly the same amount
         // it excludes -- it must not appear duplicated or lost in the coverage.

@@ -7,7 +7,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <summary>
 /// <c>mHierarchyNode</c> -- the <c>SubCategoryItem</c> tree of the EFFECTIVE version of each
 /// subcategory. It reuses <see cref="Dpm20SkeletonFixture"/> (collection <c>Dpm2Skeleton</c>): the
-/// same <c>--all</c> conversion already loads <c>mHierarchyNode</c>
+/// same <c>--release 4.2</c> conversion already loads <c>mHierarchyNode</c>
 /// (<see cref="EbaDpm.Converter.Core.Mapping.Dpm20.Dpm20HierarchyNodeLoader"/> runs without a
 /// separate flag).
 ///

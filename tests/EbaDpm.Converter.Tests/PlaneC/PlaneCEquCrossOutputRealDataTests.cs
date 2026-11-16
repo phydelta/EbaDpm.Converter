@@ -11,8 +11,8 @@ namespace EbaDpm.Converter.Tests.PlaneC;
 /// The <c>C-EQU-01</c> counterpart of <see cref="PlaneCCrossOutputDpm10Tests"/> -- the other two
 /// of the three real <c>--all</c> conversions the suite maintains, DPM 1.0
 /// (<see cref="AllFixture.ValidatedDatabasePath"/>) and DPM 2.0 4.3
-/// (<see cref="Dpm2043ValidateFixture"/>), against the ONLY layout repository available in
-/// <c>Data/</c> (4.2).
+/// (<see cref="Dpm2043ValidateFixture"/>: its 4.3 file and its 4.2 file), against the ONLY layout repository
+/// available in <c>Data/</c> (4.2).
 ///
 /// <c>C-EQU-01</c> resolves each TERM only if its <c>TableCode</c> matches the release of the sheet
 /// the rule came from (<c>PlaneCReleaseMatcher</c>, the same mechanism <c>PlaneCComparer</c> uses).
@@ -74,32 +74,45 @@ public sealed class PlaneCEquCrossOutputDpm10Tests(AllFixture fixture)
 public sealed class PlaneCEquCrossOutputDpm2043Tests(Dpm2043ValidateFixture fixture)
 {
     /// <summary>
-    /// 4.3 as a LIVE CORPUS -- a publication DIFFERENT from the one the layouts came from (4.2),
-    /// and a second INDEPENDENT measurement of the whole plane C machinery. It comes out green
-    /// because rules were genuinely evaluated, with 0 divergent -- the exact figure (pinned to the
-    /// 4.3 database at its natural cutoff, measured against the 4.2 layouts), not a threshold. If
-    /// the pin stops holding it is a FINDING.
+    /// A SECOND INDEPENDENT corpus for the plane C machinery: the 4.3 database converted at release 4.2
+    /// (<see cref="Dpm2043ValidateFixture.Generated42DatabasePath"/>, the database as of 4.2, not the
+    /// 4.2.1 database) against the 4.2 layouts. Since #73 the 4.3 file holds only the taxonomies that start in
+    /// 4.3 and no table of the 4.2 layouts pairs with them, so the check is exercised on the file of the
+    /// release the layouts were published for. It comes out green because rules were genuinely evaluated
+    /// (exact pinned figure, not a threshold), with 0 divergent. If the pin stops holding it is a FINDING.
     /// </summary>
     [DataFact]
-    public void CEqu01_OnTheDpm2043OutputAgainstThe42Layouts_CheckableRulesMatchThePinAndZeroDivergent()
+    public void CEqu01_OnTheDpm20Release42FileOfThe43Database_CheckableRulesMatchThePinAndZeroDivergent()
     {
-        var result = ValidatorRunCache.Run(fixture.GeneratedDatabasePath, referencePath: null, PlaneCLayoutRepositoryHolder.LayoutsDatabasePath);
+        var result = ValidatorRunCache.Run(fixture.Generated42DatabasePath, referencePath: null, PlaneCLayoutRepositoryHolder.LayoutsDatabasePath);
 
         var cEqu01 = Assert.Single(result.Report.Checks, c => c.Id == "C-EQU-01");
         var cEqu02 = Assert.Single(result.Report.Checks, c => c.Id == "C-EQU-02");
         var diag = $"Status={cEqu01.Status} Examined={cEqu01.Examined} Failed={cEqu01.Failed} Cov={cEqu02.Statement} " +
                    $"Samples=[{string.Join(" || ", cEqu01.Samples.Select(s => s.BusinessKey))}]";
 
-        // Pin dated 2026-10-27: 4610 checkable rules = 4780 (before #66, taxonomy per module start
-        // release) - 270 (correct: rules whose tables no longer pair) + 100 (correct: newly pairing
-        // rules). The intermediate value after #66 was 4499 because 111 rules of the FINREP9DP 4.2.1
-        // layout fell into "ambiguous cell" (a code lived in both finrep 4.2 and finrep 4.2.1); with
-        // exact pairings winning over the REL.n -> REL tolerance
-        // (PlaneCReleaseMatcher.SelectTableIds) the 111 are recovered: 4499 + 111 = 4610.
         ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Natural43, "C-EQU-01 checkable rules (4.3 output against the 4.2 layouts)", 4610, cEqu01.Examined);
+            ReleasePins.Dpm20Cutoff42Of43Database, "C-EQU-01 checkable rules (4.2 file of the 4.3 database against the 4.2 layouts)", 4960, cEqu01.Examined);
         Assert.True(cEqu01.Failed == 0, diag);
         Assert.NotEqual("skipped", cEqu01.Status);
+    }
+
+    /// <summary>
+    /// The 4.3 file (taxonomies starting in 4.3) against the 4.2 layouts, a publication DIFFERENT from the one the
+    /// layouts came from: the check must never fail. Its tables pair with no 4.2 sheet, so it has nothing to
+    /// evaluate and comes out skipped with the reason written; the positive control that the check CAN
+    /// evaluate rules is the 4.2 file test above.
+    /// </summary>
+    [DataFact]
+    public void CEqu01_OnTheDpm2043File_AgainstThe42Layouts_NeverFails()
+    {
+        var result = ValidatorRunCache.Run(fixture.GeneratedDatabasePath, referencePath: null, PlaneCLayoutRepositoryHolder.LayoutsDatabasePath);
+
+        var cEqu01 = Assert.Single(result.Report.Checks, c => c.Id == "C-EQU-01");
+        Assert.True(
+            cEqu01.Failed == 0,
+            $"C-EQU-01 on the 4.3 file: Status={cEqu01.Status} Examined={cEqu01.Examined} Failed={cEqu01.Failed} Samples=[{string.Join(" || ", cEqu01.Samples.Select(s => s.BusinessKey))}]");
+        Assert.NotEqual("fail", cEqu01.Status);
     }
 
     [DataFact]

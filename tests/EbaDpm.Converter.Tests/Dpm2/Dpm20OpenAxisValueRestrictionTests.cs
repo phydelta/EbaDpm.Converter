@@ -7,7 +7,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 
 /// <summary>
 /// Verification of <c>mOpenAxisValueRestriction</c> and of the signature bracket. It reuses
-/// <see cref="Dpm20SkeletonFixture"/> (collection <c>Dpm2Skeleton</c>): the same <c>--all</c>
+/// <see cref="Dpm20SkeletonFixture"/> (collection <c>Dpm2Skeleton</c>): the same <c>--release 4.2</c>
 /// conversion always runs <c>Dpm20AxisAndCellLoader.Load</c>, so the large DPM 2.0 Access database does
 /// not need to be re-read.
 ///
@@ -132,9 +132,18 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
     {
         RepoPaths.EnsureReferenceDatabaseExists();
 
-        var generatedKeys = RestrictionKeys(fixture.GeneratedConnection);
         using var referenceConnection = OpenReadOnly(RepoPaths.ReferenceDatabasePath);
-        var referenceKeys = RestrictionKeys(referenceConnection);
+
+        // Named known exception (#75), stale-checked: the tables of taxonomy 'dora 4.2' (derived from the generated
+        // mTaxonomyTable) are in the generated file and absent from the reference export.
+        DoraAbsentFromReference42.AssertStale(fixture.GeneratedConnection, referenceConnection);
+        var doraTables = DoraAbsentFromReference42.AssertStaleTables(fixture.GeneratedConnection, referenceConnection);
+        var allGeneratedKeys = RestrictionKeys(fixture.GeneratedConnection, excludeDora: false);
+        var generatedKeys = RestrictionKeys(fixture.GeneratedConnection, excludeDora: true);
+        Assert.True(
+            allGeneratedKeys.Count > generatedKeys.Count && allGeneratedKeys.Except(generatedKeys).All(k => doraTables.Contains(k.TableCode)),
+            $"The exception must exclude only restriction keys of the tables of '{DoraAbsentFromReference42.TaxonomyCode}' ({DoraAbsentFromReference42.Reason}), and at least one.");
+        var referenceKeys = RestrictionKeys(referenceConnection, excludeDora: false);
 
         ReleasePins.AssertPinned(
             ReleasePins.Reference42,
@@ -159,8 +168,9 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
             + string.Join(" | ", onlyInGenerated.Take(20)));
     }
 
-    private static HashSet<(string TableCode, string AxisCode, string HierarchyCode)> RestrictionKeys(SqliteConnection connection)
+    private static HashSet<(string TableCode, string AxisCode, string HierarchyCode)> RestrictionKeys(SqliteConnection connection, bool excludeDora)
     {
+        var exclusion = excludeDora ? $"WHERE t.\"TableID\" NOT IN ({DoraAbsentFromReference42.DoraTableIdsSql})" : string.Empty;
         return QueryHelpers.Rows(
                 connection,
                 """
@@ -170,7 +180,7 @@ public sealed class Dpm20OpenAxisValueRestrictionTests(Dpm20SkeletonFixture fixt
                 JOIN "mTableAxis" ta ON ta."AxisID" = a."AxisID"
                 JOIN "mTable" t ON t."TableID" = ta."TableID"
                 JOIN "mHierarchy" h ON h."HierarchyID" = r."HierarchyID"
-                """,
+                """ + " " + exclusion,
                 3)
             .Select(row => (TableCode: row[0]!, AxisCode: row[1]!, HierarchyCode: row[2]!))
             .ToHashSet();

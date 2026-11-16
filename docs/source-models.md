@@ -98,12 +98,16 @@ The `ReleaseID` numbering is not stable between publications (release 4.3 uses I
 `1010000xxx` range while 4.2 used 1–5), so the converter never relies on ID ranges or positions —
 only on the maximum ID and on `Release.Code`.
 
-A later publication can be converted as of an earlier release with `--cutoff-release <code>`
-(for example `--cutoff-release 4.2` on the 4.2.1 database), which selects the release by
-`Release.Code`. On `DPM2 Database_v 4_2_1.accdb`, the rows in force at 4.2 are the same in
-number as in `DPM2 Database_v 4_2_20251125.accdb` (53 module versions, 929 table versions,
-19843 header versions, 117993 variable versions; measured 2026-10-08), while 3 table versions
-end at 4.2.1. The 2025-11-25 edition is no longer published by the EBA.
+A later publication reproduces its earlier releases: every release it contains can be converted
+from it (see [The release of a file](#the-release-of-a-file-dpm-20)). On
+`DPM2 Database_v 4_2_1.accdb`, the rows in force at 4.2 are the same in number as in
+`DPM2 Database_v 4_2_20251125.accdb` (53 module versions, 929 table versions, 19843 header
+versions, 117993 variable versions; measured 2026-10-08), while 3 table versions end at 4.2.1.
+The 2025-11-25 edition is no longer published by the EBA. Converting the 4.4 database as of 4.3
+gives the same structure as converting the 4.3 database (taxonomies, modules, tables, axes,
+ordinates, categorisations, cells and restrictions identical by business key; measured
+2026-11-16); the remaining differences are corrections the EBA made to earlier data in 4.4
+(labels, release status).
 
 ---
 
@@ -133,15 +137,17 @@ record it in `aDatabaseProperties` (`'Source model' = 'DPM 2.0'`). The validator
 to decide which rule set applies; DPM 1.0 outputs leave the row absent so their content is
 unchanged.
 
-## The cutoff release (DPM 2.0)
+## The release of a file (DPM 2.0)
 
-A DPM 2.0 database contains several releases at once, so every read of a versioned table is
-made **as of a single release**, the *cutoff release*.
+A DPM 2.0 database contains several releases at once. The converter writes **one file per
+release R**, and every read for that file is made **as of R**: the file holds the module versions
+published in R, with the structure and dictionary they had in R.
 
-**Derivation.** `Dpm20AccessReader.Open()` reads `[Release]` and takes the row with the highest
-`ReleaseID` (the reader also accepts an explicit `ReleaseID` through its constructor, used by
-tests). The CLI always logs the release it chose. In both published files the highest ID is also
-the most recent release.
+**Choosing R.** `Dpm20AccessReader` takes the release to read as of through its constructor
+(by `Release.Code`, or by `ReleaseID` in tests); without one it uses the row of `[Release]` with
+the highest `ReleaseID`, which in every published file is also the most recent release. Internally
+the reader calls R the *cutoff*. The CLI converts every release that publishes at least one
+module version, or the one given with `--release`, and logs each release it writes or skips.
 
 **Validity predicate.** A versioned row is current at release `R` when
 
@@ -153,51 +159,56 @@ StartReleaseID <= R  AND  (EndReleaseID IS NULL OR EndReleaseID > R)
 makes two versions of the same entity valid at the same time, which the model forbids; with the
 exclusive reading there are no such overlaps in any versioned table. The predicate is applied in
 SQL inside the reader, once per method, so no versioned row reaches the mapping layer unfiltered.
-The one deliberate exception is the `ModuleVersion` history described below, filtered by
-`StartReleaseID <= R` only.
+The deliberate exceptions are the dictionary and the `ModuleVersion` history described below,
+filtered by `StartReleaseID <= R` only.
 
 **What is cut and what is not.**
 
-| Filtered at the cutoff | Not filtered (full history) |
+| Current at R | Started by R (history up to R) |
 |---|---|
-| `ModuleVersion`, `TableVersion`, `TableGroup`, `TableGroupComposition`, `SubCategoryVersion` (current version per sub-category) | The dictionary: `Category`, `ItemCategory`, `SuperCategoryComposition`, `SubCategory`, `PropertyCategory` |
+| `ModuleVersion`, `TableVersion`, `TableGroup`, `TableGroupComposition`, `SubCategoryVersion` (current version per sub-category) | The dictionary: `ItemCategory`, `SuperCategoryComposition`, `PropertyCategory`, `SubCategoryVersion` (for sub-categories with no current version), `Category` (by `CreatedRelease`), `SubCategory` (through its versions) |
 
 The dictionary is shared across taxonomies and the distribution format keeps renamed codes side
-by side (for example both `FGT` and `old-FGT`), so it is exported in full. `PropertyCategory`
-validity windows are still read, because the start release of each window becomes the release
-suffix of the dimension code (`eba_dim_4.0:…`).
+by side (for example both `FGT` and `old-FGT`), so it keeps its history up to R, but nothing that
+starts after R. `PropertyCategory` validity windows are still read, because the start release of
+each window becomes the release suffix of the dimension code (`eba_dim_4.0:…`). See
+[mapping-dpm2.md](mapping-dpm2.md#dictionary).
 
-`ModuleVersion` is also read a second time, as its history up to the cutoff
+`ModuleVersion` is also read a second time, as its history up to R
 (`StartReleaseID <= R`, without the end condition), to describe the derived taxonomies: the
 version, `FromDate` and `ToDate` of a taxonomy depend on the module versions published in earlier
 releases (see [mapping-dpm2.md](mapping-dpm2.md#mtaxonomy)). This history only feeds those
 columns; no superseded module version is emitted.
 
-**Taxonomies and the cutoff.** Each module version current at the cutoff belongs to the
-taxonomy `(framework, release in which that module version started)`, and only those taxonomies
-are derived. So a 4.3 database yields `corep 4.2` (COREP has not changed since 4.2) next to
-`tcb 4.3`, and no `corep 4.3`. This matches the EBA Annotated Table Layouts, which are published
-per module under the same framework and release. See [mapping-dpm2.md](mapping-dpm2.md#mtaxonomy).
+**Taxonomies and releases.** Each module version belongs to the taxonomy
+`(framework, release in which that module version started)`, and the file of R holds the module
+versions that start in R. So from a 4.3 database the 4.2 file holds `corep 4.2` (COREP has not
+changed since 4.2) and the 4.3 file holds `tcb 4.3`; there is no `corep 4.3`. This matches the
+EBA Annotated Table Layouts, which each release publishes for the modules published in it. See
+[mapping-dpm2.md](mapping-dpm2.md#mtaxonomy).
 
 ## DPM 1.0 and releases
 
-DPM 1.0 has no cutoff: one Access file contains every taxonomy published under the DPM 1.0
-model, each labelled with its `DpmPackageCode`. The user chooses what to export with
+DPM 1.0 is not versioned by release: one Access file contains every taxonomy published under the
+DPM 1.0 model, each labelled with its `DpmPackageCode`, and it is converted into one file. The user chooses what to export with
 `--taxonomies`, `--taxonomykeys`, `--releases` or `--all` (see [usage.md](usage.md)), and
 `mRelease` is built from the package calendar (see
 [mapping-dpm1.md](mapping-dpm1.md#mrelease)).
 
-## Selecting taxonomies
+## Selecting what to convert
 
-The same four mutually exclusive selectors work for both models; omitting all of them is an
-error that lists what is available.
+For a **DPM 2.0** source the unit is the release: `--release <code>` converts one release, and
+without it every release that publishes a module version is converted, one file each.
 
-| Flag | Matches | DPM 1.0 example | DPM 2.0 example |
-|---|---|---|---|
-| `--taxonomies` | `TaxonomyCode` | `COREP 3.2` | `corep 4.2` |
-| `--taxonomykeys` | `TaxonomyKey` | `corep/its-005-2020/2022-03-01` or `sbp/4.0` (the segment of `Module.XbrlSchemaRef` between `/fws/` and `/mod/`) | `corep/4.2` (framework in lower case + `/` + release) |
-| `--releases` | DPM package / release code | `3.2` | `4.2` |
-| `--all` | every taxonomy | | |
+For a **DPM 1.0** source four mutually exclusive selectors choose the taxonomies; omitting all of
+them is an error that lists what is available.
 
-`--list-taxonomies --source <file>` prints the detected model (and, for DPM 2.0, the cutoff
-release) followed by the available taxonomies and their keys.
+| Flag | Matches | DPM 1.0 example |
+|---|---|---|
+| `--taxonomies` | `TaxonomyCode` | `COREP 3.2` |
+| `--taxonomykeys` | `TaxonomyKey` | `corep/its-005-2020/2022-03-01` or `sbp/4.0` (the segment of `Module.XbrlSchemaRef` between `/fws/` and `/mod/`) |
+| `--releases` | DPM package / release code | `3.2` |
+| `--all` | every taxonomy | |
+
+`--list-taxonomies --source <file>` prints the detected model followed by the available
+taxonomies and their keys; for DPM 2.0 they are grouped by release. See [usage.md](usage.md).

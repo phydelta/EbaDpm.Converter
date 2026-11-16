@@ -29,29 +29,40 @@ public static class CliRunner
 
     private const string Usage =
         """
+        DPM 1.0 source:
         EbaDpm.Converter --source "<path.accdb>" --output "<path.db>"
                          (--taxonomies "..." | --taxonomykeys "..." | --releases "..." | --all)
-                         [--cutoff-release <code>] [--overwrite] [--report <path.json>] [--verbose]
+                         [--overwrite] [--report <path.json>] [--verbose]
 
-        EbaDpm.Converter --list-taxonomies --source "<path.accdb>" [--cutoff-release <code>]
+        DPM 2.0 source (one SQLite file per release):
+        EbaDpm.Converter --source "<path.accdb>" --output <path> [--release <code>]
+                         [--overwrite] [--report <path.json>] [--verbose]
+
+        EbaDpm.Converter --list-taxonomies --source "<path.accdb>" [--release <code>]
         EbaDpm.Converter --schema-only --output "<path.db>"
         EbaDpm.Converter --validate "<generated.db>" [--reference "<ref.db>"] [--layouts "<layouts-repository.db>"] [--report <path.json>]
         EbaDpm.Converter --extract-layouts "<directory>" --out "<repository.db>"
                          --dictionary "<dictionary.db>" [--overwrite]
         EbaDpm.Converter --help | -h | -? | /?
 
-        Taxonomy selectors (exactly ONE is required):
+        DPM 1.0 taxonomy selectors (exactly ONE is required; with a DPM 2.0 source they are an error):
           --taxonomies "COREP 3.2,IF 3.2"   by TaxonomyCode (the code, as stored in mTaxonomy.TaxonomyCode)
           --taxonomykeys "..."              by TaxonomyKey (a derived identifier, not a stored value)
                                              e.g.: corep/its-005-2020/2022-03-01 (up to 3.x), sbp/4.0 (from 4.0)
           --releases 4.0,4.1                by DpmPackageCode
-                                             DPM 2.0: the release a taxonomy's module versions start in (not the cutoff)
           --all                             all taxonomies
 
         --list-taxonomies shows both columns (TaxonomyKey and TaxonomyCode) in case you do not know what to type.
 
-        --cutoff-release <code>: DPM 2.0 sources only. Converts the database as of the release with that
-        Release.Code (e.g. 4.2). Without it, the cutoff is the latest release declared in the database.
+        DPM 2.0 sources: each SQLite file is the snapshot of ONE release and carries only the module
+        versions published in it (those whose ModuleVersion.StartReleaseID is that release).
+          --release <code>   converts only the release with that Release.Code (e.g. 4.3); --output is the
+                             file path. A release in which no exportable module version starts is an error.
+          (no --release)     --output is a DIRECTORY (created if missing); one file dpm-<release code>.db
+                             is written per release, in ReleaseID order. Releases in which no exportable
+                             module version starts are skipped. If any target file exists and --overwrite
+                             is absent, nothing is written.
+        --release is an error with a DPM 1.0 source.
 
         --validate: --reference is OPTIONAL. Without it, only plane A is run (internal invariants).
         With it, plane B is added (semantic diff against the reference SQLite database).
@@ -123,9 +134,9 @@ public static class CliRunner
 
         var recognized = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "--list-taxonomies", "--source", "--cutoff-release",
+            "--list-taxonomies", "--source", "--release",
         };
-        var unknown = FindUnknownTokens(args, recognized, optionsWithValue: ["--source", "--cutoff-release"]);
+        var unknown = FindUnknownTokens(args, recognized, optionsWithValue: ["--source", "--release"]);
         if (unknown.Count > 0)
         {
             stderr.WriteLine($"Error: unrecognized argument in --list-taxonomies mode: {unknown[0]}");
@@ -134,9 +145,9 @@ public static class CliRunner
             return ExitArgumentError;
         }
 
-        if (!TryGetCutoffRelease(args, out var cutoffReleaseCode, out var cutoffError))
+        if (!TryGetReleaseOption(args, out var releaseCode, out var releaseOptionError))
         {
-            stderr.WriteLine($"Error: {cutoffError}");
+            stderr.WriteLine($"Error: {releaseOptionError}");
             stderr.WriteLine();
             stderr.WriteLine(Usage);
             return ExitArgumentError;
@@ -149,9 +160,9 @@ public static class CliRunner
 
             if (sourceModel == DpmSourceModel.Dpm10)
             {
-                if (cutoffReleaseCode is not null)
+                if (releaseCode is not null)
                 {
-                    stderr.WriteLine($"Error: {CutoffReleaseDpm10Message}");
+                    stderr.WriteLine($"Error: {ReleaseDpm10Message}");
                     return ExitArgumentError;
                 }
 
@@ -160,7 +171,7 @@ public static class CliRunner
                 return RunListTaxonomiesDpm10(source, stdout);
             }
 
-            return RunListTaxonomiesDpm20(source, cutoffReleaseCode, stdout);
+            return RunListTaxonomiesDpm20(source, releaseCode, stdout, stderr);
         }
         catch (SourceModelDetectionException ex)
         {
@@ -209,66 +220,145 @@ public static class CliRunner
         return ExitOk;
     }
 
-    private const string CutoffReleaseDpm10Message = "--cutoff-release only applies to DPM 2.0 sources.";
+    private const string ReleaseDpm10Message = "--release only applies to DPM 2.0 sources.";
 
     /// <summary>
-    /// Reads the optional <c>--cutoff-release</c> value. Absent is fine (null); present without a
+    /// Reads the optional <c>--release</c> value. Absent is fine (null); present without a
     /// value is an error.
     /// </summary>
-    private static bool TryGetCutoffRelease(string[] args, out string? cutoffReleaseCode, out string error)
+    private static bool TryGetReleaseOption(string[] args, out string? releaseCode, out string error)
     {
-        cutoffReleaseCode = null;
+        releaseCode = null;
         error = string.Empty;
 
-        if (!HasFlag(args, "--cutoff-release"))
+        if (!HasFlag(args, "--release"))
         {
             return true;
         }
 
-        if (!TryGetOptionValue(args, "--cutoff-release", out var value, out error))
+        if (!TryGetOptionValue(args, "--release", out var value, out error))
         {
             return false;
         }
 
-        cutoffReleaseCode = value.Trim();
+        releaseCode = value.Trim();
         return true;
     }
 
-    private static string DescribeCutoff(Dpm20AccessReader reader)
-        => reader.CutoffReleaseRequested ? $"{reader.CutoffReleaseCode}, requested" : reader.CutoffReleaseCode;
-
-    private static int RunListTaxonomiesDpm20(string source, string? cutoffReleaseCode, TextWriter stdout)
+    /// <summary>
+    /// Reads the release catalog with a reader opened without a requested cutoff. The reader is
+    /// closed before returning, so that the per-release readers are the only open ones.
+    /// </summary>
+    private static IReadOnlyList<Dpm20ReleaseSummary> ReadReleaseCatalog(string source)
     {
-        using var reader = new Dpm20AccessReader(source, cutoffReleaseCode: cutoffReleaseCode);
+        using var reader = new Dpm20AccessReader(source);
         reader.Open();
+        return Dpm20ReleaseCatalog.Build(reader);
+    }
 
-        stdout.WriteLine($"Detected source model: DPM 2.0 (cutoff release {DescribeCutoff(reader)}).");
+    private static string DescribeAvailableReleases(IReadOnlyList<Dpm20ReleaseSummary> catalog)
+        => string.Join(
+            ", ",
+            catalog.Select(r => r.IsEmpty ? $"{r.Code} (no exportable module version)" : r.Code));
+
+    /// <summary>
+    /// Resolves an explicit <c>--release</c> against the catalog: an unknown code, or a release with
+    /// no exportable module version, is an error.
+    /// </summary>
+    private static bool TryResolveRelease(
+        IReadOnlyList<Dpm20ReleaseSummary> catalog, string releaseCode, out Dpm20ReleaseSummary release, out string error)
+    {
+        error = string.Empty;
+        release = catalog.FirstOrDefault(r => string.Equals(r.Code, releaseCode, StringComparison.Ordinal))!;
+        if (release is null)
+        {
+            error = $"unknown release '{releaseCode}'. Available releases: {DescribeAvailableReleases(catalog)}.";
+            return false;
+        }
+
+        if (release.IsEmpty)
+        {
+            error = $"release '{releaseCode}' has no exportable module version starting in it; nothing to convert.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string SkippedReleaseMessage(Dpm20ReleaseSummary release)
+        => $"Release {release.Code}: no exportable module version starts in it; skipped.";
+
+    private static int RunListTaxonomiesDpm20(string source, string? releaseCode, TextWriter stdout, TextWriter stderr)
+    {
+        var catalog = ReadReleaseCatalog(source);
+        stdout.WriteLine("Detected source model: DPM 2.0.");
         stdout.WriteLine();
 
-        var releases = reader.ReadReleases().ToList();
-        var frameworks = reader.ReadFrameworks().ToList();
-        var modules = reader.ReadModules().ToList();
-        var moduleVersions = reader.ReadModuleVersions().ToList();
-        var compositions = reader.ReadModuleVersionCompositions().ToList();
-        var tableVersions = reader.ReadTableVersions().ToList();
+        IReadOnlyList<Dpm20ReleaseSummary> selected = catalog;
+        if (releaseCode is not null)
+        {
+            if (!TryResolveRelease(catalog, releaseCode, out var requested, out var error))
+            {
+                stderr.WriteLine($"Error: {error}");
+                return ExitArgumentError;
+            }
+
+            selected = [requested];
+        }
+
+        var total = 0;
+        foreach (var release in selected)
+        {
+            if (releaseCode is null)
+            {
+                stdout.WriteLine($"Release {release.Code} ({release.ExportableModuleVersions} exportable module versions)");
+                if (release.IsEmpty)
+                {
+                    stdout.WriteLine(SkippedReleaseMessage(release));
+                    stdout.WriteLine();
+                    continue;
+                }
+            }
+
+            total += ListReleaseTaxonomies(source, release, stdout);
+            stdout.WriteLine();
+        }
+
+        stdout.WriteLine($"Total: {total} taxonomies.");
+        return ExitOk;
+    }
+
+    /// <summary>Lists the taxonomies derived at the cutoff of one release; returns their count.</summary>
+    private static int ListReleaseTaxonomies(string source, Dpm20ReleaseSummary release, TextWriter stdout)
+    {
+        using var reader = new Dpm20AccessReader(source, cutoffReleaseCode: release.Code);
+        reader.Open();
 
         var derivation = Dpm20TaxonomyDeriver.Derive(
-            releases, frameworks, modules, moduleVersions, compositions, tableVersions, reader.CutoffReleaseId);
+            reader.ReadReleases().ToList(),
+            reader.ReadFrameworks().ToList(),
+            reader.ReadModules().ToList(),
+            reader.ReadModuleVersions().ToList(),
+            reader.ReadModuleVersionCompositions().ToList(),
+            reader.ReadTableVersions().ToList(),
+            reader.CutoffReleaseId);
 
         var tableCounts = derivation.TableCounts.ToDictionary(c => c.TaxonomyId, c => c.TableCount);
+        var taxonomies = derivation.Taxonomies
+            .Where(t => string.Equals(t.DpmPackageCode, release.Code, StringComparison.Ordinal))
+            .OrderBy(t => t.TaxonomyCode, StringComparer.Ordinal)
+            .ToList();
 
         // The DPM 2.0 taxonomy is derived; it carries no publication date.
         WriteTaxonomyTableHeader(stdout);
-        foreach (var taxonomy in derivation.Taxonomies.OrderBy(t => t.TaxonomyCode, StringComparer.Ordinal))
+        foreach (var taxonomy in taxonomies)
         {
             var tableCount = tableCounts.GetValueOrDefault(taxonomy.TaxonomyId);
             var taxonomyKey = derivation.TaxonomyKeyByTaxonomyId.GetValueOrDefault(taxonomy.TaxonomyId, "-");
             WriteTaxonomyRow(stdout, taxonomyKey, taxonomy.TaxonomyCode, taxonomy.DpmPackageCode, "-", tableCount);
         }
 
-        stdout.WriteLine();
-        stdout.WriteLine($"Total: {derivation.Taxonomies.Count} taxonomies.");
-        return ExitOk;
+        return taxonomies.Count;
     }
 
     private static void WriteTaxonomyTableHeader(TextWriter stdout)
@@ -283,9 +373,9 @@ public static class CliRunner
         var recognized = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--all", "--overwrite", "--report", "--verbose",
-            "--cutoff-release",
+            "--release",
         };
-        var optionsWithValue = new[] { "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--report", "--cutoff-release" };
+        var optionsWithValue = new[] { "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--report", "--release" };
         var unknown = FindUnknownTokens(args, recognized, optionsWithValue);
         if (unknown.Count > 0)
         {
@@ -311,9 +401,9 @@ public static class CliRunner
             return ExitArgumentError;
         }
 
-        if (!TryGetCutoffRelease(args, out var cutoffReleaseCode, out var cutoffError))
+        if (!TryGetReleaseOption(args, out var releaseCode, out var releaseOptionError))
         {
-            stderr.WriteLine($"Error: {cutoffError}");
+            stderr.WriteLine($"Error: {releaseOptionError}");
             stderr.WriteLine();
             stderr.WriteLine(Usage);
             return ExitArgumentError;
@@ -345,13 +435,25 @@ public static class CliRunner
 
             if (sourceModel == DpmSourceModel.Dpm20)
             {
-                return RunConvertDpm20(
-                    source, output, overwrite, taxonomyCodes, taxonomyKeys, releaseCodes, all, cutoffReleaseCode, stdout, stderr);
+                var selectorOption = HasFlag(args, "--taxonomies") ? "--taxonomies"
+                    : HasFlag(args, "--taxonomykeys") ? "--taxonomykeys"
+                    : HasFlag(args, "--releases") ? "--releases"
+                    : all ? "--all"
+                    : null;
+                if (selectorOption is not null)
+                {
+                    stderr.WriteLine(
+                        $"Error: {selectorOption} does not apply to DPM 2.0 sources. "
+                        + "Use --release <code> for one release, or no selector for one file per release.");
+                    return ExitArgumentError;
+                }
+
+                return RunConvertDpm20(source, output, overwrite, releaseCode, stdout, stderr);
             }
 
-            if (cutoffReleaseCode is not null)
+            if (releaseCode is not null)
             {
-                stderr.WriteLine($"Error: {CutoffReleaseDpm10Message}");
+                stderr.WriteLine($"Error: {ReleaseDpm10Message}");
                 return ExitArgumentError;
             }
 
@@ -439,8 +541,88 @@ public static class CliRunner
     }
 
     /// <summary>
-    /// DPM 2.0 branch of <see cref="RunConvert"/>. Creates the schema and loads, in order, the
-    /// skeleton (<see cref="Dpm20SkeletonLoader"/>), the full dictionary
+    /// DPM 2.0 branch of <see cref="RunConvert"/>. With <paramref name="releaseCode"/>, converts that
+    /// release into the file <paramref name="output"/>; without it, <paramref name="output"/> is a
+    /// directory and one file <c>dpm-&lt;release code&gt;.db</c> is written per non-empty release.
+    /// </summary>
+    private static int RunConvertDpm20(
+        string source, string output, bool overwrite, string? releaseCode, TextWriter stdout, TextWriter stderr)
+    {
+        var catalog = ReadReleaseCatalog(source);
+
+        if (releaseCode is not null)
+        {
+            if (!TryResolveRelease(catalog, releaseCode, out var release, out var error))
+            {
+                stderr.WriteLine($"Error: {error}");
+                return ExitArgumentError;
+            }
+
+            if (Directory.Exists(output))
+            {
+                stderr.WriteLine($"Error: --output '{output}' is a directory; with --release it must be the path of the file to write.");
+                return ExitArgumentError;
+            }
+
+            return ConvertDpm20Release(source, release.Code, output, overwrite, stdout);
+        }
+
+        if (File.Exists(output))
+        {
+            stderr.WriteLine($"Error: --output '{output}' is a file; without --release it must be a directory.");
+            return ExitArgumentError;
+        }
+
+        var invalid = Path.GetInvalidFileNameChars();
+        var targets = new List<(Dpm20ReleaseSummary Release, string Path)>();
+        foreach (var release in catalog)
+        {
+            if (release.IsEmpty)
+            {
+                stdout.WriteLine(SkippedReleaseMessage(release));
+                continue;
+            }
+
+            var safeCode = new string(release.Code.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
+            targets.Add((release, Path.Join(output, $"dpm-{safeCode}.db")));
+        }
+
+        if (targets.Count == 0)
+        {
+            stderr.WriteLine("Error: no release has an exportable module version; nothing to convert.");
+            return ExitArgumentError;
+        }
+
+        var existing = targets.Where(t => File.Exists(t.Path)).Select(t => t.Path).ToList();
+        if (existing.Count > 0 && !overwrite)
+        {
+            stderr.WriteLine("Error: the following output files already exist (use --overwrite to replace them); nothing was written:");
+            foreach (var path in existing)
+            {
+                stderr.WriteLine($"  {path}");
+            }
+
+            return ExitArgumentError;
+        }
+
+        Directory.CreateDirectory(output);
+        foreach (var (release, path) in targets)
+        {
+            stdout.WriteLine();
+            stdout.WriteLine($"=== Release {release.Code} ({release.ExportableModuleVersions} exportable module versions) -> '{path}' ===");
+            var exit = ConvertDpm20Release(source, release.Code, path, overwrite, stdout);
+            if (exit != ExitOk)
+            {
+                return exit;
+            }
+        }
+
+        return ExitOk;
+    }
+
+    /// <summary>
+    /// Creates, loads and finalizes the SQLite snapshot of one DPM 2.0 release: the skeleton
+    /// (<see cref="Dpm20SkeletonLoader"/>), the full dictionary
     /// (<see cref="Dpm20DictionaryLoader"/>), the hierarchy tree
     /// (<see cref="Dpm20HierarchyNodeLoader"/>: <c>mHierarchyNode</c>), the structure
     /// (<see cref="Dpm20StructureLoader"/>), the axes/cells/signatures
@@ -448,26 +630,14 @@ public static class CliRunner
     /// <c>mModule</c>, <c>mConceptualModule</c>, <c>mModuleBusinessTemplate</c>) and, in a FINAL
     /// phase of its own after all the previous loaders, the concepts
     /// (<see cref="Dpm20ConceptLoader"/>: <c>mConcept</c>, <c>mConceptTranslation</c>).
+    /// The reader's cutoff is the release itself.
     /// </summary>
-    private static int RunConvertDpm20(
-        string source,
-        string output,
-        bool overwrite,
-        List<string>? taxonomyCodes,
-        List<string>? taxonomyKeys,
-        List<string>? releaseCodes,
-        bool all,
-        string? cutoffReleaseCode,
-        TextWriter stdout,
-        TextWriter stderr)
+    private static int ConvertDpm20Release(string source, string releaseCode, string output, bool overwrite, TextWriter stdout)
     {
-        using var accessReader = new Dpm20AccessReader(source, cutoffReleaseCode: cutoffReleaseCode);
+        using var accessReader = new Dpm20AccessReader(source, cutoffReleaseCode: releaseCode);
         accessReader.Open();
 
-        stdout.WriteLine(
-            accessReader.CutoffReleaseRequested
-                ? $"Cutoff release: {accessReader.CutoffReleaseCode} (requested)."
-                : $"Cutoff release: {accessReader.CutoffReleaseCode}.");
+        stdout.WriteLine($"Release: {accessReader.CutoffReleaseCode}.");
 
         var releases = accessReader.ReadReleases().ToList();
         var frameworks = accessReader.ReadFrameworks().ToList();
@@ -480,7 +650,7 @@ public static class CliRunner
         var derivation = Dpm20TaxonomyDeriver.Derive(
             releases, frameworks, modules, moduleVersions, compositions, tableVersions, accessReader.CutoffReleaseId);
 
-        var request = new TaxonomySelectionRequest(taxonomyCodes, taxonomyKeys, releaseCodes, all);
+        var request = new TaxonomySelectionRequest(null, null, [accessReader.CutoffReleaseCode], false);
         var selectedTaxonomies = TaxonomySelector.Resolve(derivation.Taxonomies, request, derivation.TaxonomyKeyByTaxonomyId);
 
         SchemaCreator.Create(output, overwrite);

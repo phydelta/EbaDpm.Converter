@@ -7,8 +7,9 @@ using Xunit.Abstractions;
 namespace EbaDpm.Converter.Tests.Dpm2;
 
 /// <summary>
-/// The 4.2.1 publication converted with its natural cutoff (no <c>--cutoff-release</c>): derived
-/// cutoff, full <c>--all</c> conversion, plane A and plane C against the 4.2 layouts.
+/// The 4.2.1 release of the 4.2.1 publication (<c>--release 4.2.1</c>, #73): the last release the
+/// database declares, which a reader opened without a requested cutoff also resolves; the one-release
+/// conversion, plane A and plane C against the 4.2 layouts.
 /// </summary>
 [Collection("Dpm2042_1ValidateSuite")]
 [Trait("Tier", "RealData")]
@@ -22,10 +23,10 @@ public sealed class Dpm2042_1NaturalCutoffTests(Dpm2042_1ValidateFixture fixture
     }
 
     [DataFact]
-    public void All_ExitsOk_AndTheLogShowsTheDerivedCutoffWithoutTheRequestedMarker()
+    public void Release421_ExitsOk_AndTheLogShowsTheRelease()
     {
         Assert.True(fixture.ExitCode == 0, $"exit={fixture.ExitCode}; stderr: {fixture.Stderr}");
-        Assert.Contains("Cutoff release: 4.2.1.", fixture.Stdout, StringComparison.Ordinal);
+        Assert.Contains("Release: 4.2.1.", fixture.Stdout, StringComparison.Ordinal);
         Assert.DoesNotContain("(requested)", fixture.Stdout, StringComparison.Ordinal);
     }
 
@@ -79,7 +80,10 @@ public sealed class Dpm2042_1NaturalCutoffTests(Dpm2042_1ValidateFixture fixture
         Assert.True(match.Success, $"C-COB-01 statement has an unexpected shape: {coverage.Statement}");
         var compared = long.Parse(match.Groups["compared"].Value, System.Globalization.CultureInfo.InvariantCulture);
         var contained = long.Parse(match.Groups["contained"].Value, System.Globalization.CultureInfo.InvariantCulture);
-        ReleasePins.AssertPinned(ReleasePins.Dpm20Natural421, $"C-COB-01 signatures compared ({diag})", 91182, compared);
+        // Re-measured 2026-11-16 (#73): the file holds the taxonomies of release 4.2.1 only, so the figure is
+        // no longer that of every taxonomy in force at 4.2.1 (91182). The property that matters stays
+        // asserted below: every compared signature is contained in the layouts.
+        ReleasePins.AssertPinned(ReleasePins.Dpm20Natural421, $"C-COB-01 signatures compared ({diag})", 14616, compared);
         Assert.Equal(compared, contained);
 
         // C-DPS-01 may be Skipped here (its census was measured on release 4.2, the cutoff is

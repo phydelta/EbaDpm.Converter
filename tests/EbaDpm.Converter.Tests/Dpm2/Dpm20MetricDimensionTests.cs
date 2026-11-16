@@ -10,7 +10,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <c>mMetric</c> and <c>mDimension</c>, the two tables that close the DPM 2.0 dictionary: in
 /// particular the naming law that decides the string type, and the fact that the property code is
 /// also versioned (window crossing). It reuses <see cref="Dpm20SkeletonFixture"/> (collection
-/// <c>Dpm2Skeleton</c>): the same <c>--all</c> conversion already loads the six dictionary tables,
+/// <c>Dpm2Skeleton</c>): the same <c>--release 4.2</c> conversion already loads the six dictionary tables,
 /// so the large DPM 2.0 Access database does not need to be re-read.
 ///
 /// The row counts of <c>mMetric</c> and <c>mDimension</c> are scoped pins

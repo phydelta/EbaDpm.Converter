@@ -17,8 +17,9 @@ namespace EbaDpm.Converter.Core.Validation.Checks;
 /// (<c>mRewriteURI</c>=4, <c>mTaxonomyPackage</c>=1, <c>aDatabaseProperties</c>=2) are written by
 /// <c>Dpm20SkeletonLoader</c> with LITERAL rows fixed in code: they do not derive from the Access,
 /// so their census IS a stable property of the pipeline, not a measurement of one publication,
-/// and they are still checked by exact census. <c>mDomainUnion</c> drops to "not empty": the only
-/// statement that survives the real variation of the data without pinning a number again.
+/// and they are still checked by exact census. <c>mDomainUnion</c> becomes an INFORMATIVE census:
+/// "not empty" was a measurement on 4.2/4.3, not a property of the format (no row starts before
+/// release 4.0), so it states the count and never fails.
 /// </summary>
 public static class EmptyTableChecks
 {
@@ -64,8 +65,8 @@ public static class EmptyTableChecks
                 $"SELECT COUNT(*) FROM \"{table}\"", expected);
         }
 
-        // mDomainUnion: 1:1 from the source, its census VARIES by release (102 in 4.2, 104 in 4.3).
-        // The property that survives is "not empty" in DPM 2.0, "empty" in DPM 1.0, not a number.
+        // mDomainUnion: 1:1 from the source, its census VARIES by release and is 0 in releases
+        // before 4.0. DPM 2.0: informative census; DPM 1.0: empty.
         yield return DomainUnionNotEmptyInDpm2(c, model);
     }
 
@@ -74,15 +75,16 @@ public static class EmptyTableChecks
         var countSql = "SELECT COUNT(*) FROM \"mDomainUnion\"";
         if (model == ValidationSourceModel.Dpm2)
         {
+            // Informative census: it comes 1:1 from SuperCategoryComposition, which has no row
+            // before release 4.0, so older releases legitimately have 0 rows. States the count,
+            // never fails.
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var count = SqlHelpers.Scalar(c, countSql);
             sw.Stop();
-            var failed = count > 0 ? 0 : 1;
-            var samples = failed == 0 ? [] : new List<CheckSample> { new($"mDomainUnion has {count} rows, expected >0") };
             return CheckResult.FromViolationCount(
-                "A-VAC-01.mDomainUnion", ValidationPlane.A, ValidationLayer.Critical, "mDomainUnion",
-                "mDomainUnion is NOT empty (populated by DPM 2.0; census NOT pinned: it varies by release, 102 in 4.2, 104 in 4.3)",
-                examined: 1, failed, sw.ElapsedMilliseconds, samples);
+                "A-VAC-01.mDomainUnion", ValidationPlane.A, ValidationLayer.Informative, "mDomainUnion",
+                "mDomainUnion census (DPM 2.0, 1:1 from the source domain-union relations; the count depends on the release and may legitimately be 0)",
+                examined: 1, failed: 0, sw.ElapsedMilliseconds, [new CheckSample($"mDomainUnion has {count} row(s)")]);
         }
 
         return SqlHelpers.ExactMatch(

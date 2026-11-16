@@ -122,8 +122,8 @@ internal static class AccessCensus
     /// <summary>
     /// The DPM 2.0 taxonomy rule (issue 66), derived straight from the source tables with OLEDB and
     /// without calling production code: the module versions in force at the cutoff release whose
-    /// module is not a document module and whose framework is not DORA are the EMITTED module
-    /// versions; the taxonomy of each one is (lower-case <c>Framework.Code</c>, <c>Release.Code</c>
+    /// module is not a document module (every framework, DORA included, is emitted since #75) are
+    /// the EMITTED module versions; the taxonomy of each one is (lower-case <c>Framework.Code</c>, <c>Release.Code</c>
     /// of its <c>StartReleaseID</c>). Returns, per taxonomy code (<c>"corep 4.2"</c>), the upper-case
     /// codes of its module versions.
     /// </summary>
@@ -136,7 +136,7 @@ internal static class AccessCensus
             + "FROM (([ModuleVersion] mv INNER JOIN [Module] m ON m.[ModuleID] = mv.[ModuleID]) "
             + "INNER JOIN [Framework] f ON f.[FrameworkID] = m.[FrameworkID]) "
             + "INNER JOIN [Release] r ON r.[ReleaseID] = mv.[StartReleaseID] "
-            + $"WHERE {inForce} AND m.[isDocumentModule] = 0 AND f.[Code] <> 'DORA'");
+            + $"WHERE {inForce} AND m.[isDocumentModule] = 0 ");
 
         var result = new Dictionary<string, SortedSet<string>>(StringComparer.Ordinal);
         foreach (var row in rows)
@@ -154,6 +154,17 @@ internal static class AccessCensus
 
         return result;
     }
+
+    /// <summary>
+    /// The taxonomies of a per-release file (#73): those whose release is <paramref name="releaseCode"/>,
+    /// that is, whose module versions start in it. A DPM 2.0 SQLite file of release R carries exactly
+    /// these taxonomies of the derivation read at cutoff R. The taxonomy code is
+    /// <c>"&lt;framework&gt; &lt;release code&gt;"</c>, so the release is its last word.
+    /// </summary>
+    public static Dictionary<string, T> OfRelease<T>(Dictionary<string, T> byTaxonomyCode, string releaseCode)
+        => byTaxonomyCode
+            .Where(kv => kv.Key.EndsWith(" " + releaseCode, StringComparison.Ordinal))
+            .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
 
     /// <summary>
     /// Second, independent derivation of the tables of each taxonomy (same grouping as
@@ -176,7 +187,7 @@ internal static class AccessCensus
             + "FROM (([ModuleVersion] mv INNER JOIN [Module] m ON m.[ModuleID] = mv.[ModuleID]) "
             + "INNER JOIN [Framework] f ON f.[FrameworkID] = m.[FrameworkID]) "
             + "INNER JOIN [Release] r ON r.[ReleaseID] = mv.[StartReleaseID] "
-            + $"WHERE {mvInForce} AND m.[isDocumentModule] = 0 AND f.[Code] <> 'DORA'"))
+            + $"WHERE {mvInForce} AND m.[isDocumentModule] = 0 "))
         {
             taxonomyByModuleVid[Convert.ToInt32(row[0], CultureInfo.InvariantCulture)] =
                 Convert.ToString(row[1], CultureInfo.InvariantCulture)!.ToLowerInvariant()
