@@ -9,8 +9,8 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <summary>
 /// Synthetic tests of <see cref="Dpm20ModuleLoader.Load"/> through
 /// <see cref="InMemoryModuleSource"/>: no Access, no data files. Rule under test:
-/// docs/mapping-dpm2.md, section "Modules" (<c>mModule</c>: current modules excluding DORA and
-/// document modules, <c>ModuleCode</c> in upper case; <c>mConceptualModule</c> mirrors it). The
+/// docs/mapping-dpm2.md, section "Modules" (<c>mModule</c>: current modules excluding
+/// document modules (DORA is emitted since #75), <c>ModuleCode</c> in upper case; <c>mConceptualModule</c> mirrors it). The
 /// <see cref="Dpm20StructureLoader.Result"/> is built by hand and empty: this test does not
 /// exercise <c>mModuleBusinessTemplate</c>.
 /// </summary>
@@ -38,7 +38,7 @@ public sealed class Dpm20ModuleLoaderSyntheticTests : IDisposable
     }
 
     [Fact]
-    public void Modules_ExcludeDoraAndDocumentModules_AndUpperCaseTheCode()
+    public void Modules_ExcludeDocumentModulesOnly_DoraIsEmitted_AndUpperCaseTheCode()
     {
         var source = new InMemoryModuleSource { CutoffReleaseCode = "R42" };
 
@@ -83,13 +83,15 @@ public sealed class Dpm20ModuleLoaderSyntheticTests : IDisposable
             source, connection, modules, moduleVersions, [], [], frameworks, releases, taxonomies, structure);
 
         Assert.Empty(result.UnresolvedCases);
-        Assert.Equal(1, result.ModuleRows);
-        Assert.Equal(1, result.ConceptualModuleRows);
+        Assert.Equal(2, result.ModuleRows);
+        Assert.Equal(2, result.ConceptualModuleRows);
 
         Assert.Empty(Query(connection, "SELECT \"table\" FROM pragma_foreign_key_check"));
-        Assert.Equal(["COREP_LR"], Query(connection, "SELECT ModuleCode FROM mModule ORDER BY ModuleCode"));
-        Assert.Equal(["COREP_LR"], Query(
+        // The DORA module is emitted like any other (#75); only the document module (P3_DOCS) is not.
+        Assert.Equal(["COREP_LR", "DORA_ICT"], Query(connection, "SELECT ModuleCode FROM mModule ORDER BY ModuleCode"));
+        Assert.Equal(["COREP_LR", "DORA_ICT"], Query(
             connection, "SELECT ConceptualModuleCode FROM mConceptualModule ORDER BY ConceptualModuleCode"));
+        Assert.DoesNotContain("P3_DOCS", Query(connection, "SELECT ModuleCode FROM mModule"));
     }
 
     /// <summary>

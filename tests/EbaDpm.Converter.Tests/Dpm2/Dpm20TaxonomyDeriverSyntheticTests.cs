@@ -6,13 +6,13 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <summary>
 /// Synthetic tests of <see cref="Dpm20TaxonomyDeriver"/> (issue 66, DPM 2.0 only): a module
 /// version hangs from the taxonomy (framework, <c>ModuleVersion.StartReleaseID</c>), not from the
-/// cutoff release; only the taxonomies of emitted module versions (current, not DORA, not a
-/// document module) exist; the tables of a taxonomy are the non-abstract compositions of its
+/// cutoff release; only the taxonomies of emitted module versions (current, not a
+/// document module; DORA is emitted since #75) exist; the tables of a taxonomy are the non-abstract compositions of its
 /// module versions plus the abstract closure. No Access, no data files.
 ///
 /// The world: cutoff release 3 (<c>4.2</c>); COREP has two modules, one that starts in 4.0 and one
 /// that starts in 4.2; FINREP one module starting in 4.2; SOLO one module starting in 4.0 only;
-/// DORA and a PILLAR3 document module start in 4.2; EMPTY has a module but no module version.
+/// DORA (emitted) and a PILLAR3 document module (not emitted) start in 4.2; EMPTY has a module but no module version.
 /// </summary>
 public sealed class Dpm20TaxonomyDeriverSyntheticTests
 {
@@ -66,7 +66,7 @@ public sealed class Dpm20TaxonomyDeriverSyntheticTests
         Table(201, "C_02.00", 2), // only corep_old
         Table(202, "C_03.00", 3), // only corep_new
         Table(203, "F_01.00", 4), // finrep_new
-        Table(204, "D_01.00", 5), // only DORA
+        Table(204, "D_01.00", 5), // only DORA (emitted since #75)
         Table(205, "P_DOC.00", 6), // only the document module
         Table(206, "C_09.00", 50, isAbstract: true), // abstract, declared by corep_new
         Table(207, "C_09.00.a", 51, abstractTableId: 50),
@@ -146,14 +146,17 @@ public sealed class Dpm20TaxonomyDeriverSyntheticTests
     }
 
     [Fact]
-    public void DocumentModulesAndDora_ProduceNoTaxonomy_AndTheirTablesAppearNowhere()
+    public void DocumentModulesProduceNoTaxonomy_ButDoraDoes_AndItsTablesAreInIt()
     {
         var result = Derive();
 
-        Assert.DoesNotContain(Codes(result), c => c.StartsWith("dora ", StringComparison.Ordinal));
+        // #75: DORA is not excluded any more; its module version yields the taxonomy "dora 4.2".
+        Assert.Contains("dora 4.2", Codes(result));
+        Assert.Equal(["D_01.00"], TableCodes(result, "dora 4.2"));
+        // A document module still yields no taxonomy and its table appears nowhere.
         Assert.DoesNotContain(Codes(result), c => c.StartsWith("pillar3 ", StringComparison.Ordinal));
         var allTables = result.TableVIdsByTaxonomyId.Values.SelectMany(v => v).ToHashSet();
-        Assert.DoesNotContain(204, allTables); // DORA only
+        Assert.Contains(204, allTables); // DORA only
         Assert.DoesNotContain(205, allTables); // document module only
     }
 
@@ -175,7 +178,7 @@ public sealed class Dpm20TaxonomyDeriverSyntheticTests
         // EMPTY has a [Module] row but no module version: no taxonomy.
         Assert.DoesNotContain(Codes(result), c => c.StartsWith("empty ", StringComparison.Ordinal));
         // The taxonomies are exactly the distinct (framework, start release) of the emitted module versions.
-        Assert.Equal(["corep 4.0", "corep 4.2", "finrep 4.2", "solo 4.0"], Codes(result));
+        Assert.Equal(["corep 4.0", "corep 4.2", "dora 4.2", "finrep 4.2", "solo 4.0"], Codes(result));
     }
 
     [Fact]
@@ -210,7 +213,7 @@ public sealed class Dpm20TaxonomyDeriverSyntheticTests
         Assert.Equal(
             first.Taxonomies.Select(t => (t.TaxonomyCode, t.TaxonomyId)),
             second.Taxonomies.Select(t => (t.TaxonomyCode, t.TaxonomyId)));
-        Assert.Equal([1, 2, 3, 4], first.Taxonomies.Select(t => t.TaxonomyId));
+        Assert.Equal([1, 2, 3, 4, 5], first.Taxonomies.Select(t => t.TaxonomyId));
 
         var corepOld = first.Taxonomies.Single(t => t.TaxonomyCode == "corep 4.0");
         Assert.Equal("4.0", corepOld.DpmPackageCode);

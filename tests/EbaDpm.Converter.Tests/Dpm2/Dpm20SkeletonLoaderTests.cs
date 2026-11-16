@@ -10,30 +10,44 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <summary>
 /// The DPM 2.0 skeleton (<c>Dpm20SkeletonLoader</c>), verified over the real <c>.db</c> generated
 /// by the CLI (<see cref="Dpm20SkeletonFixture"/>), exactly the path a user follows with
-/// <c>--all</c>. Figures and values column by column.
+/// <c>--release 4.2</c>. Figures and values column by column.
 /// </summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
 public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
 {
     // ------------------------------------------------------------------
-    // Counts, with --all
+    // Counts, with --release 4.2 (one file per release, #73)
     // ------------------------------------------------------------------
 
     [DataFact]
-    // The output lists the releases the database declares, the publication release (4.2.1) included.
-    public void MRelease_HasOneRowPerAccessRelease()
+    // #73: the file is the database as of release R, so mRelease holds the releases with ReleaseID <= R
+    // (the later publication release, 4.2.1, is absent).
+    public void MRelease_HasOneRowPerAccessReleaseUpToTheCutoff()
     {
-        var expected = AccessCensus.Count(RepoPaths.AccessDpm20DatabasePath, "Release");
+        var accdb = RepoPaths.AccessDpm20DatabasePath;
+        var cutoffId = AccessCensus.ReleaseId(accdb, RepoPaths.Cutoff42ReleaseCode);
+        var expected = AccessCensus.Scalar(accdb, $"SELECT COUNT(1) FROM [Release] WHERE [ReleaseID] <= {cutoffId}");
         var actual = CountRows("mRelease");
         Assert.True(
             expected == actual,
-            $"mRelease rows: expected {expected} (COUNT(1) of [Release] in '{RepoPaths.AccessDpm20DatabaseFileName}'), actual {actual}.");
+            $"mRelease rows: expected {expected} (COUNT(1) of [Release] with ReleaseID <= {cutoffId} in '{RepoPaths.AccessDpm20DatabaseFileName}'), actual {actual}.");
+
+        // The filter is exercised: the source declares releases after R, and none of them is written.
+        var later = AccessCensus.Scalar(accdb, $"SELECT COUNT(1) FROM [Release] WHERE [ReleaseID] > {cutoffId}");
+        Assert.True(later > 0, $"'{RepoPaths.AccessDpm20DatabaseFileName}' declares no release after {RepoPaths.Cutoff42ReleaseCode}: the cutoff filter is not exercised.");
+        var written = ReadStringColumn("SELECT ReleaseCode FROM mRelease").Where(c => c is not null).Select(c => c!).ToList();
+        foreach (var row in AccessCensus.Rows(accdb, $"SELECT [Code] FROM [Release] WHERE [ReleaseID] > {cutoffId}"))
+        {
+            Assert.DoesNotContain(Convert.ToString(row[0], CultureInfo.InvariantCulture)!, written);
+        }
     }
 
     /// <summary>Derived from Access: the distinct (lower-case framework, StartRelease.Code) of the emitted module versions.</summary>
     private static Dictionary<string, SortedSet<string>> ExpectedTaxonomies()
-        => AccessCensus.EmittedModuleCodesByTaxonomy(RepoPaths.AccessDpm20DatabasePath, RepoPaths.Cutoff42ReleaseCode);
+        => AccessCensus.OfRelease(
+            AccessCensus.EmittedModuleCodesByTaxonomy(RepoPaths.AccessDpm20DatabasePath, RepoPaths.Cutoff42ReleaseCode),
+            RepoPaths.Cutoff42ReleaseCode);
 
     [DataFact]
     public void MReportingFramework_RowCount_IsTheDistinctFrameworksOfTheDerivedTaxonomies()
@@ -97,7 +111,7 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Every <c>[Release]</c> row of the Access source (ReleaseID, Code, Status, Date) against the
+    /// Every <c>[Release]</c> row of the Access source with <c>ReleaseID &lt;= R</c> (ReleaseID, Code, Status, Date) against the
     /// <c>mRelease</c> row with the same <c>ReleaseID</c> (ReleaseCode, Status, PublicationDate,
     /// IsCurrent). <c>PublicationDate</c> is compared as an exact STRING, never as a parsed
     /// <see cref="DateTime"/> on the output side: a roundtrip through <c>DateTime</c> would bring in
@@ -110,7 +124,9 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     public void MRelease_MatchesAccessReleases_ColumnByColumn()
     {
         var accessRows = AccessCensus.Rows(
-            RepoPaths.AccessDpm20DatabasePath, "SELECT [ReleaseID], [Code], [Status], [Date] FROM [Release]");
+            RepoPaths.AccessDpm20DatabasePath,
+            "SELECT [ReleaseID], [Code], [Status], [Date] FROM [Release] "
+            + $"WHERE [ReleaseID] <= {AccessCensus.ReleaseId(RepoPaths.AccessDpm20DatabasePath, RepoPaths.Cutoff42ReleaseCode)}");
         Assert.True(accessRows.Count > 0, $"[Release] of '{RepoPaths.AccessDpm20DatabaseFileName}' returned no rows: nothing to compare.");
 
         var problems = new List<string>();
@@ -159,7 +175,7 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
 
         Assert.True(
             problems.Count == 0,
-            $"mRelease differs from [Release] in '{RepoPaths.AccessDpm20DatabaseFileName}' (cutoff {RepoPaths.Cutoff42ReleaseCode}): "
+            $"mRelease differs from [Release] in '{RepoPaths.AccessDpm20DatabaseFileName}' (release {RepoPaths.Cutoff42ReleaseCode}): "
             + string.Join(" | ", problems));
     }
 
@@ -282,6 +298,10 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
         ReleasePins.AssertPinned(
             ReleasePins.Reference42, "reference mTaxonomy codes", ReleasePins.Reference42MTaxonomyRows, referenceCodes.Count);
 
+        // Named known exception (#75), stale-checked: 'dora 4.2' is emitted and the reference has no DORA.
+        DoraAbsentFromReference42.AssertTaxonomyStale(generatedCodes, referenceCodes);
+        generatedCodes.Remove(DoraAbsentFromReference42.TaxonomyCode);
+
         var onlyGenerated = generatedCodes.Except(referenceCodes).ToList();
         Assert.True(
             onlyGenerated.Count == 0,
@@ -308,9 +328,9 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
 
     /// <summary>
     /// <c>mReportingFramework</c>: <c>FrameworkCode</c> and <c>FrameworkLabel</c> identical to those
-    /// of the reference, every framework -- CRITICAL layer (dictionary by code). The two that drop
-    /// out of the source are <c>DORA</c> and <c>FINREPCOVID19</c>, named in case they ever
-    /// reappear and it has to be reviewed why.
+    /// of the reference, every framework -- CRITICAL layer (dictionary by code). The one that
+    /// has no module version in the release is <c>FINREPCOVID19</c>; DORA is emitted since #75, so the
+    /// reference (which has no DORA) is expected to differ by exactly that framework.
     /// </summary>
     [DataFact]
     public void MReportingFramework_MatchesReference_CodeAndLabel()
@@ -330,6 +350,11 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
         var generatedByCode = generated.ToDictionary(r => r.Code, r => r.Label, StringComparer.Ordinal);
         var referenceByCode = reference.ToDictionary(r => r.Code, r => r.Label, StringComparer.Ordinal);
 
+        // Named known exception (#75), stale-checked: framework 'DORA' is emitted and the reference has none.
+        DoraAbsentFromReference42.AssertFrameworkStale(
+            generatedByCode.Keys.ToHashSet(StringComparer.Ordinal), referenceByCode.Keys.ToHashSet(StringComparer.Ordinal));
+        generatedByCode.Remove(DoraAbsentFromReference42.FrameworkCode);
+
         Assert.Equal(referenceByCode.Keys.OrderBy(k => k, StringComparer.Ordinal), generatedByCode.Keys.OrderBy(k => k, StringComparer.Ordinal));
 
         var mismatches = new List<string>();
@@ -345,15 +370,25 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
         Assert.True(mismatches.Count == 0, "FrameworkLabel does not match: " + string.Join(" | ", mismatches));
     }
 
+    /// <summary>
+    /// #75: DORA is emitted like any other framework. Its presence is tied to Access: the derived
+    /// taxonomies of the release hold a DORA one (positive control, so the assertion cannot pass
+    /// because nothing was derived). FINREPCOVID19 has no module version starting in this release and
+    /// stays out.
+    /// </summary>
     [DataFact]
-    public void MReportingFramework_ExcludesDoraAndFinrepCovid19()
+    public void MReportingFramework_IncludesDora_AndStillExcludesFinrepCovid19()
     {
+        var expected = ExpectedTaxonomies();
+        Assert.Contains(expected.Keys, k => k.StartsWith("dora ", StringComparison.Ordinal));
+        Assert.DoesNotContain(expected.Keys, k => k.StartsWith("finrepcovid19 ", StringComparison.Ordinal));
+
         var codes = ReadStringColumn("SELECT FrameworkCode FROM mReportingFramework")
             .Where(c => c is not null)
             .Select(c => c!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        Assert.DoesNotContain("DORA", codes);
+        Assert.Contains("DORA", codes);
         Assert.DoesNotContain("FINREPCOVID19", codes);
     }
 
@@ -381,13 +416,19 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
         Assert.Equal(
             "http://www.eba.europa.eu/eu/fr/xbrl/tp/4.2/EBA_XBRL_4.2_Reporting_Frameworks_4.2.0.0.zip",
             reader.GetString(1));
+        // docs/mapping-dpm2.md: the framework codes actually emitted, upper case, sorted, joined with "_".
+        // Derived from the Access taxonomies of the release (DORA included since #75), not copied from the output.
+        var frameworks = string.Join(
+            "_",
+            ExpectedTaxonomies().Keys
+                .Select(k => k[..k.IndexOf(' ', StringComparison.Ordinal)].ToUpperInvariant())
+                .Distinct()
+                .OrderBy(c => c, StringComparer.Ordinal));
         Assert.Equal(
-            "EBA XBRL 4.2 Reporting Frameworks 4.2.0.0 "
-            + "(AE_COREP_ESG_FC_FINREP_FP_GSII_IF_IMPRAC_IPU_IRRBB_MICA_MREL_PAY_PILLAR3_REM_RES_SBP)",
+            $"EBA XBRL 4.2 Reporting Frameworks 4.2.0.0 ({frameworks})",
             reader.GetString(2));
         Assert.Equal(
-            "EBA XBRL 4.2 Reporting Frameworks 4.2.0.0 "
-            + "(AE_COREP_ESG_FC_FINREP_FP_GSII_IF_IMPRAC_IPU_IRRBB_MICA_MREL_PAY_PILLAR3_REM_RES_SBP)"
+            $"EBA XBRL 4.2 Reporting Frameworks 4.2.0.0 ({frameworks})"
             + ". Requires Dictionary 4.2 or later",
             reader.GetString(3));
         Assert.Equal("4.2.0.0", reader.GetString(4));
@@ -441,14 +482,14 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
             using var stdoutA = new StringWriter();
             using var stderrA = new StringWriter();
             var exitA = CliRunner.Run(
-                ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", pathA, "--all"],
+                ["--source", RepoPaths.AccessDpm20DatabasePath, "--release", RepoPaths.Cutoff42ReleaseCode, "--output", pathA],
                 stdoutA, stderrA);
             SqliteConnection.ClearAllPools();
 
             using var stdoutB = new StringWriter();
             using var stderrB = new StringWriter();
             var exitB = CliRunner.Run(
-                ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", pathB, "--all"],
+                ["--source", RepoPaths.AccessDpm20DatabasePath, "--release", RepoPaths.Cutoff42ReleaseCode, "--output", pathB],
                 stdoutB, stderrB);
             SqliteConnection.ClearAllPools();
 
@@ -491,7 +532,7 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// <c>--all</c> over the DPM 2.0 source writes the REAL skeleton (the nine tables, populated)
+    /// <c>--release 4.2</c> over the DPM 2.0 source writes the REAL skeleton (the nine tables, populated)
     /// and the complete conversion: the exit code is <see cref="CliRunner.ExitOk"/> (0), not
     /// <see cref="CliRunner.ExitNotImplemented"/>.
     /// </summary>
@@ -500,15 +541,15 @@ public sealed class Dpm20SkeletonLoaderTests(Dpm20SkeletonFixture fixture)
     {
         Assert.Equal(CliRunner.ExitOk, fixture.ExitCode);
 
-        Assert.True(CountRows("mRelease") > 0, "mRelease is empty after --all.");
-        Assert.True(CountRows("mReportingFramework") > 0, "mReportingFramework is empty after --all.");
-        Assert.True(CountRows("mTaxonomy") > 0, "mTaxonomy is empty after --all.");
-        Assert.True(CountRows("mOwner") > 0, "mOwner is empty after --all.");
-        Assert.True(CountRows("mOwnerParent") > 0, "mOwnerParent is empty after --all.");
-        Assert.True(CountRows("mLanguage") > 0, "mLanguage is empty after --all.");
-        Assert.True(CountRows("mRewriteURI") > 0, "mRewriteURI is empty after --all.");
-        Assert.True(CountRows("mTaxonomyPackage") > 0, "mTaxonomyPackage is empty after --all.");
-        Assert.True(CountRows("aDatabaseProperties") > 0, "aDatabaseProperties is empty after --all.");
+        Assert.True(CountRows("mRelease") > 0, "mRelease is empty after --release 4.2.");
+        Assert.True(CountRows("mReportingFramework") > 0, "mReportingFramework is empty after --release 4.2.");
+        Assert.True(CountRows("mTaxonomy") > 0, "mTaxonomy is empty after --release 4.2.");
+        Assert.True(CountRows("mOwner") > 0, "mOwner is empty after --release 4.2.");
+        Assert.True(CountRows("mOwnerParent") > 0, "mOwnerParent is empty after --release 4.2.");
+        Assert.True(CountRows("mLanguage") > 0, "mLanguage is empty after --release 4.2.");
+        Assert.True(CountRows("mRewriteURI") > 0, "mRewriteURI is empty after --release 4.2.");
+        Assert.True(CountRows("mTaxonomyPackage") > 0, "mTaxonomyPackage is empty after --release 4.2.");
+        Assert.True(CountRows("aDatabaseProperties") > 0, "aDatabaseProperties is empty after --release 4.2.");
     }
 
     /// <summary>

@@ -380,7 +380,9 @@ public static class Dpm20AxisAndCellLoader
                 subCategoryIdBySubCategoryVId, allSubCategoryIdBySubCategoryVId, hierarchyBySubCategoryId,
                 variableVersionByVariableVId, defaultMemberByDomainId, dimensionInfoById,
                 tableVersionByTableVId[tableVId].ContextId, // level-2 source: the table's ContextID, reused for arbitration.
-                structuralAnomalies);
+                structuralAnomalies,
+                tableVersionByTableVId[tableVId].Code,
+                tableVersionByTableVId[tableVId].PropertyId);
 
             plansByTableVId[tableVId] = plan;
         }
@@ -1169,7 +1171,9 @@ public static class Dpm20AxisAndCellLoader
         IReadOnlyDictionary<int, (int MemberId, string? MemberXbrlCode)> defaultMemberByDomainId,
         IReadOnlyDictionary<int, (int DomainId, string? DimensionXbrlCode)> dimensionInfoById,
         int? tableContextId,
-        List<string> structuralAnomalies)
+        List<string> structuralAnomalies,
+        string tableCode,
+        int? tablePropertyId)
     {
         var nodesByHeaderId = nodes.ToDictionary(n => n.HeaderId);
         var byDirection = nodes.GroupBy(n => n.Direction).ToDictionary(g => g.Key, g => g.ToList());
@@ -1369,6 +1373,7 @@ public static class Dpm20AxisAndCellLoader
 
         // Source 3: the metric — non-key header with a PropertyID.
         var metricRestrictionByHeaderId = new Dictionary<int, (int HierarchyId, string HierarchyCode)>();
+        var nonKeyHeaderDeclaresMetric = false;
         // It is never inherited; it is added AFTER the projection, in case an ordinate had no entry.
         foreach (var axis in closedAxes)
         {
@@ -1379,6 +1384,8 @@ public static class Dpm20AxisAndCellLoader
                 {
                     continue;
                 }
+
+                nonKeyHeaderDeclaresMetric = true;
 
                 var member = resolver.ResolveMetMember(propertyId);
                 if (member is not { } m)
@@ -1425,6 +1432,50 @@ public static class Dpm20AxisAndCellLoader
                 ownWithDefaultFlag[MetDimensionId] = (
                     m.MemberId, "MET", m.MemberXbrlCode,
                     resolver.IsDefaultMemberByMemberId.GetValueOrDefault(m.MemberId));
+            }
+        }
+
+        // Table-level metric: TableVersion.PropertyID declares the metric of the WHOLE table. It is
+        // used ONLY when no non-key header contributes a metric (the two are never mixed). The
+        // pair goes to the ordinates of the FIRST closed axis in X, Y, Z order (same convention as
+        // table-context dimensions with no owning axis), so that the closure and the cell
+        // signatures carry it for every cell. Resolved as of the cutoff exactly like the
+        // non-key-header metrics; if it cannot be resolved nothing is invented.
+        if (tablePropertyId is { } tableMetricPropertyId && !nonKeyHeaderDeclaresMetric && closedAxes.Count > 0)
+        {
+            var tableMetricMember = resolver.ResolveMetMember(tableMetricPropertyId);
+            if (tableMetricMember is not { } tm)
+            {
+                resolver.UnresolvedMetricPairs++;
+                var propertyCode = resolver.PrItemCodeWindowsByPropertyId.TryGetValue(tableMetricPropertyId, out var codeWindows)
+                    ? string.Join("/", codeWindows.Select(w => w.Code).Distinct())
+                    : "?";
+                structuralAnomalies.Add(
+                    $"TableVID={tableVId} ({tableCode}): TableVersion.PropertyID={tableMetricPropertyId} " +
+                    $"(property code '{propertyCode}') declares a table-level metric that cannot be resolved " +
+                    "at the cutoff release: unresolved metric pair, nothing invented.");
+            }
+            else
+            {
+                foreach (var survivor in closedAxes[0].Survivors)
+                {
+                    if (!ownByHeaderId.TryGetValue(survivor.HeaderId, out var own))
+                    {
+                        own = new Dictionary<int, (int, string, string?)>();
+                        ownByHeaderId[survivor.HeaderId] = own;
+                    }
+
+                    if (!ownWithDefaultFlagByHeaderId.TryGetValue(survivor.HeaderId, out var ownWithDefaultFlag))
+                    {
+                        ownWithDefaultFlag = new Dictionary<int, (int, string, string?, bool)>();
+                        ownWithDefaultFlagByHeaderId[survivor.HeaderId] = ownWithDefaultFlag;
+                    }
+
+                    own[MetDimensionId] = (tm.MemberId, "MET", tm.MemberXbrlCode);
+                    ownWithDefaultFlag[MetDimensionId] = (
+                        tm.MemberId, "MET", tm.MemberXbrlCode,
+                        resolver.IsDefaultMemberByMemberId.GetValueOrDefault(tm.MemberId));
+                }
             }
         }
 

@@ -1,4 +1,4 @@
-﻿using EbaDpm.Converter.Core.Access;
+using EbaDpm.Converter.Core.Access;
 using EbaDpm.Converter.Core.Access.Dpm20;
 
 namespace EbaDpm.Converter.Core.Mapping.Dpm20;
@@ -31,8 +31,8 @@ public sealed record Dpm20TaxonomyDerivationResult(
 /// Rules:
 ///
 /// 1. **Emitted module versions**: the current ones at the cutoff release (already filtered in
-///    <see cref="Dpm20AccessReader.ReadModuleVersions"/>), excluding the <c>DORA</c> framework and
-///    <c>Module.isDocumentModule = True</c> — the same selection <see cref="Dpm20ModuleLoader"/>
+///    <see cref="Dpm20AccessReader.ReadModuleVersions"/>), excluding
+///    <c>Module.isDocumentModule = True</c> (every framework, DORA included, is emitted) — the same selection <see cref="Dpm20ModuleLoader"/>
 ///    emits.
 /// 2. **Taxonomy of a module version** = (framework of its module, <c>ModuleVersion.StartReleaseID</c>):
 ///    the EBA taxonomy that publishes that module version, NOT the cutoff release.
@@ -43,7 +43,7 @@ public sealed record Dpm20TaxonomyDerivationResult(
 ///    modules (49 on 4.2, <c>FINREP9DP</c> on 4.2.1, <c>AML_RA</c> and the <c>TCB_*</c> modules on 4.3).
 /// 3. **Tables of a taxonomy**: the current, non-abstract table versions in
 ///    <c>ModuleVersionComposition</c> of the taxonomy's emitted module versions. A table in modules
-///    of two taxonomies belongs to both. Tables that only DORA modules or document modules carry
+///    of two taxonomies belongs to both. Tables that only document modules carry
 ///    never appear.
 /// 3b. <b>Abstract closure</b>: if the composition row declares an ABSTRACT table, its CURRENT
 ///    concrete children are added as well (<c>TableVersion.AbstractTableID</c> pointing to that
@@ -83,10 +83,6 @@ public static class Dpm20TaxonomyDeriver
         }
 
         var frameworkById = frameworks.ToDictionary(f => f.FrameworkId);
-        var doraFrameworkId = frameworks
-            .Where(f => string.Equals(f.Code, "DORA", StringComparison.OrdinalIgnoreCase))
-            .Select(f => (int?)f.FrameworkId)
-            .FirstOrDefault();
 
         var moduleById = modules.ToDictionary(m => m.ModuleId);
         var tableVersionByTableVId = currentTableVersions.ToDictionary(tv => tv.TableVId);
@@ -131,11 +127,6 @@ public static class Dpm20TaxonomyDeriver
                 continue;
             }
 
-            if (doraFrameworkId is { } doraId && framework.FrameworkId == doraId)
-            {
-                continue;
-            }
-
             if (!releaseCodeById.TryGetValue(moduleVersion.StartReleaseId, out var startReleaseCode))
             {
                 throw new InvalidOperationException(
@@ -159,7 +150,7 @@ public static class Dpm20TaxonomyDeriver
         {
             if (!taxonomyCodeByModuleVId.TryGetValue(composition.ModuleVId, out var taxonomyCode))
             {
-                continue; // ModuleVersion not emitted (not current, DORA or document module).
+                continue; // ModuleVersion not emitted (not current or document module).
             }
 
             if (!tableVersionByTableVId.TryGetValue(composition.TableVId, out var tableVersion))

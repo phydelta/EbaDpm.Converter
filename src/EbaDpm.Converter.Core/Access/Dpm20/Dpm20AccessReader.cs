@@ -269,8 +269,10 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
     }
 
     // ------------------------------------------------------------------
-    // Typed reads — mMetric, mDimension. None is filtered by the currency predicate, same
-    // criterion as the rest of the dictionary.
+    // Typed reads — mMetric, mDimension. The dictionary is read AS OF the cutoff release R: rows
+    // whose StartReleaseID is greater than R do not contribute, and there is NO end condition
+    // (renamed codes such as old-* stay side by side). Source rows that carry no release column
+    // (ContextComposition) are filtered through their contexts.
     // ------------------------------------------------------------------
 
     /// <summary>Reads the whole <c>[DataType]</c> table. Not versioned.</summary>
@@ -303,15 +305,17 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
     }
 
     /// <summary>
-    /// Reads the whole <c>PropertyCategory</c> table: the domain OF THE VALUES of a property,
-    /// source of <c>mDimension.DomainID</c>. Do NOT confuse it with <c>ItemCategory</c>
-    /// (membership in <c>_PR</c>): its rows never include <c>_PR</c>.
+    /// Reads <c>PropertyCategory</c> as of the cutoff (<c>StartReleaseID &lt;= R</c>, no end
+    /// condition): the domain OF THE VALUES of a property, source of <c>mDimension.DomainID</c>.
+    /// Do NOT confuse it with <c>ItemCategory</c> (membership in <c>_PR</c>): its rows never
+    /// include <c>_PR</c>.
     /// </summary>
     public IEnumerable<Dpm20PropertyCategoryRow> ReadPropertyCategories()
     {
-        const string sql = "SELECT [PropertyID], [CategoryID], [StartReleaseID], [EndReleaseID] FROM [PropertyCategory]";
+        const string sql =
+            "SELECT [PropertyID], [CategoryID], [StartReleaseID], [EndReleaseID] FROM [PropertyCategory] WHERE [StartReleaseID] <= ?";
 
-        foreach (var row in Query(sql))
+        foreach (var row in Query(sql, [CutoffReleaseId]))
         {
             yield return new Dpm20PropertyCategoryRow(
                 Convert.ToInt32(row.GetValue(0)),
@@ -323,21 +327,44 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
 
     /// <summary>
     /// <c>PropertyID</c> of the properties that appear in <c>ContextComposition</c>: first half of
-    /// the identification of a dimension.
+    /// the identification of a dimension. <c>ContextComposition</c> has no release column, so it
+    /// is read as of the cutoff through its contexts: only the contexts referenced by at least one
+    /// <c>HeaderVersion</c>, <c>VariableVersion</c>, <c>TableVersion</c> or <c>CompoundItemContext</c> (the four tables that carry a <c>ContextID</c>) with
+    /// <c>StartReleaseID &lt;= R</c> (no end condition) contribute. The three context-id sets are
+    /// read first and the 1.7 million rows are filtered while streaming (an SQL <c>IN ... OR</c>
+    /// over that table is far too slow in ACE).
     /// </summary>
     public IEnumerable<int> ReadContextCompositionPropertyIds()
     {
-        const string sql = "SELECT DISTINCT [PropertyID] FROM [ContextComposition]";
-
-        foreach (var row in Query(sql))
+        var cutoff = CutoffReleaseId;
+        var contextIds = new HashSet<int>();
+        foreach (var table in new[] { "HeaderVersion", "VariableVersion", "TableVersion", "CompoundItemContext" })
         {
-            yield return Convert.ToInt32(row.GetValue(0));
+            var sql = $"SELECT DISTINCT [ContextID] FROM [{table}] WHERE [ContextID] IS NOT NULL AND [StartReleaseID] <= ?";
+            foreach (var row in Query(sql, [cutoff]))
+            {
+                contextIds.Add(Convert.ToInt32(row.GetValue(0)));
+            }
         }
+
+        var propertyIds = new HashSet<int>();
+        foreach (var row in Query("SELECT [ContextID], [PropertyID] FROM [ContextComposition]"))
+        {
+            var contextId = Convert.ToInt32(row.GetValue(0));
+            var propertyId = Convert.ToInt32(row.GetValue(1));
+            if (contextIds.Contains(contextId))
+            {
+                propertyIds.Add(propertyId);
+            }
+        }
+
+        return propertyIds;
     }
 
     /// <summary>
     /// <c>PropertyID</c> of the variables of type <c>key</c>: <c>VariableVersion.PropertyID</c>
-    /// for <c>Variable.Type = 'key'</c>. Second half of the identification of a dimension.
+    /// for <c>Variable.Type = 'key'</c>, only the variable versions with <c>StartReleaseID &lt;= R</c>.
+    /// Second half of the identification of a dimension.
     /// </summary>
     public IEnumerable<int> ReadKeyVariablePropertyIds()
     {
@@ -345,10 +372,10 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
             """
             SELECT DISTINCT vv.[PropertyID]
             FROM [VariableVersion] vv INNER JOIN [Variable] v ON v.[VariableID] = vv.[VariableID]
-            WHERE v.[Type] = 'key' AND vv.[PropertyID] IS NOT NULL
+            WHERE v.[Type] = 'key' AND vv.[PropertyID] IS NOT NULL AND vv.[StartReleaseID] <= ?
             """;
 
-        foreach (var row in Query(sql))
+        foreach (var row in Query(sql, [CutoffReleaseId]))
         {
             yield return Convert.ToInt32(row.GetValue(0));
         }
@@ -360,10 +387,12 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
     /// <c>HeaderVersion.SubCategoryVID</c>, counting only the header versions referenced by
     /// <c>TableVersionHeader</c> of a <c>TableVersion</c> current at <see cref="CutoffReleaseId"/>
     /// (the same predicate as <see cref="ReadTableVersions"/>). <c>SubCategoryVID</c> is mapped to
-    /// the stable <c>SubCategoryID</c> through <c>SubCategoryVersion</c> WITHOUT the cutoff filter:
+    /// the stable <c>SubCategoryID</c> through <c>SubCategoryVersion</c> with
+    /// <c>StartReleaseID &lt;= R</c> and no end condition (<see cref="ReadAllSubCategoryVersions"/>):
     /// a stale <c>SubCategoryVID</c> still names the same subcategory. Independent of the taxonomy
     /// and release selection. Rows with IsCurrent=false are the historical uses (header versions of
-    /// ANY table version), the fallback of a property with no current use. It is the source of <c>mMetric.ReferencedHierarchyID</c> (exactly one
+    /// ANY table version that started by R: <c>HeaderVersion.StartReleaseID &lt;= R</c>), the
+    /// fallback of a property with no current use. It is the source of <c>mMetric.ReferencedHierarchyID</c> (exactly one
     /// candidate) and the reason for <c>mOrdinateMetricRestriction</c> (several).
     ///
     /// ACE does not join more than 2 tables reliably: the pieces are read separately and composed
@@ -394,7 +423,8 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
             }
         }
 
-        // Step 3: the stable SubCategoryID of every SubCategoryVID (no cutoff filter).
+        // Step 3: the stable SubCategoryID of every SubCategoryVID that started by the cutoff
+        // (no end condition).
         var subCategoryIdByVId = new Dictionary<int, int>();
         foreach (var scv in ReadAllSubCategoryVersions())
         {
@@ -408,10 +438,11 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
             SELECT hv.[HeaderVID], hv.[PropertyID], hv.[SubCategoryVID]
             FROM [HeaderVersion] hv INNER JOIN [Header] h ON h.[HeaderID] = hv.[HeaderID]
             WHERE h.[IsKey] = 0 AND hv.[PropertyID] IS NOT NULL AND hv.[SubCategoryVID] IS NOT NULL
+              AND hv.[StartReleaseID] <= ?
             """;
 
         var candidates = new SortedSet<(int PropertyId, int SubCategoryId, bool IsCurrent)>();
-        foreach (var row in Query(headerVersionsSql))
+        foreach (var row in Query(headerVersionsSql, [cutoff]))
         {
             // SequentialAccess: the columns are read once, in order.
             var headerVId = Convert.ToInt32(row.GetValue(0));
@@ -420,7 +451,7 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
 
             if (subCategoryIdByVId.TryGetValue(subCategoryVId, out var subCategoryId))
             {
-                candidates.Add((propertyId, subCategoryId, false)); // historical: any table version
+                candidates.Add((propertyId, subCategoryId, false)); // historical: any table version that started by the cutoff
                 if (currentHeaderVIds.Contains(headerVId))
                 {
                     candidates.Add((propertyId, subCategoryId, true));
@@ -510,7 +541,7 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
     /// rows, <c>P3_NONREM_DIS_DOCS</c> and <c>P3_REM_DIS_DOCS</c> (<c>PILLAR3</c>), which are
     /// modules that link to PDFs and have no table at all (<c>ModuleVersionComposition</c> is
     /// empty for both). <c>isDocumentModule</c> is true for exactly those two of the current
-    /// modules other than DORA. It arrives as -1/0 (Access boolean).
+    /// modules. It arrives as -1/0 (Access boolean).
     /// </summary>
     public IEnumerable<Dpm20ModuleRow> ReadModules()
     {
@@ -616,7 +647,7 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
         const string sql =
             """
             SELECT tv.[TableVID], tv.[Code], tv.[Name], tv.[TableID], tv.[AbstractTableID],
-                   tv.[StartReleaseID], tv.[EndReleaseID], t.[IsAbstract], tv.[ContextID]
+                   tv.[StartReleaseID], tv.[EndReleaseID], t.[IsAbstract], tv.[ContextID], tv.[PropertyID]
             FROM [TableVersion] tv INNER JOIN [Table] t ON t.[TableID] = tv.[TableID]
             WHERE tv.[StartReleaseID] <= ? AND (tv.[EndReleaseID] IS NULL OR tv.[EndReleaseID] > ?)
             """;
@@ -635,26 +666,31 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
             // IsAbstract arrives as -1/0 (Access boolean).
             var isAbstract = Convert.ToBoolean(row.GetValue(7));
             var contextId = GetNullableInt32(row, 8);
+            var propertyId = GetNullableInt32(row, 9);
 
             yield return new Dpm20TableVersionRow(
-                tableVId, code, name, tableId, abstractTableId, startReleaseId, endReleaseId, isAbstract, contextId);
+                tableVId, code, name, tableId, abstractTableId, startReleaseId, endReleaseId, isAbstract, contextId, propertyId);
         }
     }
 
     // ------------------------------------------------------------------
     // Typed reads — mDomain, mDomainUnion, mMember, mHierarchy.
-    // None of these tables is filtered by the currency predicate: the dictionary is shared
-    // across taxonomies and is not pruned by release (same criterion as DPM 1.0's
-    // DictionaryLoader). The counts that match the reference come from ItemCategory,
-    // SuperCategoryComposition and SubCategory WITHOUT applying StartReleaseID/EndReleaseID.
+    // The dictionary is read AS OF the cutoff release R: StartReleaseID <= R and NO end condition
+    // (renamed codes such as old-* stay side by side). It is shared across taxonomies, so it is
+    // not pruned by the currency predicate.
     // ------------------------------------------------------------------
 
-    /// <summary>Reads the whole <c>Category</c> table. Not versioned.</summary>
+    /// <summary>
+    /// Reads <c>Category</c> as of the cutoff: <c>CreatedRelease &lt;= R</c> (measured on the 4.4
+    /// database: it equals the earliest <c>StartReleaseID</c> of the category's
+    /// <c>ItemCategory</c>/<c>PropertyCategory</c> rows).
+    /// </summary>
     public IEnumerable<Dpm20CategoryRow> ReadCategories()
     {
-        const string sql = "SELECT [CategoryID], [Code], [Name], [Description], [IsEnumerated] FROM [Category]";
+        const string sql =
+            "SELECT [CategoryID], [Code], [Name], [Description], [IsEnumerated] FROM [Category] WHERE [CreatedRelease] <= ?";
 
-        foreach (var row in Query(sql))
+        foreach (var row in Query(sql, [CutoffReleaseId]))
         {
             var categoryId = Convert.ToInt32(row.GetValue(0));
             var code = GetNullableString(row, 1)
@@ -669,16 +705,16 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
     }
 
     /// <summary>
-    /// Reads the whole <c>ItemCategory</c> table: the item-to-domain membership, not filtered by
-    /// the currency predicate (the target emits the complete history of codes, including the
+    /// Reads <c>ItemCategory</c> as of the cutoff (<c>StartReleaseID &lt;= R</c>, no end condition):
+    /// the item-to-domain membership (the target emits the history of codes up to R, including the
     /// renamed <c>old-*</c> ones).
     /// </summary>
     public IEnumerable<Dpm20ItemCategoryRow> ReadItemCategories()
     {
         const string sql =
-            "SELECT [ItemID], [CategoryID], [Code], [IsDefaultItem], [StartReleaseID], [EndReleaseID] FROM [ItemCategory]";
+            "SELECT [ItemID], [CategoryID], [Code], [IsDefaultItem], [StartReleaseID], [EndReleaseID] FROM [ItemCategory] WHERE [StartReleaseID] <= ?";
 
-        foreach (var row in Query(sql))
+        foreach (var row in Query(sql, [CutoffReleaseId]))
         {
             var itemId = Convert.ToInt32(row.GetValue(0));
             var categoryId = Convert.ToInt32(row.GetValue(1));
@@ -706,14 +742,16 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
     }
 
     /// <summary>
-    /// Reads the whole <c>SuperCategoryComposition</c> table: <c>mDomainUnion</c>, direct
-    /// translation — the union is NOT materialized, this table only declares the pairs.
+    /// Reads <c>SuperCategoryComposition</c> as of the cutoff (<c>StartReleaseID &lt;= R</c>, no end
+    /// condition): <c>mDomainUnion</c>, direct translation — the union is NOT materialized, this
+    /// table only declares the pairs.
     /// </summary>
     public IEnumerable<Dpm20SuperCategoryCompositionRow> ReadSuperCategoryCompositions()
     {
-        const string sql = "SELECT [SuperCategoryID], [CategoryID] FROM [SuperCategoryComposition]";
+        const string sql =
+            "SELECT [SuperCategoryID], [CategoryID] FROM [SuperCategoryComposition] WHERE [StartReleaseID] <= ?";
 
-        foreach (var row in Query(sql))
+        foreach (var row in Query(sql, [CutoffReleaseId]))
         {
             yield return new Dpm20SuperCategoryCompositionRow(
                 Convert.ToInt32(row.GetValue(0)),
@@ -722,16 +760,22 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
     }
 
     /// <summary>
-    /// Reads the whole <c>SubCategory</c> table: <c>mHierarchy</c>, 1 to 1. It includes some rows
+    /// Reads <c>SubCategory</c> as of the cutoff, only the sub-categories with at least one
+    /// <c>SubCategoryVersion</c> row with <c>StartReleaseID &lt;= R</c>: <c>mHierarchy</c>, 1 to 1. It includes some rows
     /// whose <c>CategoryID</c> is that of <c>_PR</c> (<c>AT*</c> codes, hierarchies of the metric
     /// domain in DPM 1.0 terminology): the mapping assigns them to the <c>MET</c> domain, it does
     /// not discard them.
     /// </summary>
     public IEnumerable<Dpm20SubCategoryRow> ReadSubCategories()
     {
-        const string sql = "SELECT [SubCategoryID], [CategoryID], [Code], [Name] FROM [SubCategory]";
+        const string sql =
+            """
+            SELECT [SubCategoryID], [CategoryID], [Code], [Name]
+            FROM [SubCategory]
+            WHERE [SubCategoryID] IN (SELECT [SubCategoryID] FROM [SubCategoryVersion] WHERE [StartReleaseID] <= ?)
+            """;
 
-        foreach (var row in Query(sql))
+        foreach (var row in Query(sql, [CutoffReleaseId]))
         {
             // SequentialAccess requires reading in increasing ordinal order: CategoryID (1) before
             // Code (2), even though Code is needed earlier when building the record.
@@ -750,8 +794,9 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
     /// <c>VariableVersion.PropertyID</c> for <c>Variable.Type = 'fact'</c>. 2-table JOIN (the only
     /// size that works in this source, see the class header). First of the two structural sources
     /// for identifying a metric: it is used here ONLY to decide which <c>_PR</c> codes enter the
-    /// <c>MET</c> domain of <c>mMember</c> — it does NOT build <c>mMetric</c>. No currency
-    /// filter, like the rest of the dictionary.
+    /// <c>MET</c> domain of <c>mMember</c> — it does NOT build <c>mMetric</c>. Only variable
+    /// versions with <c>StartReleaseID &lt;= R</c>, no end condition, like the rest of the
+    /// dictionary.
     /// </summary>
     public IEnumerable<int> ReadFactVariablePropertyIds()
     {
@@ -759,10 +804,10 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
             """
             SELECT DISTINCT vv.[PropertyID]
             FROM [VariableVersion] vv INNER JOIN [Variable] v ON v.[VariableID] = vv.[VariableID]
-            WHERE v.[Type] = 'fact' AND vv.[PropertyID] IS NOT NULL
+            WHERE v.[Type] = 'fact' AND vv.[PropertyID] IS NOT NULL AND vv.[StartReleaseID] <= ?
             """;
 
-        foreach (var row in Query(sql))
+        foreach (var row in Query(sql, [CutoffReleaseId]))
         {
             yield return Convert.ToInt32(row.GetValue(0));
         }
@@ -770,8 +815,9 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
 
     /// <summary>
     /// <c>PropertyID</c> of the NON-key headers: <c>HeaderVersion.PropertyID</c> for
-    /// <c>Header.IsKey = false</c>. Second source for identifying a metric. Same use and same
-    /// caveats as <see cref="ReadFactVariablePropertyIds"/>.
+    /// <c>Header.IsKey = false</c>, only header versions with <c>StartReleaseID &lt;= R</c>.
+    /// Second source for identifying a metric. Same use and same caveats as
+    /// <see cref="ReadFactVariablePropertyIds"/>.
     /// </summary>
     public IEnumerable<int> ReadNonKeyHeaderPropertyIds()
     {
@@ -779,10 +825,10 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
             """
             SELECT DISTINCT hv.[PropertyID]
             FROM [HeaderVersion] hv INNER JOIN [Header] h ON h.[HeaderID] = hv.[HeaderID]
-            WHERE h.[IsKey] = 0 AND hv.[PropertyID] IS NOT NULL
+            WHERE h.[IsKey] = 0 AND hv.[PropertyID] IS NOT NULL AND hv.[StartReleaseID] <= ?
             """;
 
-        foreach (var row in Query(sql))
+        foreach (var row in Query(sql, [CutoffReleaseId]))
         {
             yield return Convert.ToInt32(row.GetValue(0));
         }
@@ -1060,17 +1106,19 @@ public sealed class Dpm20AccessReader : IDpm20AxisAndCellSource, IDpm20Dictionar
     }
 
     /// <summary>
-    /// Reads the whole <c>SubCategoryVersion</c> table WITHOUT the currency filter: the hierarchy
-    /// node loader also needs the NON-current versions, for the subcategories that have no current
-    /// version at all (their latest version is used instead).
-    /// <see cref="ReadSubCategoryVersions"/> does not serve this purpose — it applies the release
-    /// cutoff and discards them.
+    /// Reads <c>SubCategoryVersion</c> as of the cutoff (<c>StartReleaseID &lt;= R</c>, NO end
+    /// condition): the hierarchy node loader also needs the NON-current versions, for the
+    /// subcategories that have no current version at all (their latest version that started by R
+    /// is used instead, never a later one).
+    /// <see cref="ReadSubCategoryVersions"/> does not serve this purpose — it applies the full
+    /// currency predicate and discards them.
     /// </summary>
     public IEnumerable<Dpm20SubCategoryVersionRow> ReadAllSubCategoryVersions()
     {
-        const string sql = "SELECT [SubCategoryVID], [SubCategoryID], [StartReleaseID], [EndReleaseID] FROM [SubCategoryVersion]";
+        const string sql =
+            "SELECT [SubCategoryVID], [SubCategoryID], [StartReleaseID], [EndReleaseID] FROM [SubCategoryVersion] WHERE [StartReleaseID] <= ?";
 
-        foreach (var row in Query(sql))
+        foreach (var row in Query(sql, [CutoffReleaseId]))
         {
             yield return new Dpm20SubCategoryVersionRow(
                 Convert.ToInt32(row.GetValue(0)),

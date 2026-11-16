@@ -20,7 +20,7 @@ public sealed class Dpm20MetricSubCategoryCandidatesReaderTests
         "CREATE TABLE [TableVersion] ([TableVID] INTEGER, [StartReleaseID] INTEGER, [EndReleaseID] INTEGER)",
         "CREATE TABLE [TableVersionHeader] ([TableVID] INTEGER, [HeaderVID] INTEGER)",
         "CREATE TABLE [Header] ([HeaderID] INTEGER, [IsKey] YESNO)",
-        "CREATE TABLE [HeaderVersion] ([HeaderVID] INTEGER, [HeaderID] INTEGER, [PropertyID] INTEGER, [SubCategoryVID] INTEGER)",
+        "CREATE TABLE [HeaderVersion] ([HeaderVID] INTEGER, [HeaderID] INTEGER, [PropertyID] INTEGER, [SubCategoryVID] INTEGER, [StartReleaseID] INTEGER)",
         "CREATE TABLE [SubCategoryVersion] ([SubCategoryVID] INTEGER, [SubCategoryID] INTEGER, [StartReleaseID] INTEGER, [EndReleaseID] INTEGER)",
     ];
 
@@ -46,6 +46,7 @@ public sealed class Dpm20MetricSubCategoryCandidatesReaderTests
 
                 Exec(oledb, "INSERT INTO [Release] ([ReleaseID],[Code],[IsCurrent]) VALUES (1,'1.0',0)");
                 Exec(oledb, "INSERT INTO [Release] ([ReleaseID],[Code],[IsCurrent]) VALUES (2,'2.0',-1)");
+                Exec(oledb, "INSERT INTO [Release] ([ReleaseID],[Code],[IsCurrent]) VALUES (3,'3.0',0)");
                 populate(oledb);
             }
 
@@ -85,11 +86,11 @@ public sealed class Dpm20MetricSubCategoryCandidatesReaderTests
         Exec(c, "INSERT INTO [SubCategoryVersion] VALUES (1002,501,1,NULL)");
 
         // Header versions (HeaderVID, HeaderID, PropertyID, SubCategoryVID).
-        Exec(c, "INSERT INTO [HeaderVersion] VALUES (10,1,100,1000)"); // non-key, current table, property 100
-        Exec(c, "INSERT INTO [HeaderVersion] VALUES (11,1,100,1001)"); // non-key, past table, property 100, re-versioned
-        Exec(c, "INSERT INTO [HeaderVersion] VALUES (12,2,101,1000)"); // KEY header, current table: must be ignored
-        Exec(c, "INSERT INTO [HeaderVersion] VALUES (13,1,102,1002)"); // non-key, past table only: history
-        Exec(c, "INSERT INTO [HeaderVersion] VALUES (14,1,103,1001)"); // non-key, current, re-versioned sub-category
+        Exec(c, "INSERT INTO [HeaderVersion] VALUES (10,1,100,1000,1)"); // non-key, current table, property 100
+        Exec(c, "INSERT INTO [HeaderVersion] VALUES (11,1,100,1001,1)"); // non-key, past table, property 100, re-versioned
+        Exec(c, "INSERT INTO [HeaderVersion] VALUES (12,2,101,1000,1)"); // KEY header, current table: must be ignored
+        Exec(c, "INSERT INTO [HeaderVersion] VALUES (13,1,102,1002,1)"); // non-key, past table only: history
+        Exec(c, "INSERT INTO [HeaderVersion] VALUES (14,1,103,1001,1)"); // non-key, current, re-versioned sub-category
 
         // Which table version carries which header version.
         Exec(c, "INSERT INTO [TableVersionHeader] VALUES (2,10)");
@@ -136,5 +137,41 @@ public sealed class Dpm20MetricSubCategoryCandidatesReaderTests
         Assert.Contains(new Dpm20MetricSubCategoryCandidateRow(102, 501, true), rows);
         Assert.DoesNotContain(new Dpm20MetricSubCategoryCandidateRow(103, 500, true), rows);
         Assert.DoesNotContain(rows, r => r.PropertyId == 101);
+    }
+
+    /// <summary>
+    /// #73, dictionary as of R: a header version that starts after the cutoff does not contribute to
+    /// the candidates (not even as history). Header version 15 (non-key, property 104) starts in
+    /// release 3.
+    /// </summary>
+    private static void PopulateWithALaterHeaderVersion(OleDbConnection c)
+    {
+        Populate(c);
+        Exec(c, "INSERT INTO [HeaderVersion] VALUES (15,1,104,1000,3)");
+        Exec(c, "INSERT INTO [TableVersionHeader] VALUES (2,15)");
+    }
+
+    [AceFact]
+    public void HeaderVersionStartingAfterTheCutoff_IsAbsent_AndPresentAtALaterCutoff()
+    {
+        var atTwo = Read(PopulateWithALaterHeaderVersion, cutoffCode: "2.0");
+        var atThree = Read(PopulateWithALaterHeaderVersion, cutoffCode: "3.0");
+
+        Assert.DoesNotContain(atTwo, r => r.PropertyId == 104);
+
+        // Positive control: the very same fixture at the later cutoff does yield the candidate, so
+        // the absence above comes from the StartReleaseID filter and from nothing else.
+        Assert.Contains(new Dpm20MetricSubCategoryCandidateRow(104, 500, false), atThree);
+        Assert.Contains(new Dpm20MetricSubCategoryCandidateRow(104, 500, true), atThree);
+    }
+
+    [AceFact]
+    public void HeaderVersionStartingBeforeTheCutoff_ButInAPastTableVersion_IsStillHistory()
+    {
+        // Header version 13 starts in release 1, belongs only to table version 1 = [1,2), which
+        // ended before the cutoff 2.0: it is history, not dropped (there is no end condition).
+        var rows = Read(Populate, cutoffCode: "2.0");
+
+        Assert.Contains(new Dpm20MetricSubCategoryCandidateRow(102, 501, false), rows);
     }
 }

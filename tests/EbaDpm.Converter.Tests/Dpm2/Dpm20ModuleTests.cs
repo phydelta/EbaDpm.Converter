@@ -8,7 +8,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// <summary>
 /// Verification of <c>mModule</c>, <c>mConceptualModule</c> and <c>mModuleBusinessTemplate</c> for
 /// the DPM 2.0 source. It reuses <see cref="Dpm20SkeletonFixture"/> (collection
-/// <c>Dpm2Skeleton</c>): the same <c>--all</c> conversion already runs <c>Dpm20ModuleLoader.Load</c>,
+/// <c>Dpm2Skeleton</c>): the same <c>--release 4.2</c> conversion already runs <c>Dpm20ModuleLoader.Load</c>,
 /// so the large DPM 2.0 Access database does not need to be re-read for the generated content.
 ///
 /// <b>The third module filter</b>: without excluding <c>[Module].isDocumentModule</c>,
@@ -19,7 +19,8 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 ///
 /// The module count is DERIVED from the Access source (<see cref="AccessCensus"/>): the
 /// <c>ModuleVersion</c> rows in force at the cutoff release, of a module that is not a document
-/// module and whose framework is not DORA (docs/mapping-dpm2.md, "Modules").
+/// module (every framework, DORA included since #75), and that START in the release of the file
+/// (#73: a file carries the module versions published in its release; docs/mapping-dpm2.md, "Modules").
 /// </summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
@@ -45,26 +46,51 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
         "FROM ([ModuleVersion] mv INNER JOIN [Module] m ON m.[ModuleID] = mv.[ModuleID]) "
         + "INNER JOIN [Framework] f ON f.[FrameworkID] = m.[FrameworkID]";
 
-    /// <summary>The "in force at the cutoff release" predicate over <c>mv</c>.</summary>
+    /// <summary>The "in force at the cutoff release AND starting in it" predicate over <c>mv</c>.</summary>
     private static string InForceAtCutoff()
-        => AccessCensus.InForce(AccessCensus.ReleaseId(Accdb, RepoPaths.Cutoff42ReleaseCode), "mv");
+    {
+        var releaseId = AccessCensus.ReleaseId(Accdb, RepoPaths.Cutoff42ReleaseCode);
+        return AccessCensus.InForce(releaseId, "mv") + $" AND mv.[StartReleaseID] = {releaseId}";
+    }
 
-    /// <summary>Code to <c>ModuleVID</c> of the module versions in force that are not DORA, split by <c>isDocumentModule</c>.</summary>
+    /// <summary>Code to <c>ModuleVID</c> of the module versions of the release, split by <c>isDocumentModule</c>.</summary>
     private static Dictionary<string, int> ModuleVersionsInAccess(bool documentModules)
         => AccessCensus.IntByCode(
             Accdb,
             $"SELECT mv.[Code], mv.[ModuleVID] {ModuleVersionJoin} WHERE {InForceAtCutoff()} "
-            + $"AND m.[isDocumentModule] {(documentModules ? "<>" : "=")} 0 AND f.[Code] <> 'DORA'");
+            + $"AND m.[isDocumentModule] {(documentModules ? "<>" : "=")} 0");
 
-    /// <summary>The expected <c>mModule</c> rows: in force, not a document module, not DORA.</summary>
+    /// <summary>The expected <c>mModule</c> rows: in force and starting in the release, not a document module.</summary>
     private static long ExpectedModuleRows() => ModuleVersionsInAccess(documentModules: false).Count;
 
     [DataFact]
-    public void MModule_RowCount_IsTheModuleVersionsInForceExcludingDocumentModulesAndDora()
+    public void MModule_RowCount_IsTheModuleVersionsOfTheReleaseExcludingDocumentModules()
         => AssertDerived(
-            "mModule rows (ModuleVersion in force, not a document module, framework not DORA)",
+            "mModule rows (ModuleVersion in force and starting in the release, not a document module)",
             ExpectedModuleRows(),
             CountRows("mModule"));
+
+    /// <summary>
+    /// #75: the DORA module versions of the release are emitted. Positive control from Access: there is at
+    /// least one, so the equality with the generated rows is not an equality of two empty sets.
+    /// </summary>
+    [DataFact]
+    public void MModule_EmitsTheDoraModules_OfTheRelease()
+    {
+        var doraInAccess = AccessCensus.IntByCode(
+            Accdb,
+            $"SELECT mv.[Code], mv.[ModuleVID] {ModuleVersionJoin} WHERE {InForceAtCutoff()} "
+            + "AND m.[isDocumentModule] = 0 AND f.[Code] = 'DORA'")
+            .Keys.Select(c => c.ToUpperInvariant()).OrderBy(c => c, StringComparer.Ordinal).ToList();
+        Assert.NotEmpty(doraInAccess);
+
+        var emitted = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"ModuleCode\" FROM \"mModule\"", 1)
+            .Select(r => r[0]!)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.True(
+            doraInAccess.All(emitted.Contains),
+            $"DORA module codes of Access missing from mModule: [{string.Join(", ", doraInAccess.Where(c => !emitted.Contains(c)))}].");
+    }
 
     [DataFact]
     public void MConceptualModule_RowCount_MirrorsMModule()
@@ -79,7 +105,7 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
             CountRows("mModuleBusinessTemplate"));
 
     // ------------------------------------------------------------------
-    // 2 - The third filter: the two PILLAR3 document modules are NOT emitted.
+    // 2 - The third filter: the PILLAR3 document modules are NOT emitted.
     // It is the kind of filter that a future refactor might remove thinking it is redundant:
     // without it, mModule would gain two rows without any other structural check noticing.
     // ------------------------------------------------------------------
@@ -99,25 +125,34 @@ public sealed class Dpm20ModuleTests(Dpm20SkeletonFixture fixture)
     }
 
     /// <summary>
-    /// Positive control of the third filter, on the Access source: the document modules in force are
-    /// exactly the two named ones, and without the <c>isDocumentModule</c> filter the in-force,
-    /// non-DORA module versions would be the derived <c>mModule</c> count plus those two.
+    /// The identity behind the third filter, on the Access source: without the <c>isDocumentModule</c>
+    /// filter the module versions of the release would be the derived <c>mModule</c> count plus the
+    /// document module versions of the release, and none of those is emitted. #73: a file carries the
+    /// module versions that START in its release; in this database the PILLAR3 document modules start
+    /// in 4.0, so in the 4.2 file the set is empty and this test is only the identity. The release
+    /// where the filter does bite (4.0) is covered by <c>CliPerReleaseDirectoryTests</c>, which
+    /// converts every release and asserts that the document modules are present in the source of that
+    /// release and absent from its file.
     /// </summary>
     [DataFact]
-    public void DocumentModulesInForce_AreExactlyTheTwoNamedOnes_AndWouldAddTwoRowsWithoutTheFilter()
+    public void DocumentModulesOfTheRelease_AreNotEmitted_AndWouldAddRowsWithoutTheFilter()
     {
         var documentCodes = ModuleVersionsInAccess(documentModules: true).Keys
             .OrderBy(c => c, StringComparer.Ordinal)
             .ToList();
-        Assert.Equal(["P3_NONREM_DIS_DOCS", "P3_REM_DIS_DOCS"], documentCodes);
 
         var withoutTheFilter = AccessCensus.Scalar(
             Accdb,
-            $"SELECT COUNT(1) {ModuleVersionJoin} WHERE {InForceAtCutoff()} AND f.[Code] <> 'DORA'");
+            $"SELECT COUNT(1) {ModuleVersionJoin} WHERE {InForceAtCutoff()}");
         AssertDerived(
-            "ModuleVersion in force, framework not DORA, WITHOUT the isDocumentModule filter (expected mModule rows + 2 document modules)",
-            ExpectedModuleRows() + 2,
+            "ModuleVersion in force and starting in the release, WITHOUT the isDocumentModule filter (expected mModule rows + its document modules)",
+            ExpectedModuleRows() + documentCodes.Count,
             withoutTheFilter);
+
+        var emitted = QueryHelpers.Rows(fixture.GeneratedConnection, "SELECT \"ModuleCode\" FROM \"mModule\"", 1)
+            .Select(r => r[0]!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.All(documentCodes, code => Assert.DoesNotContain(code, emitted));
     }
 
     // ------------------------------------------------------------------

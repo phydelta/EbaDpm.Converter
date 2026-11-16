@@ -57,7 +57,7 @@ Plane A needs nothing but the generated database and always runs. Its check code
 | `A-UNQ` | Uniqueness of business keys: `DimensionXBRLCode`, `(DomainID, MemberCode)`, `(DomainID, HierarchyCode)`, `BusinessCode` within a table, `(AxisID, OrdinateCode)`, `(OrdinateID, DimensionID)`, template codes per taxonomy and level, module codes per taxonomy |
 | `A-DIC` | Dictionary rules: typed domains have no default member, at most one default per domain, `IsTypedDimension` agrees with the domain, default members belong to the dimension's domain, exactly one metric dimension `MET`, every metric has its member in the `MET` domain, XBRL code shapes |
 | `A-HIE` | Hierarchy trees: no cycles, `Level` consistent with the parent, parent in the same hierarchy, `Path` well formed, unique siblings and order, nodes inside the hierarchy's domain |
-| `A-SEN` | Open-axis sentinel conventions of the distribution schema (domain and member `9999` "Open"), and absence of the source's own sentinels |
+| `A-SEN` | Open-axis sentinel conventions of the distribution schema (domain and member `9999` "Open"), and absence of the source's own sentinels (`A-SEN-04`, the DPM 1.0 member `999`, applies to DPM 1.0 outputs only: in DPM 2.0 member IDs are a counter and `999` is an ordinary member) |
 | `A-TPL` | Template and table tree: node types and levels, parents, taxonomy consistency, table links, frameworks used by at least one taxonomy |
 | `A-AXE` | Axes and ordinates: one closed X axis per table and at most one closed Y axis, open-axis ordinate shape, `Order` reproducible in pre-order from the tree, fixed-value columns |
 | `A-CEL` | Cells and positions: the `BusinessCode` rebuilt from `mCellPosition` equals the emitted one byte for byte, every cell has at least two positions on axes of its own table, abstract headers imply shaded cells, a dimension belongs to exactly one axis of a table, a cell never receives two members of the same dimension |
@@ -66,7 +66,7 @@ Plane A needs nothing but the generated database and always runs. Its check code
 | `A-OMR` | Per-ordinate metric restrictions (`mOrdinateMetricRestriction`): the ordinate carries exactly one `MET` categorisation, that metric is enumerated (`Enumeration/Code` in DPM 2.0, `Code` in DPM 1.0), the hierarchy belongs to the metric's `ReferencedDomainID`, and a starting member, when present, is a node of the hierarchy (with `IsStartingMemberIncluded` set exactly when it is) |
 | `A-MOD` | Modules: template links point to first-level table groups of the same taxonomy, one conceptual module per module, `XBRLSchemaRef` shape, dense ordering, one-to-one taxonomy keys; for DPM 2.0 (`A-MOD-10`), every taxonomy has at least one module and each module's `XBRLSchemaRef` framework and release equal its taxonomy's |
 | `A-CPT` | Concepts: `ConceptType` belongs to the target vocabulary, concept counts per type match their entities, every concept has a label translation, `ReleaseID` only where the schema expects it |
-| `A-VAC` | Tables that must be empty are empty (for example the validation-rule tables, references and instance tables), and the tables populated with fixed rows have exactly those rows |
+| `A-VAC` | Tables that must be empty are empty (for example the validation-rule tables, references and instance tables), and the tables populated with fixed rows have exactly those rows. For DPM 2.0, `mDomainUnion` is an informative census: it is empty in the files of releases before 4.0, where the source has no domain unions |
 
 An output produced by a converter version without the extension table `mOrdinateMetricRestriction`
 is still validated: the `A-OMR` checks and the orphan checks on that table are reported as skipped,
@@ -172,7 +172,7 @@ database in which the **layout** is wrong: for example, a sheet draws ordinates 
 database does not assign to that table.
 
 The file is measured against one specific release, declared in its `CorpusRelease` header. It is
-applied only to a DPM 2.0 output whose cutoff release is that release; against any other release
+applied only to a DPM 2.0 output of that release (`mRelease.IsCurrent = 1`); against any other release
 the list is reported as not evaluated rather than stale. The file is **regenerated for each new
 release**: a new release gets its own file, and no divergence is hard-coded in C#.
 

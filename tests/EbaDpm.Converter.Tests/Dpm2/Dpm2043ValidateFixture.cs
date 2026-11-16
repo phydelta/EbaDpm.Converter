@@ -12,16 +12,35 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 ///
 /// Unlike <see cref="Dpm20SkeletonFixture"/>, this fixture has no other consumer that needs an
 /// open connection on the same file, so it keeps a single <c>GeneratedDatabasePath</c>: it runs
-/// <c>--all</c> ONCE through the real CLI, and clears the SQLite connection pool before leaving
+/// <c>--release 4.3</c> ONCE through the real CLI, and clears the SQLite connection pool before leaving
 /// the constructor because <see cref="EbaDpm.Converter.Core.Validation.Validator.Run"/> needs
 /// exclusive <c>File.OpenRead</c> access to the same file for the SHA-256.
 /// When the data directory is not available the constructor does nothing (the tests are skipped).
+///
+/// Since #73 each file is the database as of ONE release. Tests that need the SAME 4.3 database at an
+/// earlier release (the metrics whose hierarchy started after 4.2, the C-EQU-01 check against the 4.2
+/// layouts) use <see cref="Generated42DatabasePath"/>: the <c>--release 4.2</c> file of this database,
+/// converted lazily ONCE, on first use, and shared by every test of the collection.
 /// </summary>
 public sealed class Dpm2043ValidateFixture : IDisposable
 {
+    /// <summary><c>Release.Code</c> of the 4.3 release, the last one the 4.3 database declares.</summary>
+    public const string Release43Code = "4.3";
+
     public string TempDirectory { get; } = null!;
     public string GeneratedDatabasePath { get; } = null!;
     public int ExitCode { get; }
+
+    /// <summary><c>Release.Code</c> of the 4.2 release, declared by the 4.3 database too.</summary>
+    public const string Release42Code = RepoPaths.Cutoff42ReleaseCode;
+
+    private readonly Lazy<string> _generated42 = null!;
+
+    /// <summary>
+    /// The <c>--release 4.2</c> file of the 4.3 database (not the 4.2.1 database): converted on first
+    /// access, once, with no connection left open on it (<c>Validator.Run</c> needs exclusive read access).
+    /// </summary>
+    public string Generated42DatabasePath => _generated42.Value;
 
     public Dpm2043ValidateFixture()
     {
@@ -40,11 +59,31 @@ public sealed class Dpm2043ValidateFixture : IDisposable
         using var stderr = new StringWriter();
 
         ExitCode = CliRunner.Run(
-            ["--source", RepoPaths.AccessDpm20Release43DatabasePath, "--output", GeneratedDatabasePath, "--all"],
+            ["--source", RepoPaths.AccessDpm20Release43DatabasePath, "--release", Release43Code, "--output", GeneratedDatabasePath],
             stdout,
             stderr);
 
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+        _generated42 = new Lazy<string>(Convert42);
+    }
+
+    private string Convert42()
+    {
+        var path = Path.Join(TempDirectory, "generated-dpm2043-release42.db");
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var exitCode = CliRunner.Run(
+            ["--source", RepoPaths.AccessDpm20Release43DatabasePath, "--release", Release42Code, "--output", path],
+            stdout,
+            stderr);
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        if (exitCode != 0 || !File.Exists(path))
+        {
+            throw new InvalidOperationException($"Conversion of the 4.3 database at release {Release42Code} failed (exit {exitCode}): {stderr}");
+        }
+
+        return path;
     }
 
     public void Dispose()

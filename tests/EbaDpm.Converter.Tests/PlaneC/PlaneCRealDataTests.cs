@@ -31,7 +31,9 @@ public sealed class PlaneCRealDataTests(Dpm20SkeletonFixture fixture)
 
         // Universe positive control: if this is 0, the layout is not really being read and the
         // rest of the assertions of this test prove nothing.
-        ReleasePins.AssertPinned(ReleasePins.Layouts42, "C-DPS-01 signatures examined", 91056, cDps01.Examined);
+        // 91056 before #75; 91155 = 91056 + 99, the signatures of the DORA taxonomy (the only taxonomy added to
+        // this file), re-measured 2026-11-16. Still Failed == 0 below: DORA matches the 4.2 layouts.
+        ReleasePins.AssertPinned(ReleasePins.Layouts42AfterDora, "C-DPS-01 signatures examined", 91155, cDps01.Examined);
 
         Assert.Equal("pass", cDps01.Status);
         Assert.Equal(0, cDps01.Failed);

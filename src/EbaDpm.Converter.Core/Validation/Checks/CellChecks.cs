@@ -8,8 +8,10 @@ namespace EbaDpm.Converter.Core.Validation.Checks;
 /// </summary>
 public static class CellChecks
 {
-    public static IEnumerable<CheckResult> Run(SqliteConnection c, ValidationSourceModel model)
+    public static IEnumerable<CheckResult> Run(
+        SqliteConnection c, ValidationSourceModel model, List<KnownExceptions.Outcome>? exceptionSink = null)
     {
+        exceptionSink ??= [];
         yield return BusinessCodeReconstructedMatchesEmitted(c, model);
 
         // A-CEL-01/A-CEL-02 encoded a property of DPM 1.0 (the BusinessCode only counts CLOSED
@@ -189,30 +191,7 @@ public static class CellChecks
         // in Dpm2 anyway: enabling them for DPM 1.0 is a scope decision.
         if (model == ValidationSourceModel.Dpm2)
         {
-            yield return SqlHelpers.CountCheck(
-                c, "A-OCA-10", ValidationLayer.Critical, "mOrdinateCategorisation",
-                "A dimension belongs to exactly ONE axis within a given table: no (TableID,DimensionID) touches ordinates of more than one axis",
-                """
-                SELECT COUNT(*) FROM (
-                    SELECT ta."TableID", oc."DimensionID"
-                    FROM "mOrdinateCategorisation" oc
-                    JOIN "mAxisOrdinate" ao ON ao."OrdinateID" = oc."OrdinateID"
-                    JOIN "mAxis" a ON a."AxisID" = ao."AxisID"
-                    JOIN "mTableAxis" ta ON ta."AxisID" = a."AxisID"
-                    GROUP BY ta."TableID", oc."DimensionID"
-                )
-                """,
-                """
-                SELECT COUNT(*) FROM (
-                    SELECT ta."TableID", oc."DimensionID"
-                    FROM "mOrdinateCategorisation" oc
-                    JOIN "mAxisOrdinate" ao ON ao."OrdinateID" = oc."OrdinateID"
-                    JOIN "mAxis" a ON a."AxisID" = ao."AxisID"
-                    JOIN "mTableAxis" ta ON ta."AxisID" = a."AxisID"
-                    GROUP BY ta."TableID", oc."DimensionID"
-                    HAVING COUNT(DISTINCT a."AxisOrientation") > 1
-                )
-                """);
+            yield return DimensionOwnedByOneAxis(c, exceptionSink);
 
             yield return SqlHelpers.CountCheck(
                 c, "A-CEL-10", ValidationLayer.Critical, "mCellPosition",
@@ -230,6 +209,45 @@ public static class CellChecks
                 )
                 """);
         }
+    }
+
+    /// <summary>
+    /// A-OCA-10 with the named exceptions of AO-4. Business key = <c>TaxonomyCode|TableCode|DimensionXBRLCode</c>
+    /// (codes, never IDs). A declared key whose (table, dimension) pair does not occur in the
+    /// validated file at all is reported as not applicable (object absent: the file is of another
+    /// release); AO-4 is two-sided, so a declared triple that occurs but no longer violates is stale and fails.
+    /// </summary>
+    private static CheckResult DimensionOwnedByOneAxis(SqliteConnection c, List<KnownExceptions.Outcome> exceptionSink)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        const string pairs =
+            """
+            SELECT COALESCE(tx."TaxonomyCode", '#') || '|' || COALESCE(t."TableCode", '#' || ta."TableID")
+                       || '|' || COALESCE(d."DimensionXBRLCode", '#' || oc."DimensionID"),
+                   COUNT(DISTINCT a."AxisOrientation")
+            FROM "mOrdinateCategorisation" oc
+            JOIN "mAxisOrdinate" ao ON ao."OrdinateID" = oc."OrdinateID"
+            JOIN "mAxis" a ON a."AxisID" = ao."AxisID"
+            JOIN "mTableAxis" ta ON ta."AxisID" = a."AxisID"
+            LEFT JOIN "mTable" t ON t."TableID" = ta."TableID"
+            LEFT JOIN "mTaxonomyTable" tt ON tt."TableID" = ta."TableID"
+            LEFT JOIN "mTaxonomy" tx ON tx."TaxonomyID" = tt."TaxonomyID"
+            LEFT JOIN "mDimension" d ON d."DimensionID" = oc."DimensionID"
+            GROUP BY tx."TaxonomyID", ta."TableID", oc."DimensionID"
+            """;
+        var rows = SqlHelpers.Rows(c, pairs, 2);
+        sw.Stop();
+
+        var present = rows.Select(r => r[0]!).ToHashSet(StringComparer.Ordinal);
+        var violating = rows.Where(r => long.Parse(r[1]!, System.Globalization.CultureInfo.InvariantCulture) > 1)
+            .Select(r => r[0]!).ToHashSet(StringComparer.Ordinal);
+        var (unresolved, outcomes) = KnownExceptions.ApplyOriginAnomalyExceptions("A-OCA-10", violating, ValidationPlane.A, present);
+        exceptionSink.AddRange(outcomes);
+
+        return CheckResult.FromViolationCount(
+            "A-OCA-10", ValidationPlane.A, ValidationLayer.Critical, "mOrdinateCategorisation",
+            "A dimension belongs to exactly ONE axis within a given table: no (TableID,DimensionID) touches ordinates of more than one axis, except the declared anomalies (named exceptions)",
+            rows.Count, unresolved.Count, sw.ElapsedMilliseconds, unresolved.Select(k => new CheckSample(k)).ToList());
     }
 
     private static CheckResult BusinessCodeReconstructedMatchesEmitted(SqliteConnection c, ValidationSourceModel model)

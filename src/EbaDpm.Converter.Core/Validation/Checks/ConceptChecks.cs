@@ -23,8 +23,10 @@ public static class ConceptChecks
         "Module", "Release", "ReportingFramework", "Table", "TemplateOrTable", "Taxonomy",
     ];
 
-    public static IEnumerable<CheckResult> Run(SqliteConnection c, ValidationSourceModel model)
+    public static IEnumerable<CheckResult> Run(
+        SqliteConnection c, ValidationSourceModel model, List<KnownExceptions.Outcome>? exceptionSink = null)
     {
+        exceptionSink ??= [];
         var inClause = string.Join(",", DestinationVocabulary.Select(v => $"'{v}'"));
         yield return SqlHelpers.CountCheck(
             c, "A-CPT-01", ValidationLayer.Critical, "mConcept", "ConceptType belongs to the DESTINATION vocabulary",
@@ -95,10 +97,22 @@ public static class ConceptChecks
                    OR substr(oc."DimensionMemberSignature", 1, length(d."DimensionXBRLCode") + 1) IS NOT (d."DimensionXBRLCode" || '('))
             """);
 
-        yield return SqlHelpers.CountCheck(
-            c, "I-SIG-07", ValidationLayer.Critical, "mTableCell", "Every NON-shaded cell has a DPS starting with 'MET('",
-            "SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 0",
-            "SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 0 AND (\"DPS\" IS NULL OR substr(\"DPS\", 1, 4) <> 'MET(')");
+        if (model == ValidationSourceModel.Dpm2)
+        {
+            yield return EveryNonShadedCellHasMetric(c, exceptionSink);
+        }
+        else
+        {
+            // AO-5 describes the DPM 2.0 source: DPM 1.0 keeps the plain check, and the entry is
+            // reported as "does not apply" (nothing present, nothing consumed).
+            exceptionSink.AddRange(KnownExceptions.ApplyOriginAnomalyExceptions(
+                "I-SIG-07", new HashSet<string>(StringComparer.Ordinal), ValidationPlane.A,
+                new HashSet<string>(StringComparer.Ordinal)).Outcomes);
+            yield return SqlHelpers.CountCheck(
+                c, "I-SIG-07", ValidationLayer.Critical, "mTableCell", "Every NON-shaded cell has a DPS starting with 'MET('",
+                "SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 0",
+                "SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 0 AND (\"DPS\" IS NULL OR substr(\"DPS\", 1, 4) <> 'MET(')");
+        }
 
         yield return SqlHelpers.CountCheck(
             c, "I-SIG-08", ValidationLayer.Critical, "mOrdinateCategorisation", "Every categorisation with MemberID=9999 has '(*' in the DPS",
@@ -183,6 +197,56 @@ public static class ConceptChecks
     /// Member/Hierarchy, so forcing this check into the critical layer would block --validate over
     /// a point that is still open. The full breakdown is reported.
     /// </summary>
+    /// <summary>
+    /// I-SIG-07 with the named exceptions of AO-5. Business key = <c>TaxonomyCode|TableCode</c>. A
+    /// declared table absent from the validated file does not apply; one present that no longer
+    /// violates is stale and fails (two-sided). Failed = violating cells of the undeclared tables
+    /// plus one per stale entry.
+    /// </summary>
+    private static CheckResult EveryNonShadedCellHasMetric(SqliteConnection c, List<KnownExceptions.Outcome> exceptionSink)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var examined = SqlHelpers.Scalar(c, "SELECT COUNT(*) FROM \"mTableCell\" WHERE \"IsShaded\" = 0");
+        var rows = SqlHelpers.Rows(
+            c,
+            """
+            SELECT COALESCE(tx."TaxonomyCode", '#') || '|' || COALESCE(t."TableCode", '#' || tc."TableID"),
+                   SUM(tc."DPS" IS NULL OR substr(tc."DPS", 1, 4) <> 'MET(')
+            FROM "mTableCell" tc
+            LEFT JOIN "mTable" t ON t."TableID" = tc."TableID"
+            LEFT JOIN "mTaxonomyTable" tt ON tt."TableID" = tc."TableID"
+            LEFT JOIN "mTaxonomy" tx ON tx."TaxonomyID" = tt."TaxonomyID"
+            WHERE tc."IsShaded" = 0
+            GROUP BY tx."TaxonomyID", tc."TableID"
+            """,
+            2);
+        sw.Stop();
+
+        var present = rows.Select(r => r[0]!).ToHashSet(StringComparer.Ordinal);
+        var countByKey = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var r in rows)
+        {
+            var n = long.Parse(r[1]!, System.Globalization.CultureInfo.InvariantCulture);
+            if (n > 0)
+            {
+                countByKey[r[0]!] = countByKey.GetValueOrDefault(r[0]!) + n;
+            }
+        }
+
+        var (unresolved, outcomes) = KnownExceptions.ApplyOriginAnomalyExceptions(
+            "I-SIG-07", countByKey.Keys.ToHashSet(StringComparer.Ordinal), ValidationPlane.A, present);
+        exceptionSink.AddRange(outcomes);
+
+        var failed = unresolved.Sum(k => countByKey.GetValueOrDefault(k, 1));
+        var samples = unresolved
+            .Select(k => new CheckSample(countByKey.TryGetValue(k, out var n) ? $"{k}: {n} cell(s)" : k))
+            .ToList();
+        return CheckResult.FromViolationCount(
+            "I-SIG-07", ValidationPlane.A, ValidationLayer.Critical, "mTableCell",
+            "Every NON-shaded cell has a DPS starting with 'MET(', except the declared anomalies (named exceptions)",
+            examined, failed, sw.ElapsedMilliseconds, samples);
+    }
+
     private static CheckResult ConceptTypeCountsMatchEntities(SqliteConnection c)
     {
         var pairs = new (string ConceptType, string Table)[]

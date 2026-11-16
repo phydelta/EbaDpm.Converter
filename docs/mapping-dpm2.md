@@ -27,13 +27,13 @@ Loaders run in this order (`src/EbaDpm.Converter.Core/Mapping/Dpm20/`):
 
 | Rule | Detail |
 |---|---|
-| **Read as of the cutoff release.** | Versioned tables are filtered with `Start <= R AND (End IS NULL OR End > R)`, `EndReleaseID` exclusive. The dictionary is not filtered, and the `ModuleVersion` history up to the cutoff is read to describe taxonomies ([mTaxonomy](#mtaxonomy)). See [source-models.md](source-models.md#the-cutoff-release-dpm-20). |
+| **One file per release.** | Each output file is the snapshot of one release R, and carries only the module versions that start in R (`ModuleVersion.StartReleaseID = R`). A module that did not change in R stays in the file of the release that published it. See [usage.md](usage.md#dpm-20-sources). |
+| **Read as of R.** | Versioned structure tables are filtered with `Start <= R AND (End IS NULL OR End > R)`, `EndReleaseID` exclusive. The dictionary is filtered with `Start <= R` and no end condition ([Dictionary](#dictionary)), and the `ModuleVersion` history up to R is read to describe taxonomies ([mTaxonomy](#mtaxonomy)). Nothing that starts after R reaches the file. See [source-models.md](source-models.md#the-release-of-a-file-dpm-20). |
 | **The source decides.** | Where the source has a value, it is exported; where it has none, the column stays empty. Nothing is invented to resemble another export of the format. |
 | **One row per (table, taxonomy) pair.** | A table version that belongs to two derived taxonomies produces its structure twice, once per taxonomy, with fresh IDs. |
 | **IDs are minted deterministically.** | DPM 2.0 has no entity matching axes, ordinates, cells or concepts one-to-one, so their IDs are counters assigned in a fixed order. |
 | **`9999` is a literal.** | The "Open" sentinel domain and member, and the metric dimension `MET`, use ID `9999`, as in the distribution format; the member counter skips that value. |
 | **Roots of `mTemplateOrTable` use parent `0`.** | Same convention as in DPM 1.0. Orphan `BusinessTable` nodes also use `0`. |
-| **The DORA framework is excluded.** | Its tables and modules are not exported, and a table that belongs only to DORA is not emitted. DORA is not part of the reporting frameworks distributed in this format. |
 | **Unresolved cases are reported, not forced.** | When a rule cannot decide (for example a dimension appearing on two axes that no source declares an owner for), the case is listed in the conversion log and left as is. |
 
 ---
@@ -42,14 +42,14 @@ Loaders run in this order (`src/EbaDpm.Converter.Core/Mapping/Dpm20/`):
 
 ### mRelease
 
-All rows of `[Release]`, not filtered by the selection.
+The rows of `[Release]` up to R (`ReleaseID <= R`), not filtered by the selection. Releases published after R are not in the file.
 
 | Column | Source |
 |---|---|
 | `ReleaseID`, `ReleaseCode` | `ReleaseID`, `Code` |
 | `ReleaseDescription`, `Status` | `Description`, `Status` |
 | `PublicationDate` | `Date`, copied as ISO text (never round-tripped through a date type, which would depend on the machine's time zone) |
-| `IsCurrent` | `1` for the cutoff release, `0` for the others. With the natural cutoff this equals the Access `IsCurrent` (measured on the 4.2.1 and 4.3 databases); with `--cutoff-release` it marks the requested release |
+| `IsCurrent` | `1` for R, `0` for the others. For the latest release of the database this equals the Access `IsCurrent` (measured on the 4.2.1 and 4.3 databases) |
 | `ConceptID` | minted (type `Release`) |
 
 ### mReportingFramework
@@ -61,16 +61,17 @@ All rows of `[Release]`, not filtered by the selection.
 
 DPM 2.0 has no `Taxonomy` table; taxonomies are **derived** (`Dpm20TaxonomyDeriver`):
 
-1. **Modules.** The emitted module versions: current at the cutoff, excluding DORA and
-   document modules (see [Modules](#modules)).
+1. **Modules.** The emitted module versions: those that start in R, excluding document modules
+   (see [Modules](#modules)).
 2. **One taxonomy per publication.** A module version belongs to the taxonomy
    `(Module.FrameworkID, ModuleVersion.StartReleaseID)`: the release in which that module version
-   was published, which is the release of the EBA taxonomy that carries it. `mTaxonomy` holds
-   exactly the distinct pairs of the emitted module versions, so every taxonomy has at least one
-   module. A module that has not changed since an earlier release stays in that release's
-   taxonomy: on the 4.3 database (measured 2026-10-27) 49 of the 54 modules are in a `4.2`
-   taxonomy, `FINREP9DP` in `finrep 4.2.1`, and only `AML_RA` and the three `TCB_*` modules in a
-   `4.3` taxonomy.
+   was published, which is the release of the EBA taxonomy that carries it. Since every emitted
+   module version starts in R, all the taxonomies of a file have release R, one per framework that
+   publishes a module version in R, and every taxonomy has at least one module. A module that has
+   not changed since an earlier release is in the file of that release: on the 4.3 database
+   (measured 2026-10-27) 49 of the 54 modules current at 4.3 started in 4.2, so they are in the
+   4.2 file, `FINREP9DP` is in the 4.2.1 file, and the 4.3 file holds `AML_RA` and the three
+   `TCB_*` modules.
 3. **Tables of a taxonomy.** The current, non-abstract table versions that
    `ModuleVersionComposition` assigns to the taxonomy's module versions. When a module declares
    an **abstract** table, its current concrete children are added to that module too, even if
@@ -80,8 +81,6 @@ DPM 2.0 has no `Taxonomy` table; taxonomies are **derived** (`Dpm20TaxonomyDeriv
    a taxonomy never holds a table newer than its release.
 4. **Codes.** `TaxonomyCode` = framework code in lower case + space + release code
    (`corep 4.2`). `TaxonomyKey` = framework code in lower case + `/` + release (`corep/4.2`).
-   `DpmPackageCode` = the release code, so `--releases 4.3` selects the taxonomies published in
-   4.3, not every taxonomy current at 4.3.
 
 | Column | Value |
 |---|---|
@@ -97,14 +96,14 @@ DPM 2.0 has no `Taxonomy` table; taxonomies are **derived** (`Dpm20TaxonomyDeriv
 
 The descriptive columns come from `ModuleVersion`, which declares per module a `VersionNumber`
 and a `FromReferenceDate`. For a taxonomy T = (framework F, release R), with releases ordered by
-`ReleaseID` and only releases up to the cutoff considered:
+`ReleaseID` and only releases up to R considered:
 
 - **R′** is the latest release ≤ R in which a module version of F starts (`StartReleaseID`) that
-  is still current at R. Since every taxonomy is the release in which some of its module versions
-  start, R′ = R for every emitted taxonomy; the general definition is kept so the calculation
-  does not depend on how the taxonomies were chosen.
+  is still current at R. Since every emitted module version starts in R, R′ = R for every emitted
+  taxonomy; the general definition is kept so the calculation does not depend on how the
+  taxonomies were chosen.
 - The **publications** of F are the releases in which some module version of F starts, over the
-  whole `ModuleVersion` history up to the cutoff, not only the emitted taxonomies. They form a
+  whole `ModuleVersion` history up to R, not only the emitted taxonomies. They form a
   chain: `ToDate` is the day before the `FromDate` of the first later publication (in release
   order) whose `FromDate` is strictly later. `FromDate` is not monotonic in release order (COREP
   3.5 applies from 2025-03-31, COREP 4.0 from 2024-12-31), so chaining to the immediate
@@ -143,15 +142,15 @@ owners of the format.)
 
 ### mTaxonomyPackage
 
-One row, derived from the cutoff release and the emitted frameworks:
+One row, derived from R and the emitted frameworks:
 
 | Column | Value |
 |---|---|
-| `Version` | `<cutoff release>.0.0` (e.g. `4.2.0.0`) |
+| `Version` | `<R>.0.0` (e.g. `4.2.0.0`) |
 | `Name` | `EBA XBRL <release> Reporting Frameworks <version> (<codes>)`, where `<codes>` are the emitted framework codes in upper case, sorted ordinally, joined with `_` |
 | `Description` | `Name` + `. Requires Dictionary <release> or later` |
 | `Identifier` | `http://www.eba.europa.eu/eu/fr/xbrl/tp/<release>/EBA_XBRL_<release>_Reporting_Frameworks_<version>.zip` |
-| `PublicationDate` | `Release.Date` of the cutoff release |
+| `PublicationDate` | `Release.Date` of R |
 | `SchemaLocation`, `Publisher`, `PublisherURL` | constants of the taxonomy package format |
 | `LicenceName`, `LicenceHref` | empty strings; `Lang`, `PublisherCountry`, `CopyrightComment` are `NULL` |
 
@@ -167,11 +166,21 @@ sub-categories (hierarchies). A **property** is an item of the special category 
 as a metric, as a dimension, or as both (several dozen properties are both), so the two roles are
 evaluated independently.
 
+The dictionary is read **as of R**, keeping its history: every row that starts in R or earlier
+(`StartReleaseID <= R`, with no end condition, so a renamed code such as `FGT` / `old-FGT` keeps
+both rows) and none that starts later. This applies to `ItemCategory`, `PropertyCategory`,
+`SuperCategoryComposition` and `SubCategoryVersion`, to the header and variable versions used to
+identify metrics and dimensions, and to the table versions of the metric history fallback
+([mMetric](#mmetric)). A `Category` is read when `CreatedRelease <= R` (measured on the 4.4
+database: it equals the start of the category's first item or property row), and a
+`SubCategory` when one of its versions starts by R. Texts that the source does not version
+(`Item.Name`, `Category.Name`) are those of the database being converted.
+
 ### mDomain
 
 | Rows | Rule |
 |---|---|
-| One per `Category` | except `SE`, `_NA`, `_PR`, `_TE` (structural categories, not domains). IDs from 1 in `CategoryID` order. |
+| One per `Category` created by R | except `SE`, `_NA`, `_PR`, `_TE` (structural categories, not domains). IDs from 1 in `CategoryID` order. |
 | `MET` | metric domain, label `Metric domain`, XBRL code `MET` |
 | `INT_NA`, `STR_NA` | typed domains for typed dimensions whose values have no domain of their own (integer / non-empty string). Labels copied verbatim from the source definition. |
 | `9999` | the `Open` sentinel, empty code |
@@ -195,12 +204,13 @@ result matches the 4.2 reference export for all its typed domains.
 ### mDomainUnion
 
 A direct translation of `SuperCategoryComposition`: one row per (union domain, component
-domain). The union is **not** materialised: the union domain keeps its own members.
+domain). The union is **not** materialised: the union domain keeps its own members. No
+`SuperCategoryComposition` row starts before 4.0, so the 3.4 and 3.5 files have no rows here.
 
 ### mMember
 
-One row per `ItemCategory` row (the full history, so a renamed code such as `FGT` / `old-FGT`
-produces both), except:
+One row per `ItemCategory` row that starts by R (the history up to R, so a renamed code such as
+`FGT` / `old-FGT` produces both), except:
 
 - `_TE` items (templates modelled as items) are skipped;
 - `_PR` items (properties) become members of `MET` **only if they are metrics** (see below);
@@ -237,20 +247,20 @@ One row per `MET` member, in the same order, `CorrespondingMemberID` pointing to
 The hierarchy is declared per use, not per metric: only `HeaderVersion.SubCategoryVID` carries
 it (`PropertyCategory` gives the domain only, and no `VariableVersion` has a `SubCategoryVID`).
 The candidates of a metric are the sub-categories of the **non-key** headers that use its property
-in the table versions current at the cutoff, resolved to the stable `SubCategoryID` through
+in the table versions current at R, resolved to the stable `SubCategoryID` through
 `SubCategoryVersion` (a re-versioned sub-category names the same hierarchy). Key headers are
 excluded: they are open axes, whose restriction goes to `mOpenAxisValueRestriction`. The
 selection of taxonomies (`--releases`) does not change the candidates.
 
 For backward compatibility, a metric that no current table uses keeps the hierarchy of its past
 uses: when the current table versions give no candidate, the candidates are taken from **every**
-non-key header version that uses the property, in any table version. A metric that the current
-tables restrict to more than one hierarchy never falls back to the history.
+non-key header version that uses the property, in any table version that starts by R. A metric
+that the current tables restrict to more than one hierarchy never falls back to the history.
 
 | Candidates | `ReferencedHierarchyID` | `ReferencedDomainID` |
 |---|---|---|
 | exactly one | that hierarchy | its domain |
-| none, or more than one | `NULL` | for an `Enumeration/Code` metric, the domain of its `PropertyCategory` row in force at the cutoff; otherwise `NULL` |
+| none, or more than one | `NULL` | for an `Enumeration/Code` metric, the domain of its `PropertyCategory` row in force at R; otherwise `NULL` |
 
 In the 4.3 database (20260622), 155 metrics take their hierarchy from the history: no current
 table uses them, and most were last used in tables of 3.x to 4.1.
@@ -288,14 +298,23 @@ label `Metric dimension`, domain `MET`. DPM 2.0 has no source row to rename, so 
 
 ### mHierarchy
 
-`SubCategory`, one to one, IDs in source order. Sub-categories of `_PR` (metric hierarchies,
+`SubCategory`, one to one for the sub-categories with a version that starts by R, IDs in source
+order. Sub-categories of `_PR` (metric hierarchies,
 codes `AT*`) are assigned to the `MET` domain. `HierarchyDescription` = empty string.
 
 ### mHierarchyNode
 
-The items of each sub-category's **effective version**: the version current at the cutoff or,
-for a sub-category with no current version, its latest version (a hierarchy whose effective
-version has no items gets no nodes).
+The items of each sub-category's **effective version**: the version current at R or, for a
+sub-category with no version current at R, its latest version that starts by R (a hierarchy whose
+effective version has no items gets no nodes).
+
+The output has no hierarchy versions, so a header that pointed to another version of the
+sub-category than the effective one would get the effective version's members. Because each file
+holds only the module versions published in R, this does not happen on the published data:
+measured on the 4.4 database (2026-11-16), 0 headers with a sub-category in any release file
+point to a version that is not current at that release. The positive control, the same query over
+every module version current at 4.3 read as of 4.3, finds the 68 headers of #62. Frameworks
+change between releases, so this is a measurement, not a property.
 
 | Column | Rule |
 |---|---|
@@ -337,10 +356,10 @@ Three strata, built for **every** emitted taxonomy.
 | Table | `BusinessTable` / 1 | the table version | `TableCode` / `TableLabel` |
 
 - **Abstract tables are not emitted as tables, but they are the template nodes.**
-- **Emitted groups.** `TableGroup` rows of type `templateGroup`, current at the cutoff, that
+- **Emitted groups.** `TableGroup` rows of type `templateGroup`, current at R, that
   contain at least one emitted table (over the whole derived universe, not only the selection)
   and whose set of emitted tables is not contained in another group's set (ties go to the lower
-  `TableGroupID`). Redundant and DORA-only groups are thus dropped. The set is computed
+  `TableGroupID`). Redundant groups are thus dropped. The set is computed
   independently of the selection, so a taxonomy's tree does not change shape depending on what
   else is converted with it.
 - **Parent of a template.** The emitted group that contains the template or any of its concrete
@@ -411,7 +430,15 @@ The categorisation of each **closed** ordinate is assembled from these sources, 
    closed axis, the axis whose header declares the dimension in its context keeps it; failing
    that, a dimension declared by the table context goes to `X`; otherwise the case is reported.
 3. **Metric.** A non-key header with a `PropertyID` contributes `MET(<metric>)`. The metric is
-   never inherited.
+   never inherited. When no non-key header of the table contributes a metric and the table
+   version declares one itself (`TableVersion.PropertyID`), `MET(<that metric>)` goes to the
+   ordinates of the first closed axis in X, Y, Z order, the same convention as a table-context
+   dimension with no owning axis. The data points of the cells confirm it
+   (`VariableVersion.PropertyID` is the same property). On the 4.4 database (measured
+   2026-11-16) only `C_96.05.2`, in releases 3.5 to 4.2, declares its metric this way; a metric
+   that cannot be resolved as of R is reported, not invented. That is the case of the 3.5
+   version: its metric `qCFB` has no `ItemCategory` row before 4.0, so its cells have no metric
+   in the 3.5 file (known exception of `I-SIG-07`, key `corep 3.5|C_96.05.2`).
 4. **Table context.** Pairs declared on `TableVersion.ContextID` are added to the ordinates of
    the axis that owns the dimension, where the ordinate has no value of its own.
 5. **Closure.** The written rows are the **effective categorisation**: the parent's pairs
@@ -430,9 +457,9 @@ open pair of a restricted axis (hierarchy code versus hierarchy ID). `Source` is
 
 One row per open axis whose key header has a `HeaderVersion.SubCategoryVID`: the sub-category is
 resolved through `SubCategoryVersion` to its `mHierarchy` row. If the referenced version is no
-longer current at the cutoff (a sub-category re-versioned without updating every header that
-used it), the version is resolved without the cutoff; the hierarchy is the same, and the case is
-logged. `HierarchyStartingMemberID` is `NULL` and `IsStartingMemberIncluded` is `0`: DPM 2.0 does
+longer current at R (a sub-category re-versioned without updating every header that used it),
+the version is resolved without R; the hierarchy code is the same, its nodes are those of the
+effective version ([mHierarchyNode](#mhierarchynode)), and the case is logged. `HierarchyStartingMemberID` is `NULL` and `IsStartingMemberIncluded` is `0`: DPM 2.0 does
 not model a starting member.
 
 ### mOrdinateMetricRestriction
@@ -465,7 +492,11 @@ configuration: it is reported under the structural anomalies, once per (table, d
 the number of affected cells, an example `BusinessCode`, and the ordinates and members of each
 axis involved. The signature itself is not changed: it keeps the pair the depth arbitration
 picks (on a tie, the ordinate of the first closed axis in X, Y, Z order), but that pair has no defined meaning. Measured on 2026-10-22: no table of the 4.2,
-4.2.1 and 4.3 databases declares a dimension on more than one axis.
+4.2.1 and 4.3 databases declares a dimension on more than one axis. Earlier releases do
+(measured 2026-11-16 on the 4.4 database): `K_04.00.b` (`PDR`), `K_05.00.b` (`BAS`) and
+`K_26.00.b` (`TRI`), each with the same member on every axis involved. They are reported and
+registered as known exceptions of `A-OCA-10`, keyed by taxonomy, table and dimension
+(`pillar3 3.4` and `pillar3 4.0`).
 
 ---
 
@@ -473,7 +504,7 @@ picks (on a tie, the ordinate of the first closed axis in X, Y, Z order), but th
 
 | Table | Rule |
 |---|---|
-| `mModule` | Current `ModuleVersion` rows, excluding DORA modules and **document modules** (`Module.isDocumentModule`, links to PDF documentation without tables). `ModuleCode` = `ModuleVersion.Code` in **upper case**; `ModuleLabel` = `Name`. `TaxonomyID` = the taxonomy `(framework, ModuleVersion.StartReleaseID)` ([mTaxonomy](#mtaxonomy)). `XBRLSchemaRef` = `http://www.eba.europa.eu/eu/fr/xbrl/crr/fws/<framework in lower case>/<StartRelease.Code>/mod/<module in lower case>.xsd`: the release in which the module version was published, not the cutoff release. `ConceptualModuleID` = `ModuleID`; `AutogenerateRefs = 1`; `JsonBlob` empty; `DefaultFrequency`, `JSONSchemaRef` `NULL`. |
+| `mModule` | The `ModuleVersion` rows that start in R, excluding **document modules** (`Module.isDocumentModule`, links to PDF documentation without tables). `ModuleCode` = `ModuleVersion.Code` in **upper case**; `ModuleLabel` = `Name`. `TaxonomyID` = the taxonomy `(framework, ModuleVersion.StartReleaseID)` ([mTaxonomy](#mtaxonomy)). `XBRLSchemaRef` = `http://www.eba.europa.eu/eu/fr/xbrl/crr/fws/<framework in lower case>/<StartRelease.Code>/mod/<module in lower case>.xsd`: the release in which the module version was published, R. `ConceptualModuleID` = `ModuleID`; `AutogenerateRefs = 1`; `JsonBlob` empty; `DefaultFrequency`, `JSONSchemaRef` `NULL`. |
 | `mConceptualModule` | a 1:1 mirror of `mModule` |
 | `mModuleBusinessTemplate` | one row per (module, emitted group containing any of the module's tables), via `ModuleVersionComposition` → `TableVersion` → `TableGroupComposition`. `BusinessTemplateID` is the level-1 group node of the module's taxonomy. `Order` is 0-based natural order of the group code — a declared convention (the source has no order for this relation). |
 

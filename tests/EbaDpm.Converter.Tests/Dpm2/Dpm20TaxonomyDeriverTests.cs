@@ -145,6 +145,10 @@ public sealed class Dpm20TaxonomyDeriverTests(Dpm20AccessReaderFixture fixture)
         ReleasePins.AssertPinned(
             ReleasePins.Reference42, "reference mTaxonomy codes", ReleasePins.Reference42MTaxonomyRows, referenceCodes.Count);
 
+        // Named known exception (#75), stale-checked: 'dora 4.2' is derived and the reference has no DORA.
+        DoraAbsentFromReference42.AssertTaxonomyStale(derivedCodes, referenceCodes);
+        derivedCodes.Remove(DoraAbsentFromReference42.TaxonomyCode);
+
         var onlyDerived = derivedCodes.Except(referenceCodes).ToList();
         Assert.True(
             onlyDerived.Count == 0,

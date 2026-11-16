@@ -1,4 +1,4 @@
-﻿using EbaDpm.Converter.Core.Access;
+using EbaDpm.Converter.Core.Access;
 using EbaDpm.Converter.Core.Access.Dpm20;
 using EbaDpm.Converter.Core.Sqlite;
 using Microsoft.Data.Sqlite;
@@ -27,8 +27,8 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 /// <list type="bullet">
 /// <item><description>
 /// <b><c>mModule</c></b> ← CURRENT <c>ModuleVersion</c> (already filtered by the cutoff release in
-/// <see cref="Dpm20AccessReader.ReadModuleVersions"/>), excluding the <c>DORA</c> framework AND
-/// excluding <c>Module.isDocumentModule = True</c> (see <see cref="Dpm20ModuleRow"/>: without this
+/// <see cref="Dpm20AccessReader.ReadModuleVersions"/>), excluding
+/// <c>Module.isDocumentModule = True</c> (every framework, DORA included, is emitted like any other) (see <see cref="Dpm20ModuleRow"/>: without this
 /// second filter 52 come out, not 50 — the 2 extra ones are <c>P3_NONREM_DIS_DOCS</c> and
 /// <c>P3_REM_DIS_DOCS</c>, links to PDFs with no tables), with <c>ModuleCode</c> =
 /// <b><c>UCase(ModuleVersion.Code)</c></b> (50/50). <c>ModuleLabel</c>
@@ -104,7 +104,7 @@ public static class Dpm20ModuleLoader
             .Where(t => t.FrameworkId.HasValue)
             .ToDictionary(t => (t.FrameworkId!.Value, t.DpmPackageCode), t => t.TaxonomyId);
 
-        // ---- Selection of emitted modules: current, without DORA, without document modules, with
+        // ---- Selection of emitted modules: current, without document modules, with
         // the taxonomy (framework, StartRelease) present in the current selection. ----
         var emitted = new List<(int ModuleVId, string ModuleCode, string ModuleLabel, int TaxonomyId)>();
 
@@ -124,11 +124,6 @@ public static class Dpm20ModuleLoader
                     $"ModuleVersion ModuleVID={mv.ModuleVId} ('{mv.Code}'): FrameworkID="
                     + $"{moduleRow.FrameworkId} missing from Framework.");
                 continue;
-            }
-
-            if (string.Equals(framework.Code, "DORA", StringComparison.OrdinalIgnoreCase))
-            {
-                continue; // DORA is excluded by rule, it is not an unresolved case.
             }
 
             if (moduleRow.IsDocumentModule)

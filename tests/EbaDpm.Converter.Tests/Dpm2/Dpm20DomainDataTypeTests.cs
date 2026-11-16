@@ -41,9 +41,9 @@ public sealed class Dpm20DomainDataTypeSyntheticTests
                 }
 
                 Exec(oledb, "INSERT INTO [Release] ([ReleaseID],[Code],[IsCurrent]) VALUES (1,'1.0',-1)");
-                Exec(oledb, $"INSERT INTO [Category] ([CategoryID],[Code],[Name],[IsEnumerated]) VALUES ({PrCategory},'_PR','Property',-1)");
-                Exec(oledb, "INSERT INTO [Category] ([CategoryID],[Code],[Name],[IsEnumerated]) VALUES (2,'_TE','Template',-1)");
-                Exec(oledb, "INSERT INTO [Category] ([CategoryID],[Code],[Name],[IsEnumerated]) VALUES (3,'_NA','Not applicable',-1)");
+                Exec(oledb, $"INSERT INTO [Category] ([CategoryID],[Code],[Name],[IsEnumerated],[CreatedRelease]) VALUES ({PrCategory},'_PR','Property',-1,1)");
+                Exec(oledb, "INSERT INTO [Category] ([CategoryID],[Code],[Name],[IsEnumerated],[CreatedRelease]) VALUES (2,'_TE','Template',-1,1)");
+                Exec(oledb, "INSERT INTO [Category] ([CategoryID],[Code],[Name],[IsEnumerated],[CreatedRelease]) VALUES (3,'_NA','Not applicable',-1,1)");
                 foreach (var (id, code) in new[] { (1, "i"), (2, "r"), (3, "s"), (4, "es"), (5, "dt"), (6, "e") })
                 {
                     Exec(oledb, $"INSERT INTO [DataType] ([DataTypeID],[Code]) VALUES ({id},'{code}')");
@@ -95,18 +95,19 @@ public sealed class Dpm20DomainDataTypeSyntheticTests
     private static readonly string[] Ddl =
     [
         "CREATE TABLE [Release] ([ReleaseID] INTEGER, [Code] TEXT(50), [Date] TEXT(50), [Status] TEXT(50), [Description] TEXT(50), [IsCurrent] YESNO)",
-        "CREATE TABLE [Category] ([CategoryID] INTEGER, [Code] TEXT(50), [Name] TEXT(100), [Description] TEXT(100), [IsEnumerated] YESNO)",
-        "CREATE TABLE [SuperCategoryComposition] ([SuperCategoryID] INTEGER, [CategoryID] INTEGER)",
+        "CREATE TABLE [Category] ([CategoryID] INTEGER, [Code] TEXT(50), [Name] TEXT(100), [Description] TEXT(100), [IsEnumerated] YESNO, [CreatedRelease] INTEGER)",
+        "CREATE TABLE [SuperCategoryComposition] ([SuperCategoryID] INTEGER, [CategoryID] INTEGER, [StartReleaseID] INTEGER)",
         "CREATE TABLE [ItemCategory] ([ItemID] INTEGER, [CategoryID] INTEGER, [Code] TEXT(50), [IsDefaultItem] YESNO, [StartReleaseID] INTEGER, [EndReleaseID] INTEGER)",
         "CREATE TABLE [Item] ([ItemID] INTEGER, [Name] TEXT(100))",
         "CREATE TABLE [Variable] ([VariableID] INTEGER, [Type] TEXT(20))",
-        "CREATE TABLE [VariableVersion] ([VariableVID] INTEGER, [VariableID] INTEGER, [PropertyID] INTEGER)",
+        "CREATE TABLE [VariableVersion] ([VariableVID] INTEGER, [VariableID] INTEGER, [PropertyID] INTEGER, [StartReleaseID] INTEGER, [ContextID] INTEGER)",
         "CREATE TABLE [Header] ([HeaderID] INTEGER, [IsKey] YESNO)",
-        "CREATE TABLE [HeaderVersion] ([HeaderVID] INTEGER, [HeaderID] INTEGER, [PropertyID] INTEGER, [SubCategoryVID] INTEGER)",
+        "CREATE TABLE [HeaderVersion] ([HeaderVID] INTEGER, [HeaderID] INTEGER, [PropertyID] INTEGER, [SubCategoryVID] INTEGER, [StartReleaseID] INTEGER, [ContextID] INTEGER)",
         "CREATE TABLE [SubCategory] ([SubCategoryID] INTEGER, [CategoryID] INTEGER, [Code] TEXT(50), [Name] TEXT(100))",
         "CREATE TABLE [SubCategoryVersion] ([SubCategoryVID] INTEGER, [SubCategoryID] INTEGER, [StartReleaseID] INTEGER, [EndReleaseID] INTEGER)",
         "CREATE TABLE [ContextComposition] ([ContextID] INTEGER, [PropertyID] INTEGER)",
-        "CREATE TABLE [TableVersion] ([TableVID] INTEGER, [StartReleaseID] INTEGER, [EndReleaseID] INTEGER)",
+        "CREATE TABLE [TableVersion] ([TableVID] INTEGER, [StartReleaseID] INTEGER, [EndReleaseID] INTEGER, [ContextID] INTEGER)",
+        "CREATE TABLE [CompoundItemContext] ([ContextID] INTEGER, [StartReleaseID] INTEGER)",
         "CREATE TABLE [TableVersionHeader] ([TableVID] INTEGER, [HeaderVID] INTEGER)",
         "CREATE TABLE [DataType] ([DataTypeID] INTEGER, [Code] TEXT(20))",
         "CREATE TABLE [Property] ([PropertyID] INTEGER, [DataTypeID] INTEGER)",
@@ -123,7 +124,7 @@ public sealed class Dpm20DomainDataTypeSyntheticTests
     /// <summary>A category (typed or enumerated) with one property per given raw data type code, linked by PropertyCategory.</summary>
     private static void AddCategory(OleDbConnection c, int categoryId, string code, bool enumerated, params (int PropertyId, int DataTypeId)[] properties)
     {
-        Exec(c, $"INSERT INTO [Category] ([CategoryID],[Code],[Name],[IsEnumerated]) VALUES ({categoryId},'{code}','{code} name',{(enumerated ? -1 : 0)})");
+        Exec(c, $"INSERT INTO [Category] ([CategoryID],[Code],[Name],[IsEnumerated],[CreatedRelease]) VALUES ({categoryId},'{code}','{code} name',{(enumerated ? -1 : 0)},1)");
         foreach (var (propertyId, dataTypeId) in properties)
         {
             Exec(c, $"INSERT INTO [Property] ([PropertyID],[DataTypeID]) VALUES ({propertyId},{dataTypeId})");

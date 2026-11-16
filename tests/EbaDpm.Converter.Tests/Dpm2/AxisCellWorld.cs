@@ -61,6 +61,9 @@ internal sealed class AxisCellWorld
     /// <summary><c>TableVersion.ContextID</c> of the table.</summary>
     public int? TableContextId { get; set; }
 
+    /// <summary><c>TableVersion.PropertyID</c> of the table: the table-level metric.</summary>
+    public int? TablePropertyId { get; set; }
+
     /// <summary>A dimension of the dictionary: its property and the item of each member code.</summary>
     public sealed record Dimension(string Code, string XbrlCode, int PropertyId, IReadOnlyDictionary<string, int> ItemIdByMember);
 
@@ -100,11 +103,18 @@ internal sealed class AxisCellWorld
     }
 
     /// <summary>Declares a metric: the member <paramref name="code"/> of the <c>MET</c> domain, reached through a property. Returns the <c>PropertyID</c>.</summary>
-    public int AddMetric(string code, bool isDefault = false)
+    public int AddMetric(string code, bool isDefault = false, bool withDestinationMember = true)
     {
         var propertyId = _nextItem++;
         Source.ItemCategories.Add(new(propertyId, PrCategory, code, false, 1, null));
         Source.PropertyCategories.Add(new(propertyId, MetCategory, 1, null));
+        if (!withDestinationMember)
+        {
+            // The metric exists in the source but no MET member of the destination carries its code
+            // (as of the cutoff the dictionary has no such member): the metric cannot be resolved.
+            return propertyId;
+        }
+
         _destinationSql.Add(
             $"""
             INSERT INTO "mMember" ("MemberID", "DomainID", "MemberCode", "MemberXBRLCode", "IsDefaultMember")
@@ -194,7 +204,7 @@ internal sealed class AxisCellWorld
             var tableVersions = new List<Dpm20TableVersionRow>
             {
                 new(TableVId: 1, Code: "T_01", Name: "Synthetic table", TableId: 1, AbstractTableId: null,
-                    StartReleaseId: 1, EndReleaseId: null, IsAbstract: false, ContextId: TableContextId),
+                    StartReleaseId: 1, EndReleaseId: null, IsAbstract: false, ContextId: TableContextId, PropertyId: TablePropertyId),
             };
 
             var result = Dpm20AxisAndCellLoader.Load(

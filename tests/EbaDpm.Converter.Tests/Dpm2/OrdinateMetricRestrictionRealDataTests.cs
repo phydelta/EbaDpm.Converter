@@ -319,6 +319,30 @@ public sealed class OrdinateMetricRestrictionDpm20Cutoff42RealDataTests(Dpm20Ske
     public void PlaneC_CMhr_WithLayouts42_PassesAndReportsItsCensus()
         => OmrPlaneCAssertions.AssertCMhr(fixture.ValidatedDatabasePath, PlaneCLayoutRepositoryHolder.LayoutsDatabasePath, output);
 
+    /// <summary>
+    /// The worked example of issue 61 in the file of release 4.2 (#73: the tables C_67.00.a and C_67.00.w
+    /// are published in 4.2, so they are here and not in the 4.2.1 file): each table restricts qAYV to its
+    /// own hierarchy. As of 4.2 the metric uses ONE hierarchy in every header version that has started, so
+    /// it names it (the several hierarchies of 4.3 are not in this file: they start in 4.3, #73).
+    /// </summary>
+    [DataFact]
+    public void Qayv_IsRestrictedInC6700aAndC6700w_AndTheMetricNamesNoHierarchy()
+    {
+        using var c = OmrRealData.OpenReadOnly(fixture.ValidatedDatabasePath);
+        var qayv = OmrRealData.Rows(
+            c, OmrRealData.RestrictionRows + " WHERE mm.MemberCode = 'qAYV' AND t.TableCode LIKE 'C_67.00.%' ORDER BY t.TableCode", 7)
+            .Select(r => $"{r[0]}/{r[1]}/{r[3]}").Distinct().ToList();
+        Assert.Equal(["C_67.00.a/0016/new_CO4", "C_67.00.w/0016/new_CO4"], qayv);
+
+        var metric = Assert.Single(OmrRealData.Rows(
+            c,
+            """
+            SELECT h.HierarchyCode FROM mMetric me JOIN mMember mm ON mm.MemberID = me.CorrespondingMemberID
+            LEFT JOIN mHierarchy h ON h.HierarchyID = me.ReferencedHierarchyID WHERE mm.MemberCode = 'qAYV'
+            """, 1));
+        Assert.Equal("new_CO4", metric[0]);
+    }
+
     [DataFact]
     public void TheSeveralHierarchiesDiagnostic_NamesEi794_AndItIsHistoryOnly()
     {
@@ -363,10 +387,20 @@ public sealed class OrdinateMetricRestrictionDpm20Natural421RealDataTests(Dpm204
             OmrRealData.Scalar(c, "SELECT COUNT(1) FROM mMetric WHERE ReferencedHierarchyID IS NULL AND ReferencedDomainID IS NOT NULL"));
         OmrRealData.AssertNoStartingMember(c);
 
-        // 4.2.1: no property uses more than one hierarchy in the current tables: no metric has several.
+        // #73: the file of release 4.2.1 only holds the tables of the taxonomies that start in 4.2.1. qAYV is
+        // restricted in C_67.00.a and C_67.00.w (module versions that start in 4.2, hence in the 4.2 file,
+        // see OrdinateMetricRestrictionDpm20Cutoff42RealDataTests), so which of them are HERE is derived from
+        // Access: the table codes of the taxonomies of release 4.2.1, never a constant.
+        var tablesHere = AccessCensus.OfRelease(
+                AccessCensus.TableCodesByTaxonomy(RepoPaths.AccessDpm20DatabasePath, Dpm2042_1ValidateFixture.Release421Code),
+                Dpm2042_1ValidateFixture.Release421Code)
+            .Values.SelectMany(v => v).ToHashSet(StringComparer.Ordinal);
+        var expectedQayv = new[] { "C_67.00.a/0016/new_CO4", "C_67.00.w/0016/new_CO4" }
+            .Where(k => tablesHere.Contains(k[..k.IndexOf('/', StringComparison.Ordinal)]))
+            .ToList();
         var qayv = OmrRealData.Rows(
             c, OmrRealData.RestrictionRows + " WHERE mm.MemberCode = 'qAYV' ORDER BY t.TableCode", 7).Select(r => $"{r[0]}/{r[1]}/{r[3]}").Distinct().ToList();
-        Assert.Equal(["C_67.00.a/0016/new_CO4", "C_67.00.w/0016/new_CO4"], qayv);
+        Assert.Equal(expectedQayv, qayv);
     }
 
     [DataFact]
@@ -412,15 +446,25 @@ public sealed class OrdinateMetricRestrictionDpm20Natural43RealDataTests(Dpm2043
         var rows = OmrRealData.Rows(
             c, OmrRealData.RestrictionRows + " WHERE mm.MemberCode = 'qAYV' ORDER BY t.TableCode", 7)
             .Select(r => $"{r[0]}|{r[1]}|{r[3]}|{r[4]}").ToList();
-        Assert.Equal(
-            [
+
+        // #73: the file of release 4.3 only holds the tables of the taxonomies that start in 4.3 (the C_67.00
+        // tables are published in 4.2). Which of the five worked-example rows are HERE is derived from Access.
+        var tablesHere = AccessCensus.OfRelease(
+                AccessCensus.TableCodesByTaxonomy(RepoPaths.AccessDpm20Release43DatabasePath, Dpm2043ValidateFixture.Release43Code),
+                Dpm2043ValidateFixture.Release43Code)
+            .Values.SelectMany(v => v).ToHashSet(StringComparer.Ordinal);
+        var expectedRows = new[]
+            {
                 "C_67.00.a|0016|new_CO4|qCO",
                 "C_67.00.w|0016|new_CO4|qCO",
                 "E_04.01|0020|new_CO5|qCO",
                 "E_04.02|0020|new_CO5|qCO",
                 "E_08.01|0050|new_CO5|qCO",
-            ],
-            rows);
+            }
+            .Where(k => tablesHere.Contains(k[..k.IndexOf('|', StringComparison.Ordinal)]))
+            .ToList();
+        Assert.NotEmpty(expectedRows);
+        Assert.Equal(expectedRows, rows);
 
         var metric = Assert.Single(OmrRealData.Rows(
             c,
@@ -457,49 +501,127 @@ public sealed class OrdinateMetricRestrictionDpm20Natural43RealDataTests(Dpm2043
     }
 
     /// <summary>
-    /// Metrics without a single hierarchy in 4.3: NULL hierarchy, domain from PropertyCategory. The
-    /// five whose current tables use several are exactly those with several distinct per-ordinate
-    /// hierarchies; <c>ei794</c> has several only in the history (no restriction row).
+    /// Metrics without a single hierarchy. Since #73 the 4.3 file only sees the headers that start in 4.3, and
+    /// as of 4.2 only ONE hierarchy per metric had started, so "several hierarchies" is a property ACROSS the
+    /// release files of the same 4.3 database (<see cref="Dpm2043ValidateFixture.Generated42DatabasePath"/> and
+    /// <see cref="Dpm2043ValidateFixture.GeneratedDatabasePath"/>), not of one file:
+    /// <list type="bullet">
+    /// <item>in the 4.3 file the five (<c>GXI</c>, <c>ei351</c>, <c>qAPH</c>, <c>qAYV</c>, <c>qAZC</c>) and
+    /// <c>ei794</c> have a NULL <c>mMetric.ReferencedHierarchyID</c> and the domain of their
+    /// PropertyCategory (the 4.3 file alone has no metric with several distinct per-ordinate hierarchies);</item>
+    /// <item>in the 4.2 file each of the five has ONE hierarchy, named by <c>mMetric</c> and equal to the only
+    /// distinct hierarchy of its per-ordinate restrictions;</item>
+    /// <item>the metrics whose per-ordinate restrictions use several distinct hierarchies over the two files are
+    /// exactly the five, and for each the hierarchy of the 4.2 file is not the one of the 4.3 file;</item>
+    /// <item>the worked example of issue 61: <c>qAYV</c> is <c>new_CO4</c> in C_67.00.a / C_67.00.w of the 4.2
+    /// file and <c>new_CO5</c> in E_04.01 / E_04.02 / E_08.01 of the 4.3 file.</item>
+    /// </list>
+    /// <c>ei794</c> has several hierarchies only in the history: no restriction row in either file.
     /// </summary>
     [DataFact]
-    public void MetricsWithSeveralHierarchies_HaveNullHierarchy_AndTheirRestrictionsDiffer()
+    public void MetricsWithSeveralHierarchies_AreNullInThe43File_AndContrastAcrossTheReleaseFiles()
     {
-        using var c = OmrRealData.OpenReadOnly(fixture.GeneratedDatabasePath);
+        var five = new[] { "GXI", "ei351", "qAPH", "qAYV", "qAZC" }.Order(StringComparer.Ordinal).ToList();
 
-        var severalInCurrentTables = OmrRealData.Rows(
+        using var c43 = OmrRealData.OpenReadOnly(fixture.GeneratedDatabasePath);
+        using var c42 = OmrRealData.OpenReadOnly(fixture.Generated42DatabasePath);
+
+        // (1) 4.3 file: NULL hierarchy, domain from PropertyCategory, for the five and for ei794.
+        foreach (var code in five.Append("ei794"))
+        {
+            var metric = Assert.Single(OmrRealData.Rows(c43, MetricSql(code), 2));
+            Assert.True(metric[0] is null, $"4.3 file, {code}: mMetric names the hierarchy {metric[0]} although its headers use several.");
+            Assert.True(metric[1] is not null, $"4.3 file, {code}: no ReferencedDomainID (PropertyCategory).");
+        }
+
+        // (2) The per-ordinate hierarchies of each metric, by business key, in each file.
+        var in43 = HierarchiesByMetric(c43);
+        var in42 = HierarchiesByMetric(c42);
+
+        Assert.Empty(in43.Where(kv => kv.Value.Count > 1).Select(kv => kv.Key));   // the 4.3 file alone has none
+        Assert.Empty(in42.Where(kv => kv.Value.Count > 1).Select(kv => kv.Key));   // nor has the 4.2 file alone
+
+        // (3) 4.2 file: one hierarchy per metric, named by mMetric and equal to the one of the restrictions.
+        foreach (var code in five)
+        {
+            var metric = Assert.Single(OmrRealData.Rows(c42, MetricSql(code), 2));
+            Assert.True(metric[0] is not null, $"4.2 file, {code}: mMetric names no hierarchy although it has a single one.");
+            var restricted = Assert.Single(in42[code]);
+            Assert.Equal(restricted, metric[0]);
+        }
+
+        // (4) Several hierarchies appear only ACROSS the files, for exactly the five, and they differ.
+        var across = in42.Keys.Union(in43.Keys)
+            .Where(code => in42.GetValueOrDefault(code, []).Union(in43.GetValueOrDefault(code, [])).Count() > 1)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        Assert.Equal(five, across);
+        foreach (var code in five)
+        {
+            Assert.Empty(in42[code].Intersect(in43[code]));
+        }
+
+        // (5) The worked example, by table code.
+        Assert.Equal(
+            ["C_67.00.a|new_CO4", "C_67.00.w|new_CO4"],
+            TablesAndHierarchies(c42, "qAYV"));
+        Assert.Equal(
+            ["E_04.01|new_CO5", "E_04.02|new_CO5", "E_08.01|new_CO5"],
+            TablesAndHierarchies(c43, "qAYV"));
+
+        // (6) ei794: no restriction row in either file.
+        Assert.False(in42.ContainsKey("ei794") || in43.ContainsKey("ei794"), "ei794 has a per-ordinate restriction.");
+    }
+
+    private static string MetricSql(string memberCode)
+        => $"""
+            SELECT h.HierarchyCode, d.DomainCode FROM mMetric me JOIN mMember mm ON mm.MemberID = me.CorrespondingMemberID
+            LEFT JOIN mHierarchy h ON h.HierarchyID = me.ReferencedHierarchyID LEFT JOIN mDomain d ON d.DomainID = me.ReferencedDomainID
+            WHERE mm.MemberCode = '{memberCode}'
+            """;
+
+    /// <summary>Metric member code -> distinct hierarchy codes of its per-ordinate restrictions in the file.</summary>
+    private static Dictionary<string, HashSet<string>> HierarchiesByMetric(SqliteConnection c)
+    {
+        var result = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        foreach (var row in OmrRealData.Rows(
             c,
             """
-            SELECT mm.MemberCode
+            SELECT DISTINCT mm.MemberCode, h.HierarchyCode
             FROM mOrdinateMetricRestriction r
             JOIN mOrdinateCategorisation oc ON oc.OrdinateID = r.OrdinateID
             JOIN mDimension dim ON dim.DimensionID = oc.DimensionID AND dim.DimensionXBRLCode = 'MET'
             JOIN mMember mm ON mm.MemberID = oc.MemberID
-            GROUP BY mm.MemberCode HAVING COUNT(DISTINCT r.HierarchyID) > 1
-            ORDER BY mm.MemberCode
-            """, 1).Select(r => r[0]!).ToList();
-        Assert.Equal(
-            new[] { "GXI", "ei351", "qAPH", "qAYV", "qAZC" }.Order(StringComparer.Ordinal).ToList(),
-            severalInCurrentTables.Order(StringComparer.Ordinal).ToList());
-
-        foreach (var code in new[] { "ei351", "GXI", "qAPH", "qAYV", "qAZC", "ei794" })
+            JOIN mHierarchy h ON h.HierarchyID = r.HierarchyID
+            """, 2))
         {
-            var metric = Assert.Single(OmrRealData.Rows(
-                c,
-                $"""
-                SELECT h.HierarchyCode, d.DomainCode FROM mMetric me JOIN mMember mm ON mm.MemberID = me.CorrespondingMemberID
-                LEFT JOIN mHierarchy h ON h.HierarchyID = me.ReferencedHierarchyID LEFT JOIN mDomain d ON d.DomainID = me.ReferencedDomainID
-                WHERE mm.MemberCode = '{code}'
-                """, 2));
-            Assert.True(metric[0] is null, $"{code}: mMetric names the hierarchy {metric[0]} although its headers use several.");
-            Assert.True(metric[1] is not null, $"{code}: no ReferencedDomainID (PropertyCategory).");
+            if (!result.TryGetValue(row[0]!, out var set))
+            {
+                result[row[0]!] = set = new HashSet<string>(StringComparer.Ordinal);
+            }
+
+            set.Add(row[1]!);
         }
 
-        Assert.Equal(
-            0,
-            OmrRealData.Scalar(
-                c,
-                "SELECT COUNT(1) FROM mOrdinateMetricRestriction r JOIN mOrdinateCategorisation oc ON oc.OrdinateID = r.OrdinateID JOIN mMember mm ON mm.MemberID = oc.MemberID WHERE mm.MemberCode = 'ei794'"));
+        return result;
     }
+
+    private static List<string> TablesAndHierarchies(SqliteConnection c, string memberCode)
+        => OmrRealData.Rows(
+                c,
+                $"""
+                SELECT DISTINCT t.TableCode, h.HierarchyCode
+                FROM mOrdinateMetricRestriction r
+                JOIN mOrdinateCategorisation oc ON oc.OrdinateID = r.OrdinateID
+                JOIN mMember mm ON mm.MemberID = oc.MemberID
+                JOIN mHierarchy h ON h.HierarchyID = r.HierarchyID
+                JOIN mAxisOrdinate ao ON ao.OrdinateID = r.OrdinateID
+                JOIN mTableAxis ta ON ta.AxisID = ao.AxisID
+                JOIN mTable t ON t.TableID = ta.TableID
+                WHERE mm.MemberCode = '{memberCode}' ORDER BY t.TableCode
+                """, 2)
+            .Select(r => $"{r[0]}|{r[1]}")
+            .ToList();
 
     [DataFact]
     public void EveryPair_IsDeclaredByANonKeyHeaderOfTheAccessDatabase()

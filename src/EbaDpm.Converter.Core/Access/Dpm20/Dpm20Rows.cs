@@ -40,7 +40,7 @@ public sealed record Dpm20OrganisationRow(int OrgId, string Name, string? Acrony
 ///
 /// <see cref="IsDocumentModule"/>: true for exactly two of the current modules
 /// (<c>P3_NONREM_DIS_DOCS</c>, <c>P3_REM_DIS_DOCS</c> — links to PDFs, with no table at all).
-/// They are excluded from <c>mModule</c>, together with the DORA modules.
+/// They are excluded from <c>mModule</c>.
 /// </summary>
 public sealed record Dpm20ModuleRow(int ModuleId, int FrameworkId, bool IsDocumentModule);
 
@@ -101,7 +101,8 @@ public sealed record Dpm20TableVersionRow(
     int StartReleaseId,
     int? EndReleaseId,
     bool IsAbstract,
-    int? ContextId);
+    int? ContextId,
+    int? PropertyId = null);
 
 // ------------------------------------------------------------------------
 // mDomain, mDomainUnion, mMember, mHierarchy. None of these five source tables is filtered by
@@ -116,8 +117,8 @@ public sealed record Dpm20CategoryRow(int CategoryId, string Code, string? Name,
 /// membership: a renamed <c>ItemID</c> leaves two rows with different <see cref="Code"/> values,
 /// and the target emits both. Source of <c>mMember</c>.
 ///
-/// <see cref="StartReleaseId"/>/<see cref="EndReleaseId"/> are also read here, unfiltered (the
-/// dictionary is not pruned by release): in <c>_PR</c> they are the validity window of a
+/// <see cref="StartReleaseId"/>/<see cref="EndReleaseId"/> are also read here (the
+/// dictionary is read as of the cutoff: <c>StartReleaseId &lt;= R</c>, no end condition): in <c>_PR</c> they are the validity window of a
 /// property's CODE, and a few property-dimensions have more than one code with different windows
 /// (e.g. <c>LEA</c> in <c>[2,3)</c> and <c>qLEA</c> in <c>[3,-)</c>, the SAME property).
 /// <see cref="Dpm20DictionaryLoader"/> crosses them with the <c>PropertyCategory</c> windows to

@@ -8,7 +8,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 
 /// <summary>
 /// Verification of <c>mConcept</c> and <c>mConceptTranslation</c> for the DPM 2.0 source. Reuses
-/// <see cref="Dpm20SkeletonFixture"/> (collection <c>Dpm2Skeleton</c>): the same <c>--all</c>
+/// <see cref="Dpm20SkeletonFixture"/> (collection <c>Dpm2Skeleton</c>): the same <c>--release 4.2</c>
 /// conversion always runs <c>Dpm20ConceptLoader.Load</c>, as the final phase after the six
 /// loaders, so the large DPM 2.0 Access database does not need to be read again.
 ///
@@ -97,6 +97,16 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     ];
 
     /// <summary>The anchor of a concept type: the source of the figure, its pin (null when derived) and its value.</summary>
+    /// <summary>The taxonomies of the file of release 4.2 (#73): those whose module versions start in it.</summary>
+    private static Dictionary<string, SortedSet<string>> ExpectedTaxonomies()
+        => AccessCensus.OfRelease(
+            AccessCensus.EmittedModuleCodesByTaxonomy(Accdb, RepoPaths.Cutoff42ReleaseCode), RepoPaths.Cutoff42ReleaseCode);
+
+    /// <summary><c>mRelease</c> holds the releases up to the cutoff only (#73), so does its concept set.</summary>
+    private static long ReleaseRowsUpToTheCutoff()
+        => AccessCensus.Scalar(
+            Accdb, $"SELECT COUNT(1) FROM [Release] WHERE [ReleaseID] <= {AccessCensus.ReleaseId(Accdb, RepoPaths.Cutoff42ReleaseCode)}");
+
     private static (string Source, ReleasePin? Pin, long Expected) ConceptTypeAnchor(string conceptType) => conceptType switch
     {
         "HierarchyNode" => ("mHierarchyNode pin", ReleasePins.Dpm20Cutoff42, ReleasePins.Dpm20Cutoff42MHierarchyNodeRows),
@@ -108,13 +118,13 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
         "Taxonomy" => (
             "distinct (framework, StartRelease) of the emitted module versions",
             null,
-            AccessCensus.EmittedModuleCodesByTaxonomy(Accdb, RepoPaths.Cutoff42ReleaseCode).Count),
+            ExpectedTaxonomies().Count),
         "ReportingFramework" => (
             "distinct frameworks of the emitted module versions",
             null,
-            AccessCensus.EmittedModuleCodesByTaxonomy(Accdb, RepoPaths.Cutoff42ReleaseCode).Keys
+            ExpectedTaxonomies().Keys
                 .Select(k => k[..k.IndexOf(' ', StringComparison.Ordinal)]).Distinct().Count()),
-        "Release" => ("[Release]", null, AccessCensus.Count(Accdb, "Release")),
+        "Release" => ("[Release] with ReleaseID <= the cutoff", null, ReleaseRowsUpToTheCutoff()),
         _ => throw new ArgumentOutOfRangeException(nameof(conceptType), conceptType, "No anchor for this concept type."),
     };
 
@@ -338,7 +348,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
         // The releases (mRelease has no label column, there is no row to emit) plus the MET dimension
         // and the sentinel member named below.
         var releaseConceptIds = unlabeled.Where(r => r[1] == "Release").Select(r => r[0]).ToHashSet();
-        AssertFromAccess("Release concepts without a translation (every [Release] row)", AccessCensus.Count(Accdb, "Release"), releaseConceptIds.Count);
+        AssertFromAccess("Release concepts without a translation (every [Release] row up to the cutoff)", ReleaseRowsUpToTheCutoff(), releaseConceptIds.Count);
         AssertDerived("concepts without a translation (releases + MET dimension + sentinel member)", "the named ones", releaseConceptIds.Count + 2, unlabeled.Count);
 
         var actualReleaseConceptIdsFromMRelease = QueryHelpers.Rows(Connection, "SELECT \"ConceptID\" FROM \"mRelease\" ORDER BY \"ReleaseID\"", 1)
@@ -425,7 +435,7 @@ public sealed class Dpm20ConceptTests(Dpm20SkeletonFixture fixture)
     public void MConcept_ReleaseID_Release_IsAlwaysNull()
     {
         var total = Scalar("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'Release'");
-        AssertFromAccess("Release concepts", AccessCensus.Count(Accdb, "Release"), total);
+        AssertFromAccess("Release concepts (every [Release] row up to the cutoff)", ReleaseRowsUpToTheCutoff(), total);
         Assert.Equal(0, Scalar("SELECT COUNT(*) FROM \"mConcept\" WHERE \"ConceptType\" = 'Release' AND \"ReleaseID\" IS NOT NULL"));
     }
 

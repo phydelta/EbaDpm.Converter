@@ -1,4 +1,4 @@
-﻿using EbaDpm.Converter.Core.Access;
+using EbaDpm.Converter.Core.Access;
 using EbaDpm.Converter.Core.Access.Dpm20;
 using EbaDpm.Converter.Core.Sqlite;
 using EbaDpm.Converter.Core.Validation;
@@ -37,10 +37,11 @@ public static class Dpm20SkeletonLoader
         IReadOnlyList<string>? UnresolvedTaxonomyColumns = null);
 
     // ------------------------------------------------------------------
-    // mRelease — the 5 rows of [Release], not filtered by selected taxonomy.
+    // mRelease — the rows of [Release] with ReleaseID <= the cutoff (the database as of R), not
+    // filtered by selected taxonomy.
     // ------------------------------------------------------------------
 
-    private static void LoadReleases(
+    private static int LoadReleases(
         SqliteConnection destination, IReadOnlyList<Dpm20ReleaseRow> releases, int cutoffReleaseId)
     {
         using var writer = new SqliteBatchWriter(
@@ -48,8 +49,10 @@ public static class Dpm20SkeletonLoader
             "mRelease",
             ["ReleaseID", "ReleaseCode", "ReleaseDescription", "Status", "PublicationDate", "IsCurrent", "ConceptID"]);
 
-        foreach (var release in releases)
+        var written = 0;
+        foreach (var release in releases.Where(r => r.ReleaseId <= cutoffReleaseId).OrderBy(r => r.ReleaseId))
         {
+            written++;
             writer.AddRow(
                 release.ReleaseId,
                 release.Code,
@@ -66,6 +69,8 @@ public static class Dpm20SkeletonLoader
                 release.ReleaseId == cutoffReleaseId,
                 null); // ConceptID: NULL until the concept loader runs
         }
+
+        return written;
     }
 
     // ------------------------------------------------------------------
@@ -270,7 +275,10 @@ public static class Dpm20SkeletonLoader
     /// Loads the skeleton tables (owner, language, release, reporting framework and taxonomy)
     /// into the destination.
     /// </summary>
-    /// <param name="releases">The 5 rows of <c>[Release]</c>, unfiltered (it is not versioned).</param>
+    /// <param name="releases">
+    /// The rows of <c>[Release]</c>, unfiltered (it is not versioned); only those with
+    /// <c>ReleaseID &lt;= cutoffReleaseId</c> are written to <c>mRelease</c>.
+    /// </param>
     /// <param name="frameworks">The source <c>Framework</c> rows, unfiltered (20 rows).</param>
     /// <param name="selectedTaxonomies">
     /// The taxonomies resulting from applying the selection filter to those derived by
@@ -302,7 +310,7 @@ public static class Dpm20SkeletonLoader
 
         ApplyBulkLoadPragmas(destination);
 
-        LoadReleases(destination, releases, cutoffReleaseId);
+        var releaseRows = LoadReleases(destination, releases, cutoffReleaseId);
 
         var emittedFrameworks = LoadReportingFrameworks(destination, frameworks, selectedTaxonomies);
 
@@ -322,7 +330,7 @@ public static class Dpm20SkeletonLoader
         LoadOwnerLanguageAndRewriteUri(destination);
 
         return new Result(
-            ReleaseRows: releases.Count,
+            ReleaseRows: releaseRows,
             ReportingFrameworkRows: emittedFrameworks.Count,
             TaxonomyRows: selectedTaxonomies.Count,
             OwnerRows: 3,

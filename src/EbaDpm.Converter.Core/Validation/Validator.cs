@@ -129,9 +129,9 @@ public static class Validator
             .Concat(DictionaryChecks.Run(c, model, exceptionSink))
             .Concat(TemplateChecks.Run(c))
             .Concat(AxisChecks.Run(c))
-            .Concat(CellChecks.Run(c, model))
+            .Concat(CellChecks.Run(c, model, exceptionSink))
             .Concat(ModuleChecks.Run(c, model))
-            .Concat(ConceptChecks.Run(c, model))
+            .Concat(ConceptChecks.Run(c, model, exceptionSink))
             .Concat(EmptyTableChecks.Run(c, model));
 
     private static IEnumerable<CheckResult> RunPlaneB(

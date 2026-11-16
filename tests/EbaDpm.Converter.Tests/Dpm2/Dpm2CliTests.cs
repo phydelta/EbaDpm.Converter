@@ -19,17 +19,20 @@ public sealed class Dpm2CliTests
         using var stderr = new StringWriter();
 
         var exitCode = CliRunner.Run(
-            ["--list-taxonomies", "--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode], stdout, stderr);
+            ["--list-taxonomies", "--source", RepoPaths.AccessDpm20DatabasePath, "--release", RepoPaths.Cutoff42ReleaseCode], stdout, stderr);
 
         Assert.Equal(CliRunner.ExitOk, exitCode);
         Assert.Empty(stderr.ToString());
-        // Derived from Access: one taxonomy per distinct (framework, start release) of the emitted module versions.
-        var taxonomies = AccessCensus.EmittedModuleCodesByTaxonomy(RepoPaths.AccessDpm20DatabasePath, RepoPaths.Cutoff42ReleaseCode);
+        // Derived from Access: one taxonomy per distinct (framework, start release) of the emitted module
+        // versions, of the listed release only (#73: a release lists the taxonomies that start in it).
+        var taxonomies = AccessCensus.OfRelease(
+            AccessCensus.EmittedModuleCodesByTaxonomy(RepoPaths.AccessDpm20DatabasePath, RepoPaths.Cutoff42ReleaseCode),
+            RepoPaths.Cutoff42ReleaseCode);
         Assert.NotEmpty(taxonomies);
         var expected = $"Total: {taxonomies.Count} taxonomies.";
         Assert.True(
             stdout.ToString().Contains(expected, StringComparison.Ordinal),
-            $"--list-taxonomies output lacks '{expected}' (cutoff {RepoPaths.Cutoff42ReleaseCode}, derived from '{RepoPaths.AccessDpm20DatabaseFileName}'). Output: {stdout}");
+            $"--list-taxonomies output lacks '{expected}' (release {RepoPaths.Cutoff42ReleaseCode}, derived from '{RepoPaths.AccessDpm20DatabaseFileName}'). Output: {stdout}");
     }
 
     [DataFact]
@@ -52,7 +55,7 @@ public sealed class Dpm2CliTests
     }
 
     /// <summary>
-    /// A DPM 2.0 conversion through <c>--all</c> is COMPLETE: it exits with
+    /// A DPM 2.0 conversion of one release (<c>--release</c>) is COMPLETE: it exits with
     /// <see cref="CliRunner.ExitOk"/> (0) and the output file must exist. Earlier, while the
     /// conversion was still incomplete, this test asserted a "not implemented" exit code; that code
     /// reflected a missing piece, not correct behaviour, so the assertion was updated to the success
@@ -61,13 +64,13 @@ public sealed class Dpm2CliTests
     /// <c>mConcept</c>/<c>mConceptTranslation</c> in <c>Dpm20ConceptTests</c>. Only the end-to-end
     /// check through the CLI is kept here.
     /// </summary>
-    // The only "extra" full --all conversion left in the suite (about 28 s): an end-to-end test of
-    // the CLI, deliberately independent of the shared fixtures, so it cannot be memoized or merged
-    // without losing what it checks (that --source/--output/--all work on their own, without going
+    // The only "extra" full conversion left in the suite: an end-to-end test of the CLI,
+    // deliberately independent of the shared fixtures, so it cannot be memoized or merged without
+    // losing what it checks (that --source/--output/--release work on their own, without going
     // through any test fixture).
     [Trait("Tier", "RealData")]
     [DataFact]
-    public void Convert_OnDpm20Source_Exits0_AndCreatesTheCompleteOutputFile()
+    public void Convert_OnDpm20Source_WithRelease_Exits0_AndCreatesTheCompleteOutputFile()
     {
         RepoPaths.EnsureAccessDpm20DatabaseExists();
 
@@ -83,7 +86,7 @@ public sealed class Dpm2CliTests
             using var stderr = new StringWriter();
 
             var exitCode = CliRunner.Run(
-                ["--source", RepoPaths.AccessDpm20DatabasePath, "--cutoff-release", RepoPaths.Cutoff42ReleaseCode, "--output", outputPath, "--all"], stdout, stderr);
+                ["--source", RepoPaths.AccessDpm20DatabasePath, "--release", RepoPaths.Cutoff42ReleaseCode, "--output", outputPath], stdout, stderr);
 
             Assert.Equal(CliRunner.ExitOk, exitCode);
             Assert.True(File.Exists(outputPath), "The complete conversion must create the output file.");

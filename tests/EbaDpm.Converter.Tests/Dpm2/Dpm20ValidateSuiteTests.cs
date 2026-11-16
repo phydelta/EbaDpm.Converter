@@ -54,9 +54,14 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
 
         // Run WITHOUT a reference (referencePath: null above). A drop would be the harness silently
         // losing coverage; a rise is a new critical check, to be re-measured (216 -> 217: A-MOD-10, issue 66;
-        // 217 -> 224: A-OMR-01..04 and I-REF-17.1..3, the seven critical checks of mOrdinateMetricRestriction, issue 61).
+        // 217 -> 224: A-OMR-01..04 and I-REF-17.1..3, the seven critical checks of mOrdinateMetricRestriction, issue 61;
+        // 224 -> 222, issue 73: A-SEN-04 is no longer emitted for DPM 2.0 (-1) and A-VAC-01.mDomainUnion
+        // is an informative census in DPM 2.0 (-1 critical); both are asserted by name just below).
         ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "critical checks run without a reference", 224, result.Report.Summary.Critical.Checks);
+            ReleasePins.Dpm20Cutoff42, "critical checks run without a reference", 222, result.Report.Summary.Critical.Checks);
+        Assert.DoesNotContain(result.Report.Checks, c => c.Id == "A-SEN-04");
+        var domainUnion = Assert.Single(result.Report.Checks, c => c.Id == "A-VAC-01.mDomainUnion");
+        Assert.Equal("informative", domainUnion.Layer);
         Assert.Equal(0, result.ExitCode);
 
         // Explicit protection of the merge of the ABSTRACT ordinate with its own cells: without it,

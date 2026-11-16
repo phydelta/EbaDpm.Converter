@@ -6,19 +6,22 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 
 /// <summary>
 /// The same idea as <see cref="Dpm2043ValidateFixture"/> applied to the 4.2.1 publication
-/// (<c>Data/DPM2 Database_v 4_2_1.accdb</c>) converted with its NATURAL cutoff: no
-/// <c>--cutoff-release</c>, so the cutoff is the latest release the database declares ("4.2.1").
-/// Every other fixture over this file passes the explicit cutoff "4.2" and means "the 4.2
-/// release"; this one is the only consumer of the default behaviour.
+/// (<c>Data/DPM2 Database_v 4_2_1.accdb</c>) converted with <c>--release 4.2.1</c>, the LAST release
+/// the database declares (a reader opened without a requested cutoff resolves it as well, which
+/// <see cref="DerivedCutoffReleaseCode"/> records). Every other fixture over this file converts
+/// <c>--release 4.2</c>.
 ///
 /// It has its own collection so it does not compete with <c>Dpm2Skeleton</c>/<c>Dpm2</c>. It runs
-/// <c>--all</c> ONCE through the real CLI and clears the SQLite connection pool before leaving the
+/// the conversion ONCE through the real CLI and clears the SQLite connection pool before leaving the
 /// constructor because <see cref="EbaDpm.Converter.Core.Validation.Validator.Run"/> needs exclusive
 /// <c>File.OpenRead</c> access to the same file for the SHA-256. When the data directory is not
 /// available the constructor does nothing (the tests are skipped).
 /// </summary>
 public sealed class Dpm2042_1ValidateFixture : IDisposable
 {
+    /// <summary><c>Release.Code</c> of the 4.2.1 release, the last one the database declares.</summary>
+    public const string Release421Code = "4.2.1";
+
     public string TempDirectory { get; } = null!;
     public string GeneratedDatabasePath { get; } = null!;
     public int ExitCode { get; }
@@ -54,7 +57,7 @@ public sealed class Dpm2042_1ValidateFixture : IDisposable
         using var stderr = new StringWriter();
 
         ExitCode = CliRunner.Run(
-            ["--source", RepoPaths.AccessDpm20DatabasePath, "--output", GeneratedDatabasePath, "--all"],
+            ["--source", RepoPaths.AccessDpm20DatabasePath, "--release", Release421Code, "--output", GeneratedDatabasePath],
             stdout,
             stderr);
 
