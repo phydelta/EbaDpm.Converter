@@ -7,8 +7,10 @@ namespace EbaDpm.Converter.Core.Mapping;
 /// already used by a real member (<c>C27_12</c>, NACE, domain 280): this class is the ONLY place
 /// where its renumbering is decided and applied. Every target column that carries an Access
 /// <c>MemberID</c> (<c>mHierarchyNode.MemberID</c>/<c>ParentMemberID</c> and
-/// <c>mMember.MemberID</c>, plus <c>mOrdinateCategorisation.MemberID</c> and
-/// <c>mOpenAxisValueRestriction.HierarchyStartingMemberID</c>) must go through
+/// <c>mMember.MemberID</c>, plus <c>mOrdinateCategorisation.MemberID</c>,
+/// <c>mOpenAxisValueRestriction.HierarchyStartingMemberID</c>,
+/// <c>mOrdinateMetricRestriction.HierarchyStartingMemberID</c> and the member ID inside
+/// <c>DimensionMemberSignature</c>) must go through
 /// <see cref="Translate"/> instead of copying the Access ID verbatim. That way, if Access changes
 /// and leaves 9999 free (or another member takes it), a single place decides the translation and
 /// no table can silently forget it.

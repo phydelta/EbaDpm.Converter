@@ -56,9 +56,14 @@ public sealed class Dpm20ValidateSuiteTests(Dpm20SkeletonFixture fixture)
         // losing coverage; a rise is a new critical check, to be re-measured (216 -> 217: A-MOD-10, issue 66;
         // 217 -> 224: A-OMR-01..04 and I-REF-17.1..3, the seven critical checks of mOrdinateMetricRestriction, issue 61;
         // 224 -> 222, issue 73: A-SEN-04 is no longer emitted for DPM 2.0 (-1) and A-VAC-01.mDomainUnion
-        // is an informative census in DPM 2.0 (-1 critical); both are asserted by name just below).
+        // is an informative census in DPM 2.0 (-1 critical); both are asserted by name just below;
+        // 222 -> 228: A-SEN-08.1..08.6 added by #70, 2026-11-20).
         ReleasePins.AssertPinned(
-            ReleasePins.Dpm20Cutoff42, "critical checks run without a reference", 222, result.Report.Summary.Critical.Checks);
+            ReleasePins.Dpm20Cutoff42, "critical checks run without a reference", 228, result.Report.Summary.Critical.Checks);
+        // The rise over the previous pin (222) is exactly the six checks of #70, by name.
+        var sentinel08 = result.Report.Checks.Where(c => c.Layer == "critical" && c.Id.StartsWith("A-SEN-08.", StringComparison.Ordinal)).Select(c => c.Id).OrderBy(i => i, StringComparer.Ordinal).ToList();
+        Assert.Equal(["A-SEN-08.1", "A-SEN-08.2", "A-SEN-08.3", "A-SEN-08.4", "A-SEN-08.5", "A-SEN-08.6"], sentinel08);
+        Assert.Equal(222, result.Report.Checks.Count(c => c.Layer == "critical") - sentinel08.Count);
         Assert.DoesNotContain(result.Report.Checks, c => c.Id == "A-SEN-04");
         var domainUnion = Assert.Single(result.Report.Checks, c => c.Id == "A-VAC-01.mDomainUnion");
         Assert.Equal("informative", domainUnion.Layer);
