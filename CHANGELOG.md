@@ -37,6 +37,16 @@ All notable changes to this project are documented in this file. The format is b
 - **CLI.** With `--release`, an `--output` that is an existing directory is an argument error
   instead of an unhandled exception.
 
+### Fixed
+
+- **DPM 1.0: the member renumbering now reaches the axis paths (#70).** The member that takes the
+  reserved ID 9999 in Access (`C27_12` in 4.1) is renumbered in `mHierarchyNode` and `mMember`, but
+  `mOrdinateCategorisation.MemberID`, `mOpenAxisValueRestriction.HierarchyStartingMemberID` and the
+  member ID inside `DimensionMemberSignature` copied the Access ID, so a categorisation or starting
+  member using it would have pointed at the `Open` sentinel. The 4.1 output does not change. A new
+  plane A check, `A-SEN-08`, fails if any column other than the open-axis categorisations refers to
+  the sentinel member.
+
 ### Added
 
 - **DPM 2.0 output.** The DORA framework is exported like any other framework: its taxonomies,
