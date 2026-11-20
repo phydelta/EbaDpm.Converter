@@ -48,6 +48,35 @@ All notable changes to this project are documented in this file. The format is b
   database at 4.4, 104 at 4.3 (and 0 at 4.2), each with exactly one candidate (in MC150 the root and its 5 children all move, and the paths follow); nodes already in an
   allowed domain never change. The known exception AO-3 of `I-TRE-07b` (104 nodes) is removed:
   the check has no exceptions.
+- **CLI: new console output and argument parsing (#76).** The arguments are parsed with
+  Spectre.Console.Cli (new dependency of the CLI, with Spectre.Console; both MIT) as a single
+  default command, so every invocation keeps working: same options, case-insensitive, same
+  defaults, same modes and exit codes. `--help` is now the generated help (one description per
+  option, one example per mode), and an argument error prints the message and a hint instead of
+  the whole usage. `--list-taxonomies`, the conversion summary and the validation summary are
+  tables; the planes of `--validate` are coloured (pass, known exception, informative and critical
+  difference, stale exception) so that the cause of exit code 3 shows at a glance; errors are
+  `Error: ...` with the label in red. An unexpected failure is now reported with its type, message
+  and stack and ends with exit code 1, instead of crashing the process. The text on standard output
+  is for people and may change; the `--report` JSON is unchanged. `--taxonomies`, `--taxonomykeys`,
+  `--releases` and `--report` without a value are now an argument error, as the usage already
+  documented (before, they were silently ignored); when an option is repeated, the last value wins.
+
+### Fixed
+
+- **DPM 1.0: the member renumbering now reaches the axis paths (#70).** The member that takes the
+  reserved ID 9999 in Access (`C27_12` in 4.1) is renumbered in `mHierarchyNode` and `mMember`, but
+  `mOrdinateCategorisation.MemberID`, `mOpenAxisValueRestriction.HierarchyStartingMemberID` and the
+  member ID inside `DimensionMemberSignature` copied the Access ID, so a categorisation or starting
+  member using it would have pointed at the `Open` sentinel. The 4.1 output does not change. A new
+  plane A check, `A-SEN-08`, fails if any column other than the open-axis categorisations refers to
+  the sentinel member.
+- **CLI: the process exit code is no longer replaced by `0xC0000409` (#82).** After the ACE OLEDB
+  provider had served a connection, the native teardown at process exit crashed (an access
+  violation in the Office module `mso20win32client.dll`, then a fail-fast in `ntdll.dll`) and
+  overrode the exit code, so a successful conversion and an argument error looked alike. `Main` now
+  ends the process with the code computed by the runner, after flushing the console, when the
+  provider is loaded.
 
 ### Added
 
@@ -63,6 +92,11 @@ All notable changes to this project are documented in this file. The format is b
   grey fill colour ignoring its alpha byte (`D8D8D8`, `999999` and `595959`), because the 4.4 files write
   `00D8D8D8` where 4.3 wrote `FFD8D8D8`; without it no 4.4 cell would be shaded. Relationship targets are resolved per OPC (4.4 writes absolute part
   names), a missing comments part is an error, and `K_74.00.a (0010)` sheet names are accepted. (#67)
+- **CLI: `--plain`, and progress by phase (#76).** `--plain` forces plain output: no colours, no live
+  widgets and tables without borders. It is also what you get when the output is redirected (pipes,
+  files, CI, the 32-bit relaunch), and `NO_COLOR` is honoured. A conversion, `--validate` and
+  `--extract-layouts` report their phases with the elapsed time of each: a live progress list on a
+  terminal, one line per finished phase otherwise.
 
 ## 2.0.0 - 2026-10-28
 

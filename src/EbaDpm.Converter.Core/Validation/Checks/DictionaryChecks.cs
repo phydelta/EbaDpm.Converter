@@ -162,6 +162,48 @@ public static class DictionaryChecks
             "SELECT COUNT(*) FROM \"mOrdinateCategorisation\" WHERE \"MemberID\" = 9999",
             "SELECT COUNT(*) FROM \"mAxis\" WHERE \"IsOpenAxis\" = 1");
 
+        // ---- A-SEN-08: the sentinel member is referenced only by the categorisations of open axes ----
+        // The sentinel is looked up in the output (the only member of the sentinel domain 9999), never
+        // hard-coded. Allowed: its own mMember row, and mOrdinateCategorisation rows of ordinates on
+        // open axes. Every other column that carries a MemberID must point at a real member.
+        const string sentinel = "(SELECT \"MemberID\" FROM \"mMember\" WHERE \"DomainID\" = 9999)";
+        yield return SqlHelpers.CountCheck(
+            c, "A-SEN-08.1", ValidationLayer.Critical, "mOrdinateCategorisation",
+            "The sentinel MemberID is used only on ordinates of open axes",
+            "SELECT COUNT(*) FROM \"mOrdinateCategorisation\" WHERE \"MemberID\" IN " + sentinel,
+            $"""
+            SELECT COUNT(*) FROM "mOrdinateCategorisation" oc
+            WHERE oc."MemberID" IN {sentinel}
+              AND NOT EXISTS (
+                SELECT 1 FROM "mAxisOrdinate" o JOIN "mAxis" a ON a."AxisID" = o."AxisID"
+                WHERE o."OrdinateID" = oc."OrdinateID" AND a."IsOpenAxis" = 1)
+            """);
+        yield return SqlHelpers.CountCheck(
+            c, "A-SEN-08.2", ValidationLayer.Critical, "mOpenAxisValueRestriction",
+            "HierarchyStartingMemberID never refers to the sentinel member",
+            "SELECT COUNT(*) FROM \"mOpenAxisValueRestriction\" WHERE \"HierarchyStartingMemberID\" IS NOT NULL",
+            $"SELECT COUNT(*) FROM \"mOpenAxisValueRestriction\" WHERE \"HierarchyStartingMemberID\" IN {sentinel}");
+        yield return SqlHelpers.CountCheck(
+            c, "A-SEN-08.3", ValidationLayer.Critical, "mOrdinateMetricRestriction",
+            "HierarchyStartingMemberID never refers to the sentinel member",
+            "SELECT COUNT(*) FROM \"mOrdinateMetricRestriction\" WHERE \"HierarchyStartingMemberID\" IS NOT NULL",
+            $"SELECT COUNT(*) FROM \"mOrdinateMetricRestriction\" WHERE \"HierarchyStartingMemberID\" IN {sentinel}");
+        yield return SqlHelpers.CountCheck(
+            c, "A-SEN-08.4", ValidationLayer.Critical, "mHierarchyNode",
+            "MemberID and ParentMemberID never refer to the sentinel member",
+            "SELECT COUNT(*) FROM \"mHierarchyNode\"",
+            $"SELECT COUNT(*) FROM \"mHierarchyNode\" WHERE \"MemberID\" IN {sentinel} OR \"ParentMemberID\" IN {sentinel}");
+        yield return SqlHelpers.CountCheck(
+            c, "A-SEN-08.5", ValidationLayer.Critical, "mDimension",
+            "DefaultMemberID never refers to the sentinel member",
+            "SELECT COUNT(*) FROM \"mDimension\" WHERE \"DefaultMemberID\" IS NOT NULL",
+            $"SELECT COUNT(*) FROM \"mDimension\" WHERE \"DefaultMemberID\" IN {sentinel}");
+        yield return SqlHelpers.CountCheck(
+            c, "A-SEN-08.6", ValidationLayer.Critical, "mMetric",
+            "CorrespondingMemberID and HierarchyStartingMemberID never refer to the sentinel member",
+            "SELECT COUNT(*) FROM \"mMetric\"",
+            $"SELECT COUNT(*) FROM \"mMetric\" WHERE \"CorrespondingMemberID\" IN {sentinel} OR \"HierarchyStartingMemberID\" IN {sentinel}");
+
         // ---- A-HIE-01..07: hierarchies ----
         foreach (var result in HierarchyChecks(c, model, exceptionSink))
         {

@@ -107,6 +107,15 @@ public static class AxisAndCellLoader
     private const int DestinationOpenMember = 9999; // mOrdinateCategorisation.MemberID
 
     /// <summary>
+    /// Marker for the "open" sentinel inside the loader's own (Access-domain) member tuples. It is
+    /// NOT <see cref="DestinationOpenMember"/>: Access <c>MemberID</c> 9999 can be a real member
+    /// (renumbered by <see cref="MemberIdRenumbering"/>), so the two must never share a value
+    /// before the translation to target IDs, which happens once, in
+    /// <see cref="ComputeCategorisationSignature"/>.
+    /// </summary>
+    private const int InternalOpenMember = -1;
+
+    /// <summary>
     /// Defensive depth limit when walking <c>ParentOrdinateID</c> up to the root: far above any
     /// real header nesting (tens, not hundreds), to turn an unforeseen cycle into an explicit
     /// failure instead of a hang.
@@ -250,7 +259,8 @@ public static class AxisAndCellLoader
         var openAxisValueRestrictionRows = ResolveOpenAxisValueRestrictions(
             accumulator.PendingRestrictions,
             categorisationsByOrdinateId,
-            openMemberRestrictionsById);
+            openMemberRestrictionsById,
+            memberIdRenumbering);
 
         // The signature of each pair is computed once, in the same order in which the row is
         // written (closedRows first, openAxisRows after): it is the list that
@@ -263,7 +273,8 @@ public static class AxisAndCellLoader
             dimensionsById,
             membersById,
             openMemberRestrictionsById,
-            hierarchiesById);
+            hierarchiesById,
+            memberIdRenumbering);
 
         WriteAxisTables(destination, accumulator);
         var categorisationRows = WriteOrdinateCategorisations(destination, categorisationSignatures);
@@ -661,7 +672,7 @@ public static class AxisAndCellLoader
                 var restrictionId = ResolveSentinelRestrictionId(
                     plan.SentinelOrdinateIdForRestriction!.Value, dimensionId, categorisationsByOrdinateId);
 
-                acc.OpenAxisCategorisationRows.Add((ordinate.OrdinateId, dimensionId, DestinationOpenMember, restrictionId));
+                acc.OpenAxisCategorisationRows.Add((ordinate.OrdinateId, dimensionId, InternalOpenMember, restrictionId));
                 acc.PendingRestrictions.Add(new PendingRestriction(
                     plan.AxisId, plan.SentinelOrdinateIdForRestriction!.Value, dimensionId));
 
@@ -1055,7 +1066,8 @@ public static class AxisAndCellLoader
     private static List<(int AxisId, int HierarchyId, int? StartMemberId, bool? StartIncluded)> ResolveOpenAxisValueRestrictions(
         List<PendingRestriction> pending,
         IReadOnlyDictionary<int, List<AccessOrdinateCategorisationRow>> categorisationsByOrdinateId,
-        IReadOnlyDictionary<int, AccessOpenMemberRestrictionRow> openMemberRestrictionsById)
+        IReadOnlyDictionary<int, AccessOpenMemberRestrictionRow> openMemberRestrictionsById,
+        MemberIdRenumbering memberIdRenumbering)
     {
         var result = new List<(int, int, int?, bool?)>();
 
@@ -1080,7 +1092,9 @@ public static class AxisAndCellLoader
                 continue; // without HierarchyID there is no row to emit (the target PK requires it)
             }
 
-            var startMemberId = restriction.IgnoreMemberId ? (int?)null : restriction.MemberId;
+            var startMemberId = restriction.IgnoreMemberId
+                ? (int?)null
+                : memberIdRenumbering.TranslateNullable(restriction.MemberId);
             var startIncluded = restriction.IgnoreMemberId ? (bool?)null : restriction.MemberIncluded;
 
             result.Add((candidate.AxisId, hierarchyId, startMemberId, startIncluded));
@@ -1243,8 +1257,15 @@ public static class AxisAndCellLoader
         IReadOnlyDictionary<int, AccessDimensionRow> dimensionsById,
         IReadOnlyDictionary<int, AccessMemberRow> membersById,
         IReadOnlyDictionary<int, AccessOpenMemberRestrictionRow> openMemberRestrictionsById,
-        IReadOnlyDictionary<int, AccessHierarchyRow> hierarchiesById)
+        IReadOnlyDictionary<int, AccessHierarchyRow> hierarchiesById,
+        MemberIdRenumbering memberIdRenumbering)
     {
+        // memberId is in the Access domain (or InternalOpenMember); the signature carries the
+        // TARGET MemberID, translated here once.
+        var targetMemberId = memberId == InternalOpenMember
+            ? DestinationOpenMember
+            : memberIdRenumbering.Translate(memberId);
+
         if (metricDimensionIds.Contains(dimensionId))
         {
             var metricMember = membersById.TryGetValue(memberId, out var mm)
@@ -1260,7 +1281,7 @@ public static class AxisAndCellLoader
 
             var metricPair = $"MET({metricXbrl})";
             return new CategorisationSignature(
-                ordinateId, dimensionId, memberId, metricMember.IsDefaultMember, metricPair, metricPair, "MET");
+                ordinateId, dimensionId, targetMemberId, metricMember.IsDefaultMember, metricPair, metricPair, "MET");
         }
 
         var dimension = dimensionsById.TryGetValue(dimensionId, out var dim)
@@ -1274,13 +1295,13 @@ public static class AxisAndCellLoader
                 $"DimensionID={dimensionId} (OrdinateID={ordinateId}) has no DimensionXbrlCode and is not " +
                 "the metric dimension: the signature algorithm does not cover this case.");
 
-        if (memberId == DestinationOpenMember)
+        if (memberId == InternalOpenMember)
         {
             if (restrictionId is not { } rid)
             {
                 var openPair = $"{dimXbrl}(*)";
                 return new CategorisationSignature(
-                    ordinateId, dimensionId, memberId, IsDefaultMember: false, openPair, openPair, dimXbrl);
+                    ordinateId, dimensionId, targetMemberId, IsDefaultMember: false, openPair, openPair, dimXbrl);
             }
 
             var restriction = openMemberRestrictionsById.TryGetValue(rid, out var r)
@@ -1335,11 +1356,11 @@ public static class AxisAndCellLoader
 
                 dps = $"{dimXbrl}(*[{hierarchy.HierarchyCode};{startMember.MemberCode};{includedFlag}])";
                 dms = $"{dimXbrl}(*[{hierarchyId.ToString(CultureInfo.InvariantCulture)};" +
-                    $"{startMemberId.ToString(CultureInfo.InvariantCulture)};{includedFlag}])";
+                    $"{memberIdRenumbering.Translate(startMemberId).ToString(CultureInfo.InvariantCulture)};{includedFlag}])";
             }
 
             return new CategorisationSignature(
-                ordinateId, dimensionId, memberId, IsDefaultMember: false, dps, dms, dimXbrl);
+                ordinateId, dimensionId, targetMemberId, IsDefaultMember: false, dps, dms, dimXbrl);
         }
 
         var member = membersById.TryGetValue(memberId, out var mem)
@@ -1354,7 +1375,7 @@ public static class AxisAndCellLoader
 
         var explicitPair = $"{dimXbrl}({memberXbrl})";
         return new CategorisationSignature(
-            ordinateId, dimensionId, memberId, member.IsDefaultMember, explicitPair, explicitPair, dimXbrl);
+            ordinateId, dimensionId, targetMemberId, member.IsDefaultMember, explicitPair, explicitPair, dimXbrl);
     }
 
     /// <summary>
@@ -1370,7 +1391,8 @@ public static class AxisAndCellLoader
         IReadOnlyDictionary<int, AccessDimensionRow> dimensionsById,
         IReadOnlyDictionary<int, AccessMemberRow> membersById,
         IReadOnlyDictionary<int, AccessOpenMemberRestrictionRow> openMemberRestrictionsById,
-        IReadOnlyDictionary<int, AccessHierarchyRow> hierarchiesById)
+        IReadOnlyDictionary<int, AccessHierarchyRow> hierarchiesById,
+        MemberIdRenumbering memberIdRenumbering)
     {
         var result = new List<CategorisationSignature>(closedRows.Count + openAxisRows.Count);
 
@@ -1378,14 +1400,16 @@ public static class AxisAndCellLoader
         {
             result.Add(ComputeCategorisationSignature(
                 ordinateId, dimensionId, memberId, restrictionId: null,
-                metricDimensionIds, dimensionsById, membersById, openMemberRestrictionsById, hierarchiesById));
+                metricDimensionIds, dimensionsById, membersById, openMemberRestrictionsById, hierarchiesById,
+                memberIdRenumbering));
         }
 
         foreach (var (ordinateId, dimensionId, memberId, restrictionId) in openAxisRows)
         {
             result.Add(ComputeCategorisationSignature(
                 ordinateId, dimensionId, memberId, restrictionId,
-                metricDimensionIds, dimensionsById, membersById, openMemberRestrictionsById, hierarchiesById));
+                metricDimensionIds, dimensionsById, membersById, openMemberRestrictionsById, hierarchiesById,
+                memberIdRenumbering));
         }
 
         return result;

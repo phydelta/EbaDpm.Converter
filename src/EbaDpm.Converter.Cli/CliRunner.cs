@@ -1,3 +1,4 @@
+using System.Globalization;
 using EbaDpm.Converter.Core.Access;
 using EbaDpm.Converter.Core.Access.Dpm20;
 using EbaDpm.Converter.Core.Layouts;
@@ -6,152 +7,259 @@ using EbaDpm.Converter.Core.Mapping.Dpm20;
 using EbaDpm.Converter.Core.Sqlite;
 using EbaDpm.Converter.Core.Validation;
 using Microsoft.Data.Sqlite;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace EbaDpm.Converter.Cli;
 
 /// <summary>
-/// Logical entry point of the CLI. Arguments are parsed by hand, with no external dependencies.
+/// Logical entry point of the CLI. The arguments are parsed by Spectre.Console.Cli into a single
+/// default command (<see cref="ConverterSettings"/>); the mode is chosen by the flag present, and
+/// each mode keeps the validation rules and messages it had with the hand-written parser.
 ///
 /// Exit codes:
 ///   0 = success (even if there are informative differences, or plane B was skipped).
-///   1 = missing or invalid arguments.
+///   1 = missing or invalid arguments, or an input/output error. Also an unexpected failure,
+///       which is reported in full on standard error.
 ///   2 = recognized mode that is not implemented yet.
 ///   3 = --validate: there are critical differences.
 /// </summary>
-public static class CliRunner
+public static partial class CliRunner
 {
     public const int ExitOk = 0;
     public const int ExitArgumentError = 1;
     public const int ExitNotImplemented = 2;
     public const int ExitValidationCriticalDifferences = 3;
 
+    private const string UsageHint = "Use --help to see the usage.";
+    private const string ReleaseDpm10Message = "--release only applies to DPM 2.0 sources.";
+
     private static readonly string[] HelpFlags = ["--help", "-h", "-?", "/?"];
 
-    private const string Usage =
-        """
-        DPM 1.0 source:
-        EbaDpm.Converter --source "<path.accdb>" --output "<path.db>"
-                         (--taxonomies "..." | --taxonomykeys "..." | --releases "..." | --all)
-                         [--overwrite] [--report <path.json>] [--verbose]
+    /// <summary>Options that take a value, in the spelling of the command line.</summary>
+    private static readonly string[] ValueOptions =
+    [
+        "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--release", "--report",
+        "--validate", "--reference", "--layouts", "--extract-layouts", "--out", "--dictionary",
+    ];
 
-        DPM 2.0 source (one SQLite file per release):
-        EbaDpm.Converter --source "<path.accdb>" --output <path> [--release <code>]
-                         [--overwrite] [--report <path.json>] [--verbose]
+    private static readonly string[] ListTaxonomiesOptions = ["--list-taxonomies", "--source", "--release", "--plain"];
+    private static readonly string[] SchemaOnlyOptions = ["--schema-only", "--output", "--overwrite", "--plain"];
+    private static readonly string[] ExtractLayoutsOptions = ["--extract-layouts", "--out", "--dictionary", "--overwrite", "--plain"];
+    private static readonly string[] ValidateOptions = ["--validate", "--reference", "--layouts", "--report", "--plain"];
+    private static readonly string[] ConvertOptions =
+    [
+        "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--all", "--overwrite", "--report",
+        "--verbose", "--release", "--plain",
+    ];
 
-        EbaDpm.Converter --list-taxonomies --source "<path.accdb>" [--release <code>]
-        EbaDpm.Converter --schema-only --output "<path.db>"
-        EbaDpm.Converter --validate "<generated.db>" [--reference "<ref.db>"] [--layouts "<layouts-repository.db>"] [--report <path.json>]
-        EbaDpm.Converter --extract-layouts "<directory>" --out "<repository.db>"
-                         --dictionary "<dictionary.db>" [--overwrite]
-        EbaDpm.Converter --help | -h | -? | /?
-
-        DPM 1.0 taxonomy selectors (exactly ONE is required; with a DPM 2.0 source they are an error):
-          --taxonomies "COREP 3.2,IF 3.2"   by TaxonomyCode (the code, as stored in mTaxonomy.TaxonomyCode)
-          --taxonomykeys "..."              by TaxonomyKey (a derived identifier, not a stored value)
-                                             e.g.: corep/its-005-2020/2022-03-01 (up to 3.x), sbp/4.0 (from 4.0)
-          --releases 4.0,4.1                by DpmPackageCode
-          --all                             all taxonomies
-
-        --list-taxonomies shows both columns (TaxonomyKey and TaxonomyCode) in case you do not know what to type.
-
-        DPM 2.0 sources: each SQLite file is the snapshot of ONE release and carries only the module
-        versions published in it (those whose ModuleVersion.StartReleaseID is that release).
-          --release <code>   converts only the release with that Release.Code (e.g. 4.3); --output is the
-                             file path. A release in which no exportable module version starts is an error.
-          (no --release)     --output is a DIRECTORY (created if missing); one file dpm-<release code>.db
-                             is written per release, in ReleaseID order. Releases in which no exportable
-                             module version starts are skipped. If any target file exists and --overwrite
-                             is absent, nothing is written.
-        --release is an error with a DPM 1.0 source.
-
-        --validate: --reference is OPTIONAL. Without it, only plane A is run (internal invariants).
-        With it, plane B is added (semantic diff against the reference SQLite database).
-        --layouts is OPTIONAL and INDEPENDENT of --reference: it adds plane C, the signature-by-signature
-        comparison against the Annotated Table Layouts repository (the one produced by --extract-layouts).
-        Without it, plane C does NOT run and the report says so explicitly - never silently.
-
-        --extract-layouts: dumps the Annotated Table Layouts (.xlsx) found recursively under <directory>
-        into a queryable SQLite repository. --dictionary is REQUIRED: it points to a SQLite database
-        with the distribution schema (mDimension/mDomain/mMember) used to disambiguate a single-term
-        "(code)" between a metric and a key dimension, and to validate "(domain:member)"; without a
-        dictionary both classifications would be a fallback that mislabels cells in an
-        indistinguishable way, so the CLI refuses instead of risking it. Its path and SHA-256 are
-        recorded in LayoutExtraction (provenance).
-
-        Exit codes: 0 = success. 1 = missing or invalid arguments. 2 = mode not implemented. 3 = critical differences.
-        """;
-
+    /// <summary>
+    /// Runs the CLI over two writers. The output is always plain text (no ANSI codes, no live
+    /// widgets), which is what callers that inject writers (tests, hosts) need.
+    /// </summary>
     public static int Run(string[] args, TextWriter stdout, TextWriter stderr)
+        => Run(args, CliConsole.Plain(stdout), CliConsole.Plain(stderr));
+
+    /// <summary>Runs the CLI over two consoles: rich on a terminal, plain when redirected or with <c>--plain</c>.</summary>
+    internal static int Run(string[] args, CliConsole stdout, CliConsole stderr)
     {
+        if (args.Any(a => string.Equals(a, "--plain", StringComparison.OrdinalIgnoreCase)))
+        {
+            stdout = stdout.AsPlain();
+            stderr = stderr.AsPlain();
+        }
+
+        // The help flags win over everything else and need no other argument.
         if (args.Any(a => HelpFlags.Contains(a, StringComparer.OrdinalIgnoreCase)))
         {
-            stdout.WriteLine(Usage);
-            return ExitOk;
+            return ShowHelp(stdout, stderr);
         }
 
         if (args.Length == 0)
         {
-            stderr.WriteLine("Error: no arguments given.");
-            stderr.WriteLine("Use --help to see the usage.");
+            stderr.Error("no arguments given.");
+            stderr.WriteLine(UsageHint);
             stderr.WriteLine();
-            stderr.WriteLine(Usage);
+            ShowHelp(stderr, stderr);
             return ExitArgumentError;
         }
 
-        if (HasFlag(args, "--schema-only"))
+        if (!TryCheckValues(args, out var valueError))
         {
-            return RunSchemaOnly(args, stdout, stderr);
+            return ArgumentError(stderr, valueError);
         }
 
-        if (HasFlag(args, "--list-taxonomies"))
+        return BuildApp(stdout, new CliContext(stdout, stderr)).Run(args);
+    }
+
+    private static int ShowHelp(CliConsole target, CliConsole stderr)
+    {
+        var help = target.ForHelp();
+        return BuildApp(help, new CliContext(help, stderr)).Run(["--help"]);
+    }
+
+    private static CommandApp<ConverterCommand> BuildApp(CliConsole console, CliContext context)
+    {
+        var app = new CommandApp<ConverterCommand>();
+        app.Configure(config =>
         {
-            return RunListTaxonomies(args, stdout, stderr);
+            config.SetApplicationName("EbaDpm.Converter");
+            config.Settings.Console = console.Console;
+            config.Settings.Culture = CultureInfo.InvariantCulture;
+            config.Settings.CaseSensitivity = CaseSensitivity.None;
+            config.Settings.StrictParsing = false;
+            config.SetInterceptor(new ContextInterceptor(context));
+            config.SetExceptionHandler((exception, _) => HandleException(exception, context.Stderr));
+
+            config.AddExample("--source", "<input.accdb>", "--output", "<directory>");
+            config.AddExample("--source", "<input.accdb>", "--output", "<file.db>", "--release", "<code>", "--overwrite");
+            config.AddExample("--source", "<dpm1.accdb>", "--output", "<file.db>", "--releases", "4.0,4.1");
+            config.AddExample("--list-taxonomies", "--source", "<input.accdb>");
+            config.AddExample("--schema-only", "--output", "<file.db>");
+            config.AddExample("--validate", "<generated.db>", "--layouts", "<layouts.db>", "--report", "<report.json>");
+            config.AddExample("--extract-layouts", "<directory>", "--out", "<layouts.db>", "--dictionary", "<dictionary.db>");
+        });
+
+        return app;
+    }
+
+    /// <summary>
+    /// Errors the parser raises are argument errors. Anything else is a failure nobody anticipated:
+    /// it is reported in full (type, message and stack) instead of crashing the process, and ends
+    /// with exit code 1.
+    /// </summary>
+    private static int HandleException(Exception exception, CliConsole stderr)
+    {
+        if (exception is CommandAppException)
+        {
+            // A stray token (one that is not an option nor the value of one) is read by the parser
+            // as the name of a command; there is none, so it is an unrecognized argument.
+            var stray = StrayToken().Match(exception.Message);
+            return ArgumentError(stderr, stray.Success ? $"unrecognized argument: {stray.Groups[1].Value}" : exception.Message);
         }
 
-        if (HasFlag(args, "--validate"))
+        stderr.Error($"unexpected failure ({exception.GetType().Name}): {exception.Message}");
+        stderr.WriteException(exception);
+        return ExitArgumentError;
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^Unknown command '(.*)'\.?$")]
+    private static partial System.Text.RegularExpressions.Regex StrayToken();
+
+    private static int ArgumentError(CliConsole stderr, string message)
+    {
+        stderr.Error(message);
+        stderr.WriteLine(UsageHint);
+        return ExitArgumentError;
+    }
+
+    /// <summary>
+    /// An option that takes a value must be followed by it, and a value cannot start with
+    /// <c>--</c> nor be blank.
+    /// </summary>
+    private static bool TryCheckValues(string[] args, out string error)
+    {
+        error = string.Empty;
+        for (var i = 0; i < args.Length; i++)
         {
-            return RunValidate(args, stdout, stderr);
+            var option = ValueOptions.FirstOrDefault(o => string.Equals(o, args[i], StringComparison.OrdinalIgnoreCase));
+            if (option is null)
+            {
+                continue;
+            }
+
+            if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                error = $"argument {option} requires a value.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(args[i + 1]))
+            {
+                error = $"argument {option} cannot be empty.";
+                return false;
+            }
+
+            i++; // skip the value
         }
 
-        if (HasFlag(args, "--extract-layouts"))
+        return true;
+    }
+
+    /// <summary>Entry of the default command: dispatches on the mode flag (the same precedence as ever).</summary>
+    internal static int Execute(ConverterSettings settings)
+    {
+        var context = settings.Context!;
+        var stdout = settings.Plain ? context.Stdout.AsPlain() : context.Stdout;
+        var stderr = settings.Plain ? context.Stderr.AsPlain() : context.Stderr;
+
+        if (settings.SchemaOnly)
         {
-            return RunExtractLayouts(args, stdout, stderr);
+            return RunSchemaOnly(settings, stdout, stderr);
+        }
+
+        if (settings.ListTaxonomies)
+        {
+            return RunListTaxonomies(settings, stdout, stderr);
+        }
+
+        if (settings.ValidatePath is not null)
+        {
+            return RunValidate(settings, stdout, stderr);
+        }
+
+        if (settings.ExtractLayouts is not null)
+        {
+            return RunExtractLayouts(settings, stdout, stderr);
         }
 
         // Any other combination of arguments points to the full conversion mode.
-        return RunConvert(args, stdout, stderr);
+        return RunConvert(settings, stdout, stderr);
     }
 
-    private static int RunListTaxonomies(string[] args, TextWriter stdout, TextWriter stderr)
+    /// <summary>
+    /// Rejects what the selected mode does not accept: tokens that match no option at all, and
+    /// options that belong to another mode. Returns the message, or null when all is accepted.
+    /// </summary>
+    private static string? FindUnrecognized(ConverterSettings settings, string? mode, string[] allowed)
     {
-        if (!TryGetOptionValue(args, "--source", out var source, out var error))
+        var unknown = settings.UnknownTokens
+            .Concat(settings.ProvidedOptions().Where(o => !allowed.Contains(o, StringComparer.Ordinal)))
+            .FirstOrDefault();
+        if (unknown is null)
         {
-            stderr.WriteLine($"Error: {error}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return null;
         }
 
-        var recognized = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        return mode is null
+            ? $"unrecognized argument: {unknown}"
+            : $"unrecognized argument in {mode} mode: {unknown}";
+    }
+
+    private static bool TryRequire(string? value, string option, out string result, out string error)
+    {
+        result = value ?? string.Empty;
+        error = value is null ? $"missing required argument {option}." : string.Empty;
+        return value is not null;
+    }
+
+    // -------------------------------------------------------------------------------------------
+    // --list-taxonomies
+    // -------------------------------------------------------------------------------------------
+
+    private static int RunListTaxonomies(ConverterSettings settings, CliConsole stdout, CliConsole stderr)
+    {
+        if (!TryRequire(settings.Source, "--source", out var source, out var error))
         {
-            "--list-taxonomies", "--source", "--release",
-        };
-        var unknown = FindUnknownTokens(args, recognized, optionsWithValue: ["--source", "--release"]);
-        if (unknown.Count > 0)
-        {
-            stderr.WriteLine($"Error: unrecognized argument in --list-taxonomies mode: {unknown[0]}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return ArgumentError(stderr, error);
         }
 
-        if (!TryGetReleaseOption(args, out var releaseCode, out var releaseOptionError))
+        if (FindUnrecognized(settings, "--list-taxonomies", ListTaxonomiesOptions) is { } unrecognized)
         {
-            stderr.WriteLine($"Error: {releaseOptionError}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return ArgumentError(stderr, unrecognized);
         }
+
+        var releaseCode = settings.Release?.Trim();
 
         try
         {
@@ -162,7 +270,7 @@ public static class CliRunner
             {
                 if (releaseCode is not null)
                 {
-                    stderr.WriteLine($"Error: {ReleaseDpm10Message}");
+                    stderr.Error(ReleaseDpm10Message);
                     return ExitArgumentError;
                 }
 
@@ -175,27 +283,27 @@ public static class CliRunner
         }
         catch (SourceModelDetectionException ex)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
         catch (AceProviderNotFoundException ex)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
         catch (TaxonomyKeyResolutionException ex)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException or UnauthorizedAccessException)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
     }
 
-    private static int RunListTaxonomiesDpm10(string source, TextWriter stdout)
+    private static int RunListTaxonomiesDpm10(string source, CliConsole stdout)
     {
         using var reader = new Dpm10AccessReader(source);
         reader.Open();
@@ -206,43 +314,19 @@ public static class CliRunner
         var taxonomyKeyByTaxonomyId = TaxonomyKeyResolver.Resolve(reader.ReadModules());
 
         // --list-taxonomies shows the TaxonomyKey as the main identifier.
-        WriteTaxonomyTableHeader(stdout);
+        var table = NewTaxonomyTable(stdout);
         foreach (var taxonomy in taxonomies.OrderBy(t => t.TaxonomyCode, StringComparer.OrdinalIgnoreCase))
         {
             var tableCount = tableCounts.GetValueOrDefault(taxonomy.TaxonomyId);
-            var publicationDate = taxonomy.ActualPublicationDate?.ToString("yyyy-MM-dd") ?? "-";
+            var publicationDate = taxonomy.ActualPublicationDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-";
             var taxonomyKey = taxonomyKeyByTaxonomyId.GetValueOrDefault(taxonomy.TaxonomyId, "-");
-            WriteTaxonomyRow(stdout, taxonomyKey, taxonomy.TaxonomyCode, taxonomy.DpmPackageCode, publicationDate, tableCount);
+            AddTaxonomyRow(table, taxonomyKey, taxonomy.TaxonomyCode, taxonomy.DpmPackageCode, publicationDate, tableCount);
         }
 
+        stdout.Write(table);
         stdout.WriteLine();
         stdout.WriteLine($"Total: {taxonomies.Count} taxonomies.");
         return ExitOk;
-    }
-
-    private const string ReleaseDpm10Message = "--release only applies to DPM 2.0 sources.";
-
-    /// <summary>
-    /// Reads the optional <c>--release</c> value. Absent is fine (null); present without a
-    /// value is an error.
-    /// </summary>
-    private static bool TryGetReleaseOption(string[] args, out string? releaseCode, out string error)
-    {
-        releaseCode = null;
-        error = string.Empty;
-
-        if (!HasFlag(args, "--release"))
-        {
-            return true;
-        }
-
-        if (!TryGetOptionValue(args, "--release", out var value, out error))
-        {
-            return false;
-        }
-
-        releaseCode = value.Trim();
-        return true;
     }
 
     /// <summary>
@@ -288,7 +372,7 @@ public static class CliRunner
     private static string SkippedReleaseMessage(Dpm20ReleaseSummary release)
         => $"Release {release.Code}: no exportable module version starts in it; skipped.";
 
-    private static int RunListTaxonomiesDpm20(string source, string? releaseCode, TextWriter stdout, TextWriter stderr)
+    private static int RunListTaxonomiesDpm20(string source, string? releaseCode, CliConsole stdout, CliConsole stderr)
     {
         var catalog = ReadReleaseCatalog(source);
         stdout.WriteLine("Detected source model: DPM 2.0.");
@@ -299,7 +383,7 @@ public static class CliRunner
         {
             if (!TryResolveRelease(catalog, releaseCode, out var requested, out var error))
             {
-                stderr.WriteLine($"Error: {error}");
+                stderr.Error(error);
                 return ExitArgumentError;
             }
 
@@ -311,10 +395,12 @@ public static class CliRunner
         {
             if (releaseCode is null)
             {
-                stdout.WriteLine($"Release {release.Code} ({release.ExportableModuleVersions} exportable module versions)");
+                stdout.WriteLine(
+                    $"Release {release.Code} ({release.ExportableModuleVersions} exportable module versions)",
+                    CliStyles.Heading);
                 if (release.IsEmpty)
                 {
-                    stdout.WriteLine(SkippedReleaseMessage(release));
+                    stdout.WriteLine(SkippedReleaseMessage(release), CliStyles.Informative);
                     stdout.WriteLine();
                     continue;
                 }
@@ -329,7 +415,7 @@ public static class CliRunner
     }
 
     /// <summary>Lists the taxonomies derived at the cutoff of one release; returns their count.</summary>
-    private static int ListReleaseTaxonomies(string source, Dpm20ReleaseSummary release, TextWriter stdout)
+    private static int ListReleaseTaxonomies(string source, Dpm20ReleaseSummary release, CliConsole stdout)
     {
         using var reader = new Dpm20AccessReader(source, cutoffReleaseCode: release.Code);
         reader.Open();
@@ -350,76 +436,59 @@ public static class CliRunner
             .ToList();
 
         // The DPM 2.0 taxonomy is derived; it carries no publication date.
-        WriteTaxonomyTableHeader(stdout);
+        var table = NewTaxonomyTable(stdout);
         foreach (var taxonomy in taxonomies)
         {
             var tableCount = tableCounts.GetValueOrDefault(taxonomy.TaxonomyId);
             var taxonomyKey = derivation.TaxonomyKeyByTaxonomyId.GetValueOrDefault(taxonomy.TaxonomyId, "-");
-            WriteTaxonomyRow(stdout, taxonomyKey, taxonomy.TaxonomyCode, taxonomy.DpmPackageCode, "-", tableCount);
+            AddTaxonomyRow(table, taxonomyKey, taxonomy.TaxonomyCode, taxonomy.DpmPackageCode, "-", tableCount);
         }
 
+        stdout.Write(table);
         return taxonomies.Count;
     }
 
-    private static void WriteTaxonomyTableHeader(TextWriter stdout)
-        => stdout.WriteLine($"{"TaxonomyKey",-45} {"Code",-30} {"DPM package",-12} {"Published",-12} {"Tables",6}");
+    private static Table NewTaxonomyTable(CliConsole stdout)
+        => ReportTable.Create(
+            stdout,
+            ("TaxonomyKey", false), ("Code", false), ("DPM package", false), ("Published", false), ("Tables", true));
 
-    private static void WriteTaxonomyRow(
-        TextWriter stdout, string taxonomyKey, string taxonomyCode, string dpmPackageCode, string publicationDate, int tableCount)
-        => stdout.WriteLine($"{taxonomyKey,-45} {taxonomyCode,-30} {dpmPackageCode,-12} {publicationDate,-12} {tableCount,6}");
+    private static void AddTaxonomyRow(
+        Table table, string taxonomyKey, string taxonomyCode, string dpmPackageCode, string publicationDate, int tableCount)
+        => table.AddRow(
+            ReportTable.Cell(taxonomyKey),
+            ReportTable.Cell(taxonomyCode),
+            ReportTable.Cell(dpmPackageCode),
+            ReportTable.Cell(publicationDate),
+            ReportTable.Cell(tableCount));
 
-    private static int RunConvert(string[] args, TextWriter stdout, TextWriter stderr)
+    // -------------------------------------------------------------------------------------------
+    // Convert
+    // -------------------------------------------------------------------------------------------
+
+    private static int RunConvert(ConverterSettings settings, CliConsole stdout, CliConsole stderr)
     {
-        var recognized = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        if (FindUnrecognized(settings, mode: null, ConvertOptions) is { } unrecognized)
         {
-            "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--all", "--overwrite", "--report", "--verbose",
-            "--release",
-        };
-        var optionsWithValue = new[] { "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--report", "--release" };
-        var unknown = FindUnknownTokens(args, recognized, optionsWithValue);
-        if (unknown.Count > 0)
-        {
-            stderr.WriteLine($"Error: unrecognized argument: {unknown[0]}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return ArgumentError(stderr, unrecognized);
         }
 
-        if (!TryGetOptionValue(args, "--source", out var source, out var sourceError))
+        if (!TryRequire(settings.Source, "--source", out var source, out var sourceError))
         {
-            stderr.WriteLine($"Error: {sourceError}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return ArgumentError(stderr, sourceError);
         }
 
-        if (!TryGetOptionValue(args, "--output", out var output, out var outputError))
+        if (!TryRequire(settings.Output, "--output", out var output, out var outputError))
         {
-            stderr.WriteLine($"Error: {outputError}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return ArgumentError(stderr, outputError);
         }
 
-        if (!TryGetReleaseOption(args, out var releaseCode, out var releaseOptionError))
-        {
-            stderr.WriteLine($"Error: {releaseOptionError}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
-        }
-
-        var overwrite = HasFlag(args, "--overwrite");
-        var all = HasFlag(args, "--all");
-        var taxonomyCodes = TryGetOptionValue(args, "--taxonomies", out var taxonomiesValue, out _)
-            ? SplitCsv(taxonomiesValue)
-            : null;
-        var taxonomyKeys = TryGetOptionValue(args, "--taxonomykeys", out var taxonomyKeysValue, out _)
-            ? SplitCsv(taxonomyKeysValue)
-            : null;
-        var releaseCodes = TryGetOptionValue(args, "--releases", out var releasesValue, out _)
-            ? SplitCsv(releasesValue)
-            : null;
+        var releaseCode = settings.Release?.Trim();
+        var overwrite = settings.Overwrite;
+        var all = settings.All;
+        var taxonomyCodes = settings.Taxonomies is { } taxonomiesValue ? SplitCsv(taxonomiesValue) : null;
+        var taxonomyKeys = settings.TaxonomyKeys is { } taxonomyKeysValue ? SplitCsv(taxonomyKeysValue) : null;
+        var releaseCodes = settings.Releases is { } releasesValue ? SplitCsv(releasesValue) : null;
 
         try
         {
@@ -435,15 +504,15 @@ public static class CliRunner
 
             if (sourceModel == DpmSourceModel.Dpm20)
             {
-                var selectorOption = HasFlag(args, "--taxonomies") ? "--taxonomies"
-                    : HasFlag(args, "--taxonomykeys") ? "--taxonomykeys"
-                    : HasFlag(args, "--releases") ? "--releases"
+                var selectorOption = settings.Taxonomies is not null ? "--taxonomies"
+                    : settings.TaxonomyKeys is not null ? "--taxonomykeys"
+                    : settings.Releases is not null ? "--releases"
                     : all ? "--all"
                     : null;
                 if (selectorOption is not null)
                 {
-                    stderr.WriteLine(
-                        $"Error: {selectorOption} does not apply to DPM 2.0 sources. "
+                    stderr.Error(
+                        $"{selectorOption} does not apply to DPM 2.0 sources. "
                         + "Use --release <code> for one release, or no selector for one file per release.");
                     return ExitArgumentError;
                 }
@@ -453,91 +522,141 @@ public static class CliRunner
 
             if (releaseCode is not null)
             {
-                stderr.WriteLine($"Error: {ReleaseDpm10Message}");
+                stderr.Error(ReleaseDpm10Message);
                 return ExitArgumentError;
             }
 
-            SchemaCreator.Create(output, overwrite);
-
-            using var accessReader = new Dpm10AccessReader(source);
-            accessReader.Open();
-
-            var allTaxonomies = accessReader.ReadTaxonomies().ToList();
-            var taxonomyKeyByTaxonomyId = TaxonomyKeyResolver.Resolve(accessReader.ReadModules());
-            var request = new TaxonomySelectionRequest(taxonomyCodes, taxonomyKeys, releaseCodes, all);
-            var selectedTaxonomies = TaxonomySelector.Resolve(allTaxonomies, request, taxonomyKeyByTaxonomyId);
-
-            using var destination = OpenDestination(output);
-
-            var skeleton = SkeletonLoader.Load(accessReader, destination, allTaxonomies, selectedTaxonomies);
-            var dictionary = DictionaryLoader.Load(accessReader, destination, allTaxonomies, selectedTaxonomies);
-            var templates = TemplateOrTableLoader.Load(accessReader, destination, selectedTaxonomies);
-            var axesAndCells = AxisAndCellLoader.Load(
-                accessReader, destination, templates.TableIdByTableVId, dictionary.MemberIdRenumbering);
-            var modules = ModuleLoader.Load(accessReader, destination, selectedTaxonomies);
-
-            var vacuumElapsedMilliseconds = VacuumWithTiming(destination);
-
-            stdout.WriteLine(
-                $"Skeleton loaded into '{output}': {selectedTaxonomies.Count} taxonomies, "
-                + $"{skeleton.ReportingFrameworkRows} frameworks, {skeleton.ReleaseRows} releases (floor {skeleton.FloorReleaseCode}), "
-                + $"{skeleton.ConceptRows} concepts.");
-            stdout.WriteLine(
-                $"Dictionary loaded: {dictionary.DomainRows} domains, {dictionary.MemberRows} members, "
-                + $"{dictionary.DimensionRows} dimensions, {dictionary.MetricRows} metrics, "
-                + $"{dictionary.HierarchyRows} hierarchies, {dictionary.HierarchyNodeRows} nodes, "
-                + $"{dictionary.NewConceptRows} new concepts, {dictionary.ConceptTranslationRows} translations.");
-            stdout.WriteLine(
-                $"Templates and tables loaded: {templates.TemplateOrTableRows} template/table nodes, "
-                + $"{templates.TableRows} tables, {templates.TaxonomyTableRows} taxonomy-table links.");
-            stdout.WriteLine(
-                $"Axes and cells loaded: {axesAndCells.AxisRows} axes, {axesAndCells.AxisOrdinateRows} ordinates, "
-                + $"{axesAndCells.OrdinateCategorisationRows} categorisations, {axesAndCells.TableCellRows} cells, "
-                + $"{axesAndCells.CellPositionRows} positions, {axesAndCells.OpenAxisValueRestrictionRows} open-axis "
-                + $"restrictions, {axesAndCells.OrdinateMetricRestrictionRows} metric restrictions, "
-                + $"{axesAndCells.SkippedDefaultMemberResets} resets skipped, "
-                + $"{axesAndCells.MetricInheritedFromAncestorCellCount} cells with a metric inherited from an "
-                + "ancestor (expected 0).");
-            stdout.WriteLine(
-                $"Sentinel categorisations: {axesAndCells.TransferredSentinelFixedPairs} fixed categorisations of the "
-                + "sentinel transferred to their target ordinate (1:1, or 1:2 on a single dimension), "
-                + $"{axesAndCells.AmbiguousSentinelFixedPairSkips} sentinels with a partition shape "
-                + "other than those two, left undecided.");
-            foreach (var detail in axesAndCells.AmbiguousSentinelFixedPairDetails)
-            {
-                stdout.WriteLine($"  Undecided sentinel categorisation: {detail}");
-            }
-            stdout.WriteLine(
-                $"Modules loaded: {modules.ModuleRows} modules, {modules.ConceptualModuleRows} conceptual modules, "
-                + $"{modules.ModuleBusinessTemplateRows} module-template links.");
-            stdout.WriteLine($"Final VACUUM: {vacuumElapsedMilliseconds} ms.");
+            ConvertDpm10(source, output, overwrite, new TaxonomySelectionRequestInput(taxonomyCodes, taxonomyKeys, releaseCodes, all), stdout);
             return ExitOk;
         }
         catch (SourceModelDetectionException ex)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
         catch (AceProviderNotFoundException ex)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
         catch (TaxonomySelectionException ex)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
         catch (TaxonomyKeyResolutionException ex)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException or UnauthorizedAccessException)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
+    }
+
+    private sealed record TaxonomySelectionRequestInput(
+        List<string>? TaxonomyCodes, List<string>? TaxonomyKeys, List<string>? ReleaseCodes, bool All);
+
+    private static readonly string[] Dpm10Phases =
+    [
+        "Create schema", "Read source", "Skeleton", "Dictionary", "Templates and tables", "Axes and cells", "Modules", "VACUUM",
+    ];
+
+    /// <summary>
+    /// DPM 1.0 conversion into one file. The schema is created before the source is read, as it
+    /// always was. The phases are reported while they run; the summary is written at the end.
+    /// </summary>
+    private static void ConvertDpm10(
+        string source, string output, bool overwrite, TaxonomySelectionRequestInput selection, CliConsole stdout)
+    {
+        var selectedCount = 0;
+        SkeletonLoader.Result skeleton = null!;
+        DictionaryLoader.Result dictionary = null!;
+        TemplateOrTableLoader.Result templates = null!;
+        AxisAndCellLoader.Result axesAndCells = null!;
+        ModuleLoader.Result modules = null!;
+        var vacuumElapsedMilliseconds = 0L;
+
+        Phases.Run(stdout, Dpm10Phases, phases =>
+        {
+            using var destination = phases.Run("Create schema", () =>
+            {
+                SchemaCreator.Create(output, overwrite);
+                return OpenDestination(output);
+            });
+
+            using var accessReader = new Dpm10AccessReader(source);
+            var read = phases.Run("Read source", () =>
+            {
+                accessReader.Open();
+
+                var allTaxonomies = accessReader.ReadTaxonomies().ToList();
+                var taxonomyKeyByTaxonomyId = TaxonomyKeyResolver.Resolve(accessReader.ReadModules());
+                var request = new TaxonomySelectionRequest(
+                    selection.TaxonomyCodes, selection.TaxonomyKeys, selection.ReleaseCodes, selection.All);
+                var selectedTaxonomies = TaxonomySelector.Resolve(allTaxonomies, request, taxonomyKeyByTaxonomyId);
+                return (AllTaxonomies: allTaxonomies, SelectedTaxonomies: selectedTaxonomies);
+            });
+            selectedCount = read.SelectedTaxonomies.Count;
+
+            skeleton = phases.Run("Skeleton", () => SkeletonLoader.Load(accessReader, destination, read.AllTaxonomies, read.SelectedTaxonomies));
+            dictionary = phases.Run("Dictionary", () => DictionaryLoader.Load(accessReader, destination, read.AllTaxonomies, read.SelectedTaxonomies));
+            templates = phases.Run("Templates and tables", () => TemplateOrTableLoader.Load(accessReader, destination, read.SelectedTaxonomies));
+            axesAndCells = phases.Run(
+                "Axes and cells",
+                () => AxisAndCellLoader.Load(accessReader, destination, templates.TableIdByTableVId, dictionary.MemberIdRenumbering));
+            modules = phases.Run("Modules", () => ModuleLoader.Load(accessReader, destination, read.SelectedTaxonomies));
+            vacuumElapsedMilliseconds = phases.Run("VACUUM", () => VacuumWithTiming(destination));
+        });
+
+        stdout.WriteLine();
+        stdout.WriteLine(
+            $"Converted into '{output}': {selectedCount} taxonomies, floor release {skeleton.FloorReleaseCode}.",
+            CliStyles.Heading);
+
+        var summary = new ConversionSummary(stdout);
+        summary.Add("Skeleton", "frameworks", skeleton.ReportingFrameworkRows);
+        summary.Add("Skeleton", "releases", skeleton.ReleaseRows, $"floor {skeleton.FloorReleaseCode}");
+        summary.Add("Skeleton", "concepts", skeleton.ConceptRows);
+        summary.Add("Dictionary", "domains", dictionary.DomainRows);
+        summary.Add("Dictionary", "members", dictionary.MemberRows);
+        summary.Add("Dictionary", "dimensions", dictionary.DimensionRows);
+        summary.Add("Dictionary", "metrics", dictionary.MetricRows);
+        summary.Add("Dictionary", "hierarchies", dictionary.HierarchyRows);
+        summary.Add("Dictionary", "hierarchy nodes", dictionary.HierarchyNodeRows);
+        summary.Add("Dictionary", "new concepts", dictionary.NewConceptRows);
+        summary.Add("Dictionary", "concept translations", dictionary.ConceptTranslationRows);
+        summary.Add("Templates and tables", "template/table nodes", templates.TemplateOrTableRows);
+        summary.Add("Templates and tables", "tables", templates.TableRows);
+        summary.Add("Templates and tables", "taxonomy-table links", templates.TaxonomyTableRows);
+        summary.Add("Axes and cells", "axes", axesAndCells.AxisRows);
+        summary.Add("Axes and cells", "ordinates", axesAndCells.AxisOrdinateRows);
+        summary.Add("Axes and cells", "categorisations", axesAndCells.OrdinateCategorisationRows);
+        summary.Add("Axes and cells", "cells", axesAndCells.TableCellRows);
+        summary.Add("Axes and cells", "positions", axesAndCells.CellPositionRows);
+        summary.Add("Axes and cells", "open-axis restrictions", axesAndCells.OpenAxisValueRestrictionRows);
+        summary.Add("Axes and cells", "metric restrictions", axesAndCells.OrdinateMetricRestrictionRows);
+        summary.Add("Axes and cells", "resets skipped", axesAndCells.SkippedDefaultMemberResets);
+        summary.Add(
+            "Axes and cells", "cells with a metric inherited from an ancestor", axesAndCells.MetricInheritedFromAncestorCellCount,
+            "expected 0", axesAndCells.MetricInheritedFromAncestorCellCount == 0 ? CliStyles.Plain : CliStyles.Informative);
+        summary.Add(
+            "Sentinel categorisations", "fixed categorisations transferred", axesAndCells.TransferredSentinelFixedPairs,
+            "fixed categorisations of the sentinel moved to their target ordinate (1:1, or 1:2 on a single dimension)");
+        summary.Add(
+            "Sentinel categorisations", "sentinels left undecided", axesAndCells.AmbiguousSentinelFixedPairSkips,
+            "partition shape other than those two",
+            axesAndCells.AmbiguousSentinelFixedPairSkips == 0 ? CliStyles.Plain : CliStyles.Informative);
+        summary.Add("Modules", "modules", modules.ModuleRows);
+        summary.Add("Modules", "conceptual modules", modules.ConceptualModuleRows);
+        summary.Add("Modules", "module-template links", modules.ModuleBusinessTemplateRows);
+        summary.AddDiagnostics(
+            "Undecided sentinel categorisation", axesAndCells.AmbiguousSentinelFixedPairDetails);
+        summary.Write();
+
+        stdout.WriteLine($"Final VACUUM: {vacuumElapsedMilliseconds} ms.");
     }
 
     /// <summary>
@@ -546,7 +665,7 @@ public static class CliRunner
     /// directory and one file <c>dpm-&lt;release code&gt;.db</c> is written per non-empty release.
     /// </summary>
     private static int RunConvertDpm20(
-        string source, string output, bool overwrite, string? releaseCode, TextWriter stdout, TextWriter stderr)
+        string source, string output, bool overwrite, string? releaseCode, CliConsole stdout, CliConsole stderr)
     {
         var catalog = ReadReleaseCatalog(source);
 
@@ -554,13 +673,13 @@ public static class CliRunner
         {
             if (!TryResolveRelease(catalog, releaseCode, out var release, out var error))
             {
-                stderr.WriteLine($"Error: {error}");
+                stderr.Error(error);
                 return ExitArgumentError;
             }
 
             if (Directory.Exists(output))
             {
-                stderr.WriteLine($"Error: --output '{output}' is a directory; with --release it must be the path of the file to write.");
+                stderr.Error($"--output '{output}' is a directory; with --release it must be the path of the file to write.");
                 return ExitArgumentError;
             }
 
@@ -569,7 +688,7 @@ public static class CliRunner
 
         if (File.Exists(output))
         {
-            stderr.WriteLine($"Error: --output '{output}' is a file; without --release it must be a directory.");
+            stderr.Error($"--output '{output}' is a file; without --release it must be a directory.");
             return ExitArgumentError;
         }
 
@@ -579,7 +698,7 @@ public static class CliRunner
         {
             if (release.IsEmpty)
             {
-                stdout.WriteLine(SkippedReleaseMessage(release));
+                stdout.WriteLine(SkippedReleaseMessage(release), CliStyles.Informative);
                 continue;
             }
 
@@ -589,14 +708,14 @@ public static class CliRunner
 
         if (targets.Count == 0)
         {
-            stderr.WriteLine("Error: no release has an exportable module version; nothing to convert.");
+            stderr.Error("no release has an exportable module version; nothing to convert.");
             return ExitArgumentError;
         }
 
         var existing = targets.Where(t => File.Exists(t.Path)).Select(t => t.Path).ToList();
         if (existing.Count > 0 && !overwrite)
         {
-            stderr.WriteLine("Error: the following output files already exist (use --overwrite to replace them); nothing was written:");
+            stderr.Error("the following output files already exist (use --overwrite to replace them); nothing was written:");
             foreach (var path in existing)
             {
                 stderr.WriteLine($"  {path}");
@@ -609,7 +728,9 @@ public static class CliRunner
         foreach (var (release, path) in targets)
         {
             stdout.WriteLine();
-            stdout.WriteLine($"=== Release {release.Code} ({release.ExportableModuleVersions} exportable module versions) -> '{path}' ===");
+            stdout.WriteLine(
+                $"=== Release {release.Code} ({release.ExportableModuleVersions} exportable module versions) -> '{path}' ===",
+                CliStyles.Heading);
             var exit = ConvertDpm20Release(source, release.Code, path, overwrite, stdout);
             if (exit != ExitOk)
             {
@@ -619,6 +740,12 @@ public static class CliRunner
 
         return ExitOk;
     }
+
+    private static readonly string[] Dpm20Phases =
+    [
+        "Read source", "Create schema", "Skeleton", "Dictionary", "Hierarchy tree", "Structure", "Axes and cells",
+        "Modules", "Concepts", "VACUUM",
+    ];
 
     /// <summary>
     /// Creates, loads and finalizes the SQLite snapshot of one DPM 2.0 release: the skeleton
@@ -632,110 +759,180 @@ public static class CliRunner
     /// (<see cref="Dpm20ConceptLoader"/>: <c>mConcept</c>, <c>mConceptTranslation</c>).
     /// The reader's cutoff is the release itself.
     /// </summary>
-    private static int ConvertDpm20Release(string source, string releaseCode, string output, bool overwrite, TextWriter stdout)
+    private static int ConvertDpm20Release(string source, string releaseCode, string output, bool overwrite, CliConsole stdout)
     {
         using var accessReader = new Dpm20AccessReader(source, cutoffReleaseCode: releaseCode);
         accessReader.Open();
 
         stdout.WriteLine($"Release: {accessReader.CutoffReleaseCode}.");
 
-        var releases = accessReader.ReadReleases().ToList();
-        var frameworks = accessReader.ReadFrameworks().ToList();
-        var modules = accessReader.ReadModules().ToList();
-        var moduleVersions = accessReader.ReadModuleVersions().ToList();
-        var compositions = accessReader.ReadModuleVersionCompositions().ToList();
-        var tableVersions = accessReader.ReadTableVersions().ToList();
-        var moduleVersionHistory = accessReader.ReadModuleVersionHistory().ToList();
+        Dpm20SkeletonLoader.Result skeleton = null!;
+        Dpm20DictionaryLoader.Result dictionary = null!;
+        Dpm20DictionaryLoader.Diagnostics dictionaryDiagnostics = null!;
+        Dpm20HierarchyNodeLoader.Result hierarchyNodes = null!;
+        Dpm20StructureLoader.Result structure = null!;
+        Dpm20AxisAndCellLoader.Result axesAndCells = null!;
+        Dpm20ModuleLoader.Result moduleResult = null!;
+        Dpm20ConceptLoader.Result concepts = null!;
+        var vacuumElapsedMilliseconds = 0L;
 
-        var derivation = Dpm20TaxonomyDeriver.Derive(
-            releases, frameworks, modules, moduleVersions, compositions, tableVersions, accessReader.CutoffReleaseId);
+        Phases.Run(stdout, Dpm20Phases, phases =>
+        {
+            var read = phases.Run("Read source", () =>
+            {
+                var releases = accessReader.ReadReleases().ToList();
+                var frameworks = accessReader.ReadFrameworks().ToList();
+                var modules = accessReader.ReadModules().ToList();
+                var moduleVersions = accessReader.ReadModuleVersions().ToList();
+                var compositions = accessReader.ReadModuleVersionCompositions().ToList();
+                var tableVersions = accessReader.ReadTableVersions().ToList();
+                var moduleVersionHistory = accessReader.ReadModuleVersionHistory().ToList();
 
-        var request = new TaxonomySelectionRequest(null, null, [accessReader.CutoffReleaseCode], false);
-        var selectedTaxonomies = TaxonomySelector.Resolve(derivation.Taxonomies, request, derivation.TaxonomyKeyByTaxonomyId);
+                var derivation = Dpm20TaxonomyDeriver.Derive(
+                    releases, frameworks, modules, moduleVersions, compositions, tableVersions, accessReader.CutoffReleaseId);
 
-        SchemaCreator.Create(output, overwrite);
+                var request = new TaxonomySelectionRequest(null, null, [accessReader.CutoffReleaseCode], false);
+                var selectedTaxonomies = TaxonomySelector.Resolve(derivation.Taxonomies, request, derivation.TaxonomyKeyByTaxonomyId);
+                return (releases, frameworks, modules, moduleVersions, compositions, tableVersions, moduleVersionHistory, derivation, selectedTaxonomies);
+            });
 
-        using var destination = OpenDestination(output);
+            using var destination = phases.Run("Create schema", () =>
+            {
+                SchemaCreator.Create(output, overwrite);
+                return OpenDestination(output);
+            });
 
-        var skeleton = Dpm20SkeletonLoader.Load(releases, frameworks, selectedTaxonomies, accessReader.CutoffReleaseCode, accessReader.CutoffReleaseId, destination, moduleVersionHistory);
-        WriteDiagnosticList(stdout, "mTaxonomy: unresolved label/version/date columns", skeleton.UnresolvedTaxonomyColumns ?? []);
+            skeleton = phases.Run(
+                "Skeleton",
+                () => Dpm20SkeletonLoader.Load(
+                    read.releases, read.frameworks, read.selectedTaxonomies, accessReader.CutoffReleaseCode,
+                    accessReader.CutoffReleaseId, destination, read.moduleVersionHistory));
 
-        var dictionary = Dpm20DictionaryLoader.Load(accessReader, destination, out var dictionaryDiagnostics);
+            dictionary = phases.Run(
+                "Dictionary",
+                () =>
+                {
+                    var result = Dpm20DictionaryLoader.Load(accessReader, destination, out var diagnostics);
+                    dictionaryDiagnostics = diagnostics;
+                    return result;
+                });
 
-        var hierarchyNodes = Dpm20HierarchyNodeLoader.Load(accessReader, destination, dictionary.HierarchyBySubCategoryId);
+            hierarchyNodes = phases.Run(
+                "Hierarchy tree",
+                () => Dpm20HierarchyNodeLoader.Load(accessReader, destination, dictionary.HierarchyBySubCategoryId));
 
-        var structure = Dpm20StructureLoader.Load(accessReader, destination, derivation, tableVersions, selectedTaxonomies);
+            structure = phases.Run(
+                "Structure",
+                () => Dpm20StructureLoader.Load(accessReader, destination, read.derivation, read.tableVersions, read.selectedTaxonomies));
 
-        var axesAndCells = Dpm20AxisAndCellLoader.Load(
-            accessReader, destination, structure.TableVIdByTableId, tableVersions, dictionary.HierarchyBySubCategoryId);
+            axesAndCells = phases.Run(
+                "Axes and cells",
+                () => Dpm20AxisAndCellLoader.Load(
+                    accessReader, destination, structure.TableVIdByTableId, read.tableVersions, dictionary.HierarchyBySubCategoryId));
 
-        var moduleResult = Dpm20ModuleLoader.Load(
-            accessReader, destination, modules, moduleVersions, compositions, tableVersions, frameworks,
-            releases, selectedTaxonomies, structure);
+            moduleResult = phases.Run(
+                "Modules",
+                () => Dpm20ModuleLoader.Load(
+                    accessReader, destination, read.modules, read.moduleVersions, read.compositions, read.tableVersions,
+                    read.frameworks, read.releases, read.selectedTaxonomies, structure));
 
-        // FINAL phase, after the six previous loaders. Mints mConcept and mConceptTranslation by
-        // reading what has already been written; it does not touch any of the six loaders above.
-        var concepts = Dpm20ConceptLoader.Load(destination);
+            // FINAL phase, after the six previous loaders. Mints mConcept and mConceptTranslation by
+            // reading what has already been written; it does not touch any of the six loaders above.
+            concepts = phases.Run("Concepts", () => Dpm20ConceptLoader.Load(destination));
 
-        var vacuumElapsedMilliseconds = VacuumWithTiming(destination);
+            vacuumElapsedMilliseconds = phases.Run("VACUUM", () => VacuumWithTiming(destination));
+        });
 
-        stdout.WriteLine(
-            $"DPM 2.0 skeleton loaded into '{output}': {skeleton.ReleaseRows} releases, "
-            + $"{skeleton.ReportingFrameworkRows} frameworks, {skeleton.TaxonomyRows} taxonomies, "
-            + $"{skeleton.OwnerRows} owners, {skeleton.OwnerParentRows} owner-parent, "
-            + $"{skeleton.LanguageRows} languages, {skeleton.RewriteUriRows} rewrite-URI, "
-            + $"{skeleton.TaxonomyPackageRows} taxonomy package, {skeleton.DatabasePropertiesRows} properties.");
-        stdout.WriteLine(
-            $"DPM 2.0 dictionary loaded: {dictionary.DomainRows} domains, "
-            + $"{dictionary.DomainUnionRows} domain unions, {dictionary.MemberRows} members, "
-            + $"{dictionary.MetricRows} metrics, {dictionary.DimensionRows} dimensions, "
-            + $"{dictionary.HierarchyRows} hierarchies.");
-        WriteDictionaryDiagnostics(stdout, dictionaryDiagnostics);
-        stdout.WriteLine(
-            $"DPM 2.0 hierarchy tree loaded: {hierarchyNodes.HierarchyNodeRows} "
-            + $"mHierarchyNode, {hierarchyNodes.HierarchiesWithoutNodes} hierarchies without nodes "
-            + "(no items in their effective version).");
-        WriteDiagnosticList(stdout, "Hierarchy tree: MemberID anchored to its own domain", hierarchyNodes.AnchoredMembers);
-        WriteDiagnosticList(stdout, "Hierarchy tree: MemberID re-anchored by the consistency tie-break", hierarchyNodes.ReanchoredMembers);
-        stdout.WriteLine(
-            $"DPM 2.0 structure loaded: {structure.TableRows} mTable, "
-            + $"{structure.TaxonomyTableRows} mTaxonomyTable, {structure.TemplateOrTableRows} "
-            + $"mTemplateOrTable ({structure.TableGroupLevel1Rows} group + {structure.TemplateLevel2Rows} "
-            + $"template + {structure.BusinessTableRows} table). Invariant mTaxonomyTable == "
-            + $"BusinessTable: {(structure.PairInvariantHolds ? "holds" : "DOES NOT HOLD")}.");
-        WriteDiagnosticList(stdout, "Structure: unresolved cases", structure.UnresolvedCases);
-        stdout.WriteLine(
-            $"DPM 2.0 axes and cells loaded: {axesAndCells.AxisRows} mAxis, "
-            + $"{axesAndCells.TableAxisRows} mTableAxis, {axesAndCells.AxisOrdinateRows} mAxisOrdinate, "
-            + $"{axesAndCells.TableCellRows} mTableCell, {axesAndCells.CellPositionRows} mCellPosition, "
-            + $"{axesAndCells.OrdinateCategorisationRows} mOrdinateCategorisation (informative, not "
-            + $"compared by count), {axesAndCells.OpenAxisValueRestrictionRows} "
-            + "mOpenAxisValueRestriction, "
-            + $"{axesAndCells.OrdinateMetricRestrictionRows} mOrdinateMetricRestriction ("
-            + $"{axesAndCells.UnresolvedMetricRestrictions} unresolved).");
-        stdout.WriteLine(
-            $"  Categorisation: {axesAndCells.UnresolvedContextPairs} unresolved context pairs, "
-            + $"{axesAndCells.UnresolvedMetricPairs} unresolved metric pairs, "
-            + $"{axesAndCells.UnresolvedOpenAxisDimensions} unresolved open-axis dimensions, "
-            + $"{axesAndCells.UnresolvedOpenAxisRestrictions} unresolved open-axis restrictions.");
-        WriteDiagnosticList(stdout, "Axes and cells: structural anomalies", axesAndCells.StructuralAnomalies);
-        stdout.WriteLine(
-            $"DPM 2.0 modules loaded: {moduleResult.ModuleRows} mModule, "
-            + $"{moduleResult.ConceptualModuleRows} mConceptualModule, "
-            + $"{moduleResult.ModuleBusinessTemplateRows} mModuleBusinessTemplate "
-            + "(Order: a declared choice, not derived).");
-        WriteDiagnosticList(stdout, "Modules: unresolved cases", moduleResult.UnresolvedCases);
-        stdout.WriteLine(
-            $"DPM 2.0 concepts minted: {concepts.ConceptRows} mConcept, "
-            + $"{concepts.ConceptTranslationRows} mConceptTranslation, {concepts.ConceptsWithReleaseId} "
-            + "with ReleaseID.");
+        stdout.WriteLine();
+        stdout.WriteLine($"DPM 2.0 release {accessReader.CutoffReleaseCode} converted into '{output}'.", CliStyles.Heading);
+
+        var summary = new ConversionSummary(stdout);
+        summary.Add("Skeleton", "mRelease", skeleton.ReleaseRows);
+        summary.Add("Skeleton", "mReportingFramework", skeleton.ReportingFrameworkRows);
+        summary.Add("Skeleton", "mTaxonomy", skeleton.TaxonomyRows);
+        summary.Add("Skeleton", "mOwner", skeleton.OwnerRows);
+        summary.Add("Skeleton", "owner-parent", skeleton.OwnerParentRows);
+        summary.Add("Skeleton", "languages", skeleton.LanguageRows);
+        summary.Add("Skeleton", "rewrite-URI", skeleton.RewriteUriRows);
+        summary.Add("Skeleton", "taxonomy package", skeleton.TaxonomyPackageRows);
+        summary.Add("Skeleton", "database properties", skeleton.DatabasePropertiesRows);
+        summary.Add("Dictionary", "mDomain", dictionary.DomainRows);
+        summary.Add("Dictionary", "domain unions", dictionary.DomainUnionRows);
+        summary.Add("Dictionary", "mMember", dictionary.MemberRows);
+        summary.Add("Dictionary", "mMetric", dictionary.MetricRows);
+        summary.Add("Dictionary", "mDimension", dictionary.DimensionRows);
+        summary.Add("Dictionary", "mHierarchy", dictionary.HierarchyRows);
+        summary.Add("Hierarchy tree", "mHierarchyNode", hierarchyNodes.HierarchyNodeRows);
+        summary.Add(
+            "Hierarchy tree", "hierarchies without nodes", hierarchyNodes.HierarchiesWithoutNodes,
+            "no items in their effective version");
+        summary.Add("Structure", "mTable", structure.TableRows);
+        summary.Add("Structure", "mTaxonomyTable", structure.TaxonomyTableRows);
+        summary.Add(
+            "Structure", "mTemplateOrTable", structure.TemplateOrTableRows,
+            $"{structure.TableGroupLevel1Rows} group + {structure.TemplateLevel2Rows} template + {structure.BusinessTableRows} table");
+        summary.AddStatement(
+            "Structure", "invariant mTaxonomyTable == BusinessTable",
+            structure.PairInvariantHolds ? "holds" : "DOES NOT HOLD",
+            structure.PairInvariantHolds ? CliStyles.Pass : CliStyles.Critical);
+        summary.Add("Axes and cells", "mAxis", axesAndCells.AxisRows);
+        summary.Add("Axes and cells", "mTableAxis", axesAndCells.TableAxisRows);
+        summary.Add("Axes and cells", "mAxisOrdinate", axesAndCells.AxisOrdinateRows);
+        summary.Add("Axes and cells", "mTableCell", axesAndCells.TableCellRows);
+        summary.Add("Axes and cells", "mCellPosition", axesAndCells.CellPositionRows);
+        summary.Add(
+            "Axes and cells", "mOrdinateCategorisation", axesAndCells.OrdinateCategorisationRows,
+            "informative, not compared by count");
+        summary.Add("Axes and cells", "mOpenAxisValueRestriction", axesAndCells.OpenAxisValueRestrictionRows);
+        summary.Add(
+            "Axes and cells", "mOrdinateMetricRestriction", axesAndCells.OrdinateMetricRestrictionRows,
+            $"{axesAndCells.UnresolvedMetricRestrictions} unresolved",
+            axesAndCells.UnresolvedMetricRestrictions == 0 ? CliStyles.Plain : CliStyles.Informative);
+        AddUnresolved(summary, "unresolved context pairs", axesAndCells.UnresolvedContextPairs);
+        AddUnresolved(summary, "unresolved metric pairs", axesAndCells.UnresolvedMetricPairs);
+        AddUnresolved(summary, "unresolved open-axis dimensions", axesAndCells.UnresolvedOpenAxisDimensions);
+        AddUnresolved(summary, "unresolved open-axis restrictions", axesAndCells.UnresolvedOpenAxisRestrictions);
+        summary.Add("Modules", "mModule", moduleResult.ModuleRows);
+        summary.Add("Modules", "mConceptualModule", moduleResult.ConceptualModuleRows);
+        summary.Add(
+            "Modules", "mModuleBusinessTemplate", moduleResult.ModuleBusinessTemplateRows,
+            "Order: a declared choice, not derived");
+        summary.Add("Concepts", "mConcept", concepts.ConceptRows, $"{concepts.ConceptsWithReleaseId} with ReleaseID");
+        summary.Add("Concepts", "mConceptTranslation", concepts.ConceptTranslationRows);
         foreach (var type in concepts.ConceptRowsByType.OrderBy(kv => kv.Key, StringComparer.Ordinal))
         {
-            stdout.WriteLine($"  {type.Key,-18} {type.Value,7}");
+            summary.Add("Concepts", $"  {type.Key}", type.Value);
         }
+
+        summary.AddDiagnostics("mTaxonomy: unresolved label/version/date columns", skeleton.UnresolvedTaxonomyColumns ?? []);
+        AddDictionaryDiagnostics(summary, dictionaryDiagnostics);
+        summary.AddDiagnostics("Hierarchy tree: MemberID anchored to its own domain", hierarchyNodes.AnchoredMembers);
+        summary.AddDiagnostics("Hierarchy tree: MemberID re-anchored by the consistency tie-break", hierarchyNodes.ReanchoredMembers);
+        summary.AddDiagnostics("Structure: unresolved cases", structure.UnresolvedCases);
+        summary.AddDiagnostics("Axes and cells: structural anomalies", axesAndCells.StructuralAnomalies);
+        summary.AddDiagnostics("Modules: unresolved cases", moduleResult.UnresolvedCases);
+        summary.Write();
 
         stdout.WriteLine($"Final VACUUM: {vacuumElapsedMilliseconds} ms.");
         return ExitOk;
+    }
+
+    private static void AddUnresolved(ConversionSummary summary, string item, long count)
+        => summary.Add("Axes and cells", item, count, null, count == 0 ? CliStyles.Plain : CliStyles.Informative);
+
+    /// <summary>
+    /// The named cases that are documented as not fully resolved: they are listed, not hidden and
+    /// not forced.
+    /// </summary>
+    private static void AddDictionaryDiagnostics(
+        ConversionSummary summary, Dpm20DictionaryLoader.Diagnostics diagnostics)
+    {
+        summary.AddDiagnostics("mMetric.DataType without a known translation", diagnostics.UnresolvedMetricDataTypeCases);
+        summary.AddDiagnostics("mMetric with several hierarchies in its non-key headers (mMetric.ReferencedHierarchyID NULL; the hierarchy is per ordinate in mOrdinateMetricRestriction)", diagnostics.MetricsWithSeveralHierarchies);
+        summary.AddDiagnostics("mDomain.DataType unresolved", diagnostics.UnresolvedDomainDataTypeCases);
+        summary.AddDiagnostics("mDimension without its own code in ItemCategory/_PR", diagnostics.DimensionsWithoutCode);
+        summary.AddDiagnostics("mDimension without a row in PropertyCategory", diagnostics.DimensionsWithoutPropertyCategory);
+        summary.AddDiagnostics("mDimension.DomainID unresolved", diagnostics.UnresolvedDimensionDomainCases);
     }
 
     /// <summary>
@@ -773,110 +970,54 @@ public static class CliRunner
         return vacuumStopwatch.ElapsedMilliseconds;
     }
 
-    /// <summary>
-    /// The named cases that are documented as not fully resolved: they are listed, not hidden and
-    /// not forced.
-    /// </summary>
-    private static void WriteDictionaryDiagnostics(
-        TextWriter stdout, EbaDpm.Converter.Core.Mapping.Dpm20.Dpm20DictionaryLoader.Diagnostics diagnostics)
-    {
-        WriteDiagnosticList(stdout, "mMetric.DataType without a known translation", diagnostics.UnresolvedMetricDataTypeCases);
-        WriteDiagnosticList(stdout, "mMetric with several hierarchies in its non-key headers (mMetric.ReferencedHierarchyID NULL; the hierarchy is per ordinate in mOrdinateMetricRestriction)", diagnostics.MetricsWithSeveralHierarchies);
-        WriteDiagnosticList(stdout, "mDomain.DataType unresolved", diagnostics.UnresolvedDomainDataTypeCases);
-        WriteDiagnosticList(stdout, "mDimension without its own code in ItemCategory/_PR", diagnostics.DimensionsWithoutCode);
-        WriteDiagnosticList(stdout, "mDimension without a row in PropertyCategory", diagnostics.DimensionsWithoutPropertyCategory);
-        WriteDiagnosticList(stdout, "mDimension.DomainID unresolved", diagnostics.UnresolvedDimensionDomainCases);
-    }
-
-    private static void WriteDiagnosticList(TextWriter stdout, string title, IReadOnlyList<string> cases)
-    {
-        if (cases.Count == 0)
-        {
-            return;
-        }
-
-        stdout.WriteLine($"  {title}: {cases.Count} case(s).");
-        foreach (var item in cases.Take(20))
-        {
-            stdout.WriteLine($"    - {item}");
-        }
-
-        if (cases.Count > 20)
-        {
-            stdout.WriteLine($"    ... and {cases.Count - 20} more.");
-        }
-    }
-
     private static List<string> SplitCsv(string value)
         => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
-    private static int RunSchemaOnly(string[] args, TextWriter stdout, TextWriter stderr)
+    // -------------------------------------------------------------------------------------------
+    // --schema-only
+    // -------------------------------------------------------------------------------------------
+
+    private static int RunSchemaOnly(ConverterSettings settings, CliConsole stdout, CliConsole stderr)
     {
-        if (!TryGetOptionValue(args, "--output", out var output, out var error))
+        if (!TryRequire(settings.Output, "--output", out var output, out var error))
         {
-            stderr.WriteLine($"Error: {error}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return ArgumentError(stderr, error);
         }
 
-        var overwrite = HasFlag(args, "--overwrite");
-
-        var recognized = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        if (FindUnrecognized(settings, "--schema-only", SchemaOnlyOptions) is { } unrecognized)
         {
-            "--schema-only", "--output", "--overwrite",
-        };
-        var unknown = FindUnknownTokens(args, recognized, optionsWithValue: ["--output"]);
-        if (unknown.Count > 0)
-        {
-            stderr.WriteLine($"Error: unrecognized argument in --schema-only mode: {unknown[0]}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return ArgumentError(stderr, unrecognized);
         }
 
         try
         {
-            var tableCount = SchemaCreator.Create(output, overwrite);
+            var tableCount = SchemaCreator.Create(output, settings.Overwrite);
             stdout.WriteLine($"Schema created in '{output}': {tableCount} tables.");
             return ExitOk;
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
     }
 
-    private static int RunExtractLayouts(string[] args, TextWriter stdout, TextWriter stderr)
+    // -------------------------------------------------------------------------------------------
+    // --extract-layouts
+    // -------------------------------------------------------------------------------------------
+
+    private static int RunExtractLayouts(ConverterSettings settings, CliConsole stdout, CliConsole stderr)
     {
-        if (!TryGetOptionValue(args, "--extract-layouts", out var inputDirectory, out var error))
+        var inputDirectory = settings.ExtractLayouts!;
+
+        if (!TryRequire(settings.Out, "--out", out var outputPath, out var outputError))
         {
-            stderr.WriteLine($"Error: {error}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return ArgumentError(stderr, outputError);
         }
 
-        if (!TryGetOptionValue(args, "--out", out var outputPath, out var outputError))
+        if (FindUnrecognized(settings, "--extract-layouts", ExtractLayoutsOptions) is { } unrecognized)
         {
-            stderr.WriteLine($"Error: {outputError}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
-        }
-
-        var recognized = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "--extract-layouts", "--out", "--dictionary", "--overwrite",
-        };
-        var unknown = FindUnknownTokens(args, recognized, optionsWithValue: ["--extract-layouts", "--out", "--dictionary"]);
-        if (unknown.Count > 0)
-        {
-            stderr.WriteLine($"Error: unrecognized argument in --extract-layouts mode: {unknown[0]}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return ArgumentError(stderr, unrecognized);
         }
 
         // --dictionary is REQUIRED on the CLI. Without it a single-term "(code)" cannot be
@@ -884,32 +1025,33 @@ public static class CliRunner
         // fallback that mislabels hundreds of cells is worse than refusing. (The library,
         // LayoutExtractor.Extract, keeps dictionaryPath optional: several tests deliberately
         // document what is lost without a dictionary.)
-        if (!TryGetOptionValue(args, "--dictionary", out var dictionaryPath, out var dictionaryError))
+        if (!TryRequire(settings.Dictionary, "--dictionary", out var dictionaryPath, out var dictionaryError))
         {
-            stderr.WriteLine($"Error: {dictionaryError}");
+            stderr.Error(dictionaryError);
             stderr.WriteLine("--dictionary is required in --extract-layouts (without it, single-term \"(code)\" cells cannot be classified).");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
+            stderr.WriteLine(UsageHint);
             return ExitArgumentError;
         }
 
         if (!Directory.Exists(inputDirectory))
         {
-            stderr.WriteLine($"Error: directory '{inputDirectory}' does not exist.");
+            stderr.Error($"directory '{inputDirectory}' does not exist.");
             return ExitArgumentError;
         }
 
         if (!File.Exists(dictionaryPath))
         {
-            stderr.WriteLine($"Error: dictionary file '{dictionaryPath}' does not exist.");
+            stderr.Error($"dictionary file '{dictionaryPath}' does not exist.");
             return ExitArgumentError;
         }
 
-        var overwrite = HasFlag(args, "--overwrite");
-
         try
         {
-            var summary = LayoutExtractor.Extract(inputDirectory, outputPath, overwrite, dictionaryPath);
+            LayoutExtractionSummary summary = null!;
+            Phases.Run(stdout, ["Extract layouts"], phases =>
+                summary = phases.Run(
+                    "Extract layouts",
+                    () => LayoutExtractor.Extract(inputDirectory, outputPath, settings.Overwrite, dictionaryPath)));
 
             stdout.WriteLine($"Layout repository created in '{outputPath}'.");
             stdout.WriteLine(
@@ -999,88 +1141,56 @@ public static class CliRunner
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException or UnauthorizedAccessException or DirectoryNotFoundException or Microsoft.Data.Sqlite.SqliteException)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
     }
 
-    private static int RunValidate(string[] args, TextWriter stdout, TextWriter stderr)
-    {
-        if (!TryGetOptionValue(args, "--validate", out var generatedPath, out var error))
-        {
-            stderr.WriteLine($"Error: {error}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
-        }
+    // -------------------------------------------------------------------------------------------
+    // --validate
+    // -------------------------------------------------------------------------------------------
 
-        var recognized = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    private static int RunValidate(ConverterSettings settings, CliConsole stdout, CliConsole stderr)
+    {
+        var generatedPath = settings.ValidatePath!;
+
+        if (FindUnrecognized(settings, "--validate", ValidateOptions) is { } unrecognized)
         {
-            "--validate", "--reference", "--layouts", "--report",
-        };
-        var unknown = FindUnknownTokens(args, recognized, optionsWithValue: ["--validate", "--reference", "--layouts", "--report"]);
-        if (unknown.Count > 0)
-        {
-            stderr.WriteLine($"Error: unrecognized argument in --validate mode: {unknown[0]}");
-            stderr.WriteLine();
-            stderr.WriteLine(Usage);
-            return ExitArgumentError;
+            return ArgumentError(stderr, unrecognized);
         }
 
         // --reference is OPTIONAL. Without it, only plane A is run.
-        string? referencePath = null;
-        if (HasFlag(args, "--reference"))
-        {
-            if (!TryGetOptionValue(args, "--reference", out var referenceValue, out var referenceError))
-            {
-                stderr.WriteLine($"Error: {referenceError}");
-                stderr.WriteLine();
-                stderr.WriteLine(Usage);
-                return ExitArgumentError;
-            }
-
-            referencePath = referenceValue;
-        }
+        var referencePath = settings.Reference;
 
         // --layouts is OPTIONAL and INDEPENDENT of --reference.
-        string? layoutsPath = null;
-        if (HasFlag(args, "--layouts"))
-        {
-            if (!TryGetOptionValue(args, "--layouts", out var layoutsValue, out var layoutsError))
-            {
-                stderr.WriteLine($"Error: {layoutsError}");
-                stderr.WriteLine();
-                stderr.WriteLine(Usage);
-                return ExitArgumentError;
-            }
+        var layoutsPath = settings.Layouts;
 
-            layoutsPath = layoutsValue;
-        }
-
-        var reportPath = TryGetOptionValue(args, "--report", out var reportValue, out _) ? reportValue : null;
+        var reportPath = settings.Report;
 
         if (!File.Exists(generatedPath))
         {
-            stderr.WriteLine($"Error: file '{generatedPath}' does not exist.");
+            stderr.Error($"file '{generatedPath}' does not exist.");
             return ExitArgumentError;
         }
 
         if (referencePath is not null && !File.Exists(referencePath))
         {
-            stderr.WriteLine($"Error: reference file '{referencePath}' does not exist.");
+            stderr.Error($"reference file '{referencePath}' does not exist.");
             return ExitArgumentError;
         }
 
         if (layoutsPath is not null && !File.Exists(layoutsPath))
         {
-            stderr.WriteLine($"Error: layout repository '{layoutsPath}' does not exist.");
+            stderr.Error($"layout repository '{layoutsPath}' does not exist.");
             return ExitArgumentError;
         }
 
         try
         {
-            var result = Validator.Run(generatedPath, referencePath, layoutsPath);
-            PrintSummary(stdout, result.Report);
+            Validator.Result result = null!;
+            Phases.Run(stdout, ["Validate"], phases =>
+                result = phases.Run("Validate", () => Validator.Run(generatedPath, referencePath, layoutsPath)));
+            ValidationConsoleReport.Print(stdout, result.Report);
 
             if (reportPath is not null)
             {
@@ -1091,7 +1201,7 @@ public static class CliRunner
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
         {
-            stderr.WriteLine($"Error: {ex.Message}");
+            stderr.Error(ex.Message);
             return ExitArgumentError;
         }
     }
@@ -1107,191 +1217,5 @@ public static class CliRunner
         }
 
         File.WriteAllText(path, json, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-    }
-
-    private static void PrintSummary(TextWriter stdout, EbaDpm.Converter.Core.Validation.ValidationReport report)
-    {
-        var referenceText = report.Inputs.Reference is { } reference ? $"against '{Path.GetFileName(reference.Path)}'" : "without reference (plane A only)";
-        stdout.WriteLine($"Validation of '{Path.GetFileName(report.Inputs.Generated.Path)}' {referenceText}.");
-        stdout.WriteLine();
-
-        if (report.Inputs.Reference is not null)
-        {
-            stdout.WriteLine(
-                $"Comparable universe: {report.Universe.ComparableTaxonomies.Count} taxonomies, "
-                + $"{report.Universe.Tables} tables, {report.Universe.Ordinates} ordinates, {report.Universe.Cells} cells.");
-            stdout.WriteLine();
-
-            // The hash of the reference file is DATA, announced ONCE here - never per exception.
-            if (report.ExemplarNotice is { } notice)
-            {
-                stdout.WriteLine($"WARNING: {notice}");
-                stdout.WriteLine();
-            }
-        }
-
-        PrintPlane(stdout, report, "A", "PLANE A - internal consistency (no reference)");
-        if (report.Inputs.Reference is not null)
-        {
-            // Plane B reports and does NOT fail the run: the reference export is another
-            // implementation, not an authority.
-            PrintPlane(stdout, report, "B", "PLANE B - diff against the reference (reports; does NOT decide the exit code)");
-        }
-
-        // Plane C is ALWAYS announced, whether it runs or not - never silently.
-        if (report.PlaneCNotice is { } planeCNotice)
-        {
-            stdout.WriteLine(planeCNotice);
-        }
-
-        if (report.Checks.Any(c => c.Plane == "C"))
-        {
-            PrintPlane(stdout, report, "C", "PLANE C - signature by signature against the Annotated Table Layout");
-        }
-
-        stdout.WriteLine();
-        var current = report.Exceptions.Count(e => e.AppliesToThisReference && !e.Stale);
-        var stale = report.Exceptions.Count(e => e.Stale);
-        var notEvaluated = report.Exceptions.Count(e => !e.Evaluated);
-        var identifiers = report.Exceptions.Select(e => e.Id).Distinct(StringComparer.Ordinal).Count();
-        stdout.WriteLine(
-            $"Exceptions: {identifiers} identifiers, {report.Exceptions.Count} objects; "
-            + $"{current} current, {stale} stale, {notEvaluated} NOT EVALUATED");
-
-        // Grouped by Id on the console - listing hundreds of lines is as useless as listing none.
-        // The object-by-object detail lives ENTIRELY in the JSON (--report); only the STALE ones,
-        // which require action, are named individually here.
-        foreach (var group in report.Exceptions.GroupBy(e => e.Id, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal))
-        {
-            var first = group.First();
-            var groupEvaluated = group.Any(e => e.Evaluated);
-            var status = !groupEvaluated
-                ? "NOT EVALUATED"
-                : group.Any(e => e.Stale)
-                    ? "STALE"
-                    : group.All(e => e.AppliesToThisReference)
-                        ? "applied"
-                        : "does not apply to this reference";
-            stdout.WriteLine($"  {group.Key,-6} {group.Count(),4} object(s)  {status,-24} {first.Reason}");
-        }
-
-        // The obligatory counterpart of plane B no longer failing the run is that it be NAMED:
-        // check (Scope) and declared reference of each stale exception, one by one, marking the
-        // plane B ones as those that no longer fail the run.
-        var staleExceptionSamples = report.Exceptions.Where(e => e.Stale).ToList();
-        if (staleExceptionSamples.Count > 0)
-        {
-            stdout.WriteLine("  Stale, one by one:");
-            foreach (var exception in staleExceptionSamples)
-            {
-                var gateNote = exception.Plane == "B" ? " [plane B: reports, does NOT fail the run]" : "";
-                stdout.WriteLine(
-                    $"    {exception.Id,-6}{exception.BusinessKey,-45} check={exception.Scope} reference={exception.Reference}{gateNote} {exception.Reason}");
-            }
-        }
-
-        stdout.WriteLine();
-        var criticalFailed = report.Summary.Critical.Failed;
-        var informativeFailed = report.Summary.Informative.Failed;
-        var staleText = report.Summary.StaleExceptions > 0 ? $" {report.Summary.StaleExceptions} stale exception(s)." : string.Empty;
-        stdout.WriteLine(
-            criticalFailed == 0 && report.Summary.StaleExceptions == 0
-                ? $"RESULT: no critical differences. {informativeFailed} informative differences in the report."
-                : $"RESULT: {criticalFailed} critical differences.{staleText} {informativeFailed} informative differences in the report.");
-
-        // What plane B no longer fails is counted SEPARATELY, never diluted in the figures above
-        // (which remain the total over the three planes).
-        if (report.Summary.PlaneBCriticalFailed > 0 || report.Summary.PlaneBStaleExceptions > 0)
-        {
-            stdout.WriteLine(
-                $"  Of the above, PLANE B (does not fail the run): {report.Summary.PlaneBCriticalFailed} failed critical check(s), "
-                + $"{report.Summary.PlaneBStaleExceptions} stale exception(s).");
-        }
-    }
-
-    private static void PrintPlane(TextWriter stdout, EbaDpm.Converter.Core.Validation.ValidationReport report, string plane, string header)
-    {
-        stdout.WriteLine(header);
-        foreach (var layer in new[] { ("critical", "critical"), ("informative", "informative") })
-        {
-            var checks = report.Checks.Where(c => c.Plane == plane && c.Layer == layer.Item1).ToList();
-            var passed = checks.Count(c => c.Status is "pass" or "skipped");
-            var failed = checks.Count - passed;
-            stdout.WriteLine($"  {layer.Item2,-12} {checks.Count,3} checks, {passed,3} passed, {failed,3} with differences");
-
-            foreach (var failing in checks.Where(c => c.Status == "fail" || c.Status == "info").Take(20))
-            {
-                stdout.WriteLine($"    {failing.Id}: {failing.Statement} ({failing.Failed} of {failing.Examined})");
-                var shown = failing.Samples.Take(10).ToList();
-                foreach (var sample in shown)
-                {
-                    stdout.WriteLine($"      - {sample.BusinessKey}");
-                }
-
-                // Up to 10 objects per screen, then "... and N more (see report)" - N is relative
-                // to the TOTAL failure of the check, not to the 50-item cut of the JSON.
-                if (failing.Failed > shown.Count)
-                {
-                    stdout.WriteLine($"      ... and {failing.Failed - shown.Count} more (see report)");
-                }
-            }
-        }
-    }
-
-    private static bool HasFlag(string[] args, string flag)
-        => args.Any(a => string.Equals(a, flag, StringComparison.OrdinalIgnoreCase));
-
-    private static bool TryGetOptionValue(string[] args, string option, out string value, out string error)
-    {
-        value = string.Empty;
-        error = string.Empty;
-
-        var index = Array.FindIndex(
-            args, a => string.Equals(a, option, StringComparison.OrdinalIgnoreCase));
-
-        if (index < 0)
-        {
-            error = $"missing required argument {option}.";
-            return false;
-        }
-
-        if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
-        {
-            error = $"argument {option} requires a value.";
-            return false;
-        }
-
-        value = args[index + 1];
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            error = $"argument {option} cannot be empty.";
-            return false;
-        }
-
-        return true;
-    }
-
-    private static List<string> FindUnknownTokens(
-        string[] args, HashSet<string> recognizedFlags, string[] optionsWithValue)
-    {
-        var unknown = new List<string>();
-        for (var i = 0; i < args.Length; i++)
-        {
-            var token = args[i];
-
-            if (recognizedFlags.Contains(token))
-            {
-                if (optionsWithValue.Contains(token, StringComparer.OrdinalIgnoreCase))
-                {
-                    i++; // skip the associated value
-                }
-
-                continue;
-            }
-
-            unknown.Add(token);
-        }
-
-        return unknown;
     }
 }

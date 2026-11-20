@@ -10,7 +10,7 @@ anything that is not one of the other modes is a conversion.
 | [`--schema-only`](#schema-only) | Create an empty database with the 45 tables of the distribution schema |
 | [`--validate`](#validate) | Validate a generated database (planes A, B and C) |
 | [`--extract-layouts`](#extract-layouts) | Build a SQLite repository from the EBA Annotated Table Layout workbooks |
-| `--help`, `-h`, `-?`, `/?` | Print usage and exit with code 0 |
+| `--help`, `-h`, `-?`, `/?` | Print the help and exit with code 0 |
 
 When running from source, replace `EbaDpm.Converter` with
 `dotnet run --project src/EbaDpm.Converter.Cli --`.
@@ -23,9 +23,35 @@ When running from source, replace `EbaDpm.Converter` with
 - List values (`--taxonomies`, `--taxonomykeys`, `--releases`) are comma-separated; surrounding
   spaces are trimmed, and values are matched case-insensitively.
 - Any argument not recognised by the selected mode is an error (exit code 1).
+- `--plain` is accepted with every mode and forces [plain output](#console-output).
 - The help flags win over everything else and need no other argument.
 - Mode precedence, if several mode flags are given: help, `--schema-only`, `--list-taxonomies`,
   `--validate`, `--extract-layouts`, then conversion.
+
+## Console output
+
+The command line is parsed with Spectre.Console.Cli (a single default command; the mode is the
+flag present, so there are no sub-commands). `--help` prints the generated help: every option with
+its description and one example per mode.
+
+- **On a terminal**: conversions and validations show live progress by phase (read the source,
+  one phase per area loaded, `VACUUM`, `Validate`) with the elapsed time of each; summaries are
+  tables; the planes of `--validate` are coloured (green: pass, blue: known exception that applies,
+  yellow: informative difference, red: critical difference or stale exception, the causes of exit
+  code 3); errors are shown as `Error: ...` with the label in red.
+- **Redirected** (a pipe, a file, CI, the 32-bit relaunch of the tool) **or with `--plain`**: plain
+  text. No ANSI escape sequences, no live widgets, tables without borders, and one line per
+  finished phase (for example `[  5.0 s] Dictionary`) so a log shows where a long run is. The
+  stream is detected independently: with `> out.txt` the errors on the terminal stay coloured.
+- **`NO_COLOR`**: when the environment variable is set and not empty, colours are off (terminal
+  features stay on). Use `--plain` to turn everything off.
+- **Unexpected failures** (not an argument, input or output error) are shown as
+  `Error: unexpected failure (<type>): <message>` followed by the exception details, and end with
+  exit code 1.
+
+The shape of the text on standard output (tables, wording, phase lines) is meant for people and
+may change between versions; do not parse it. The JSON written by `--report` is the machine
+interface and its structure is stable.
 
 ## Convert
 
@@ -89,8 +115,9 @@ name together with the valid values. `--release` is an error with a DPM 1.0 sour
 
 ### Output
 
-Each conversion ends with a per-area summary (rows written per table group, plus any unresolved
-cases listed by name) and a final `VACUUM`. For DPM 2.0 the release of each file is printed
+While it runs, each conversion reports its phases with their elapsed time (see
+[Console output](#console-output)). It ends with a summary table (rows written per area, plus any
+unresolved cases listed by name below it) and the time of the final `VACUUM`. For DPM 2.0 the release of each file is printed
 before its summary, and each skipped release is named.
 
 Examples:
@@ -156,9 +183,10 @@ comparison (`B-SCH-01`) runs only against a 4.2 reference. Only taxonomies prese
 databases are compared, always by business key (codes, XBRL codes, signatures), never by
 surrogate ID.
 
-Console output lists, per plane and layer (critical / informative), the number of checks, how many
-passed and the failing ones with up to ten sample business keys each. It then summarises the
-known exceptions (applied, stale, not evaluated) and prints a final `RESULT` line. The JSON report
+Console output shows, per plane, a table with the number of checks per layer (critical /
+informative), how many passed and how many have differences, followed by the failing checks with
+up to ten sample business keys each. It then summarises the known exceptions (applied, stale, not
+evaluated) in a table and prints a final `RESULT` line. The JSON report
 contains every check with its statement, counts, timing and up to 50 samples, plus the complete
 list of known exceptions and their outcome.
 
@@ -207,6 +235,6 @@ is an error that names the file, the code and the dictionary; a framework is nev
 | Code | Meaning |
 |---|---|
 | `0` | Success. For `--validate`: no critical failure in planes A or C, and no stale known exception in those planes (plane B differences and informative differences do not count) |
-| `1` | Missing or invalid arguments, or an input/output error: unknown option, missing value, file not found, output already exists without `--overwrite`, source that is not a recognisable DPM Access database, unknown taxonomy or release, a DPM 2.0 release with no module version published in it |
+| `1` | Missing or invalid arguments, an input/output error, or an unexpected failure: unknown option, missing value, file not found, output already exists without `--overwrite`, source that is not a recognisable DPM Access database, unknown taxonomy or release, a DPM 2.0 release with no module version published in it |
 | `2` | Reserved for a recognised but unimplemented mode. Not returned by the current version |
 | `3` | `--validate` only: at least one critical check failed in plane A or C, or a known exception in those planes became stale |
