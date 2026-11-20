@@ -40,6 +40,9 @@ internal static class ShadingAgreement
             LayoutShadedAccessEnabled.Count + LayoutEnabledAccessDisabledOrAbsent.Count + AccessEnabledNotInLayoutGrid.Count + LayoutTablesWithoutAccessTable.Count;
     }
 
+    /// <summary>
+    /// Compares layout shading with Access enabled/disabled status by business key and returns agreement/disagreement aggregates.
+    /// </summary>
     /// <param name="accessEnabled">For every Access cell: whether it is enabled (exists and is not excluded). An absent key is a cell that does not exist.</param>
     public static Result Compare(IEnumerable<LayoutGridCell> layout, IReadOnlyDictionary<Key, bool> accessEnabled)
     {
