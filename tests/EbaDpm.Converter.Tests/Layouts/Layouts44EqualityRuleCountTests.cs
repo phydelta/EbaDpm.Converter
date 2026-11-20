@@ -25,9 +25,11 @@ internal static class CommentCensus
         foreach (var archive in Directory.EnumerateFiles(directory, "*.xlsx").Select(ZipFile.OpenRead))
         {
             using var zip = archive;
-            foreach (var entry in zip.Entries.Where(e => e.FullName.StartsWith("xl/comments", StringComparison.Ordinal) && e.FullName.EndsWith(".xml", StringComparison.Ordinal)))
+            foreach (var commentStream in zip.Entries
+                         .Where(e => e.FullName.StartsWith("xl/comments", StringComparison.Ordinal) && e.FullName.EndsWith(".xml", StringComparison.Ordinal))
+                         .Select(e => e.Open()))
             {
-                using var stream = entry.Open();
+                using var stream = commentStream;
                 foreach (var comment in XDocument.Load(stream).Descendants(Main + "comment"))
                 {
                     comments++;
