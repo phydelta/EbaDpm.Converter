@@ -22,9 +22,9 @@ internal static class CommentCensus
     public static (long Comments, long WithEquality) Count(string directory)
     {
         long comments = 0, withEquality = 0;
-        foreach (var path in Directory.EnumerateFiles(directory, "*.xlsx"))
+        foreach (var archive in Directory.EnumerateFiles(directory, "*.xlsx").Select(ZipFile.OpenRead))
         {
-            using var zip = ZipFile.OpenRead(path);
+            using var zip = archive;
             foreach (var entry in zip.Entries.Where(e => e.FullName.StartsWith("xl/comments", StringComparison.Ordinal) && e.FullName.EndsWith(".xml", StringComparison.Ordinal)))
             {
                 using var stream = entry.Open();
