@@ -18,7 +18,12 @@ if (ShouldRelaunchToX86())
     }
 }
 
-var code = CliRunner.Run(args, Console.Out, Console.Error);
+// A terminal gets colours, tables with borders and live progress; redirected output (pipes,
+// files, CI, a relaunched child) stays plain text.
+var code = CliRunner.Run(
+    args,
+    CliConsole.Detect(Console.Out, Console.IsOutputRedirected),
+    CliConsole.Detect(Console.Error, Console.IsErrorRedirected));
 
 // Issue #82: once the ACE OLEDB provider has served a connection, the native teardown at process
 // exit (an access violation in the Office module mso20win32client.dll, then a fail-fast in ntdll)

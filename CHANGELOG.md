@@ -36,6 +36,19 @@ All notable changes to this project are documented in this file. The format is b
   source and apply to DPM 2.0 outputs only.
 - **CLI.** With `--release`, an `--output` that is an existing directory is an argument error
   instead of an unhandled exception.
+- **CLI: new console output and argument parsing (#76).** The arguments are parsed with
+  Spectre.Console.Cli (new dependency of the CLI, with Spectre.Console; both MIT) as a single
+  default command, so every invocation keeps working: same options, case-insensitive, same
+  defaults, same modes and exit codes. `--help` is now the generated help (one description per
+  option, one example per mode), and an argument error prints the message and a hint instead of
+  the whole usage. `--list-taxonomies`, the conversion summary and the validation summary are
+  tables; the planes of `--validate` are coloured (pass, known exception, informative and critical
+  difference, stale exception) so that the cause of exit code 3 shows at a glance; errors are
+  `Error: ...` with the label in red. An unexpected failure is now reported with its type, message
+  and stack and ends with exit code 1, instead of crashing the process. The text on standard output
+  is for people and may change; the `--report` JSON is unchanged. `--taxonomies`, `--taxonomykeys`,
+  `--releases` and `--report` without a value are now an argument error, as the usage already
+  documented (before, they were silently ignored); when an option is repeated, the last value wins.
 
 ### Fixed
 
@@ -58,6 +71,11 @@ All notable changes to this project are documented in this file. The format is b
 - **DPM 2.0 output.** The DORA framework is exported like any other framework: its taxonomies,
   modules, tables and table groups (in the 4.4 database, `DORA` 1.2.0 with 15 tables in the 4.2
   file). Document modules stay excluded. (#75)
+- **CLI: `--plain`, and progress by phase (#76).** `--plain` forces plain output: no colours, no live
+  widgets and tables without borders. It is also what you get when the output is redirected (pipes,
+  files, CI, the 32-bit relaunch), and `NO_COLOR` is honoured. A conversion, `--validate` and
+  `--extract-layouts` report their phases with the elapsed time of each: a live progress list on a
+  terminal, one line per finished phase otherwise.
 
 ## 2.0.0 - 2026-10-28
 

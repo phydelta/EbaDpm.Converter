@@ -122,6 +122,10 @@ The source model is detected automatically. A DPM 1.0 conversion needs exactly o
 selector (`--all`, `--taxonomies`, `--taxonomykeys` or `--releases`); a DPM 2.0 conversion takes
 only the optional `--release`. See [docs/usage.md](docs/usage.md) for every option and exit code.
 
+On a terminal the tool shows live progress by phase and coloured tables; when its output is
+redirected, or with `--plain`, it prints plain text with no escape sequences (`NO_COLOR` is also
+honoured). `EbaDpm.Converter --help` lists every option.
+
 > **What a DPM 2.0 export contains.** Each SQLite file is one EBA release: the dictionary,
 > hierarchies and table layouts as of that release, and only the module versions first published
 > in it. A module that did not change in a release stays in the file of the release that published

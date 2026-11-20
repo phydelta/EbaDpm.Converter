@@ -26,7 +26,9 @@ EbaDpm.Converter.sln
 ```
 
 External dependencies are limited to `System.Data.OleDb` (reading Access through ACE OLEDB) and
-`Microsoft.Data.Sqlite` (writing and reading SQLite). Both projects target .NET 10 on Windows;
+`Microsoft.Data.Sqlite` (writing and reading SQLite) in Core, and `Spectre.Console` and
+`Spectre.Console.Cli` (argument parsing, tables, progress and colours; both MIT) in the CLI only:
+Core has no console dependency. Both projects target .NET 10 on Windows;
 the executable is published for x64 and x86.
 
 ## Conversion pipeline

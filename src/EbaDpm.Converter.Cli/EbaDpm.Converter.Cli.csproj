@@ -7,10 +7,18 @@
     <!-- Windows-only, x64 or x86 (depends on ACE OLEDB 16.0 or 12.0). No PlatformTarget: plain
          build is a 64-bit process on x64 Windows; "publish -r win-x86" yields a 32-bit one. -->
     <SupportedOSPlatform>windows</SupportedOSPlatform>
+    <!-- Spectre.Console.Cli ships localized resources: drop them, the tool is English-only and
+         the parser messages are shown as they are (single-file publish stays small). -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\EbaDpm.Converter.Core\EbaDpm.Converter.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.57.2" />
+    <PackageReference Include="Spectre.Console.Cli" Version="0.57.2" />
   </ItemGroup>
 
 </Project>
