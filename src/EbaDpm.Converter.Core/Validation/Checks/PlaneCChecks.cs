@@ -20,30 +20,29 @@ namespace EbaDpm.Converter.Core.Validation.Checks;
 /// and every exclusion reason named.</item>
 /// </list>
 ///
-/// The plane C census of known divergences is TIED to the DPM 2.0 release 4.2 corpus and is not
-/// portable to another output. There are THREE guards, DIFFERENT although the symptom looks
-/// similar:
+/// There is ONE plane C census of known divergences per release (embedded
+/// <c>plane-c-known-divergences-&lt;release&gt;.tsv</c>), tied to the corpus release it was measured on and
+/// not portable to another output: the census applied to an output is the one whose
+/// <c># CorpusRelease</c> equals the output's release. There are THREE cases, DIFFERENT although the
+/// symptom looks similar:
 /// <list type="bullet">
 /// <item><b>(a) Zero tables compared.</b> With <c>TablesCompared == 0</c> nothing can have
 /// expired: evaluating it would yield "all of them expired" for an empty universe, a hollow zero.
 /// <c>C-DPS-01</c> is emitted as <c>Skipped</c>, and the census is NOT EVALUATED (
-/// <see cref="KnownExceptions.ApplyOriginAnomalyExceptions"/> is never called).</item>
-/// <item><b>(b) WELL-DEFINED but different release.</b> With tables really compared and an output
-/// CUTOFF release (<c>mRelease.IsCurrent=1</c> in EXACTLY one row) that differs from
-/// <see cref="KnownExceptions.PlaneCCensusRelease"/>: the case of DPM 2.0 4.3 against the 4.2
-/// census. The census does not apply (a comparison must state which publication it speaks of).
-/// <c>C-DPS-01</c> is emitted as <c>Skipped</c>, naming how many of the declared entries DO
-/// reproduce against this output (structural evidence, not a failure of this run). Identical on
-/// 4.2 and 4.3.</item>
+/// <see cref="KnownExceptions.ApplyOriginAnomalyExceptions(string, IReadOnlySet{string}, ValidationPlane)"/>
+/// is never called).</item>
+/// <item><b>(b) WELL-DEFINED release.</b> The output has a single cutoff release
+/// (<c>mRelease.IsCurrent=1</c> in EXACTLY one row). <c>C-DPS-01</c> and <c>C-MHR-01</c> are evaluated
+/// against the census of that release; when no census exists for it they are evaluated with an EMPTY
+/// census: every violation fails and nothing can expire. An empty census exempts nothing, so this is not
+/// a relaxation (the day a release is published, plane C of its output is the check that matters).</item>
 /// <item><b>(b') UNDETERMINED release: DPM 1.0.</b> <c>mRelease.IsCurrent=1</c> in MORE than one
-/// row (128 taxonomies from 2.0 to 4.1 at once): there is no SINGLE output release to ask whether
-/// it matches that of the census, a different question from (b), not one more case of the same.
-/// The table-to-sheet matching is ALREADY done by each table's OWN release
-/// (<see cref="PlaneC.PlaneCReleaseMatcher"/>), so the comparison is valid anyway; what cannot be
-/// consulted is the CENSUS, and an empty one is not invented: <c>C-DPS-01</c> is EVALUATED with the
-/// raw violations (without going through the census), and can fail again.</item>
+/// row (128 taxonomies from 2.0 to 4.1 at once): there is no SINGLE output release to select a census
+/// by, a different question from (b). The table-to-sheet matching is ALREADY done by each table's OWN
+/// release (<see cref="PlaneC.PlaneCReleaseMatcher"/>), so the comparison is valid anyway; no census is
+/// consulted and <c>C-DPS-01</c> is EVALUATED with the raw violations, and can fail.</item>
 /// </list>
-/// Outside (a)/(b)/(b'), <c>C-DPS-01</c> is evaluated as usual.
+/// Outside (a), <c>C-DPS-01</c> is always evaluated.
 /// </summary>
 public static class PlaneCChecks
 {
@@ -53,7 +52,7 @@ public static class PlaneCChecks
 
     /// <summary>
     /// As the public overload; <paramref name="mhrCensus"/>, when not <see langword="null"/>, replaces the embedded
-    /// census for C-MHR-01 only (its release scope and its DD-27 entries). C-DPS-01 keeps the embedded one.
+    /// census for C-MHR-01 only (its release scope and its DD-27 entries). C-DPS-01 keeps the embedded ones.
     /// </summary>
     internal static IEnumerable<CheckResult> Run(
         SqliteConnection generated, SqliteConnection layouts, List<KnownExceptions.Outcome> exceptionSink,
@@ -227,25 +226,33 @@ public static class PlaneCChecks
         var violationByKey = result.Violations.ToDictionary(v => v.Unit.BusinessKey, StringComparer.Ordinal);
         IReadOnlyList<string> unresolved;
 
-        // The census is tied to the release it was measured on (same scope as C-DPS-01). Against another
-        // release, or an output that does not resolve a single cutoff release (DPM 1.0), it is NOT
-        // consulted: every violation is a real failure of this run; an empty census is not invented.
-        var censusRelease = injectedCensus is null ? KnownExceptions.PlaneCCensusRelease : injectedCensus.CorpusRelease;
+        // The census is tied to the release it was measured on (same scope as C-DPS-01): the one of the
+        // output's release, or an EMPTY one when none exists. An output that does not resolve a single
+        // release (DPM 1.0) consults no census at all.
         var generatedRelease = DetectCutoffRelease(generated);
-        if (censusRelease is not null && generatedRelease is not null && generatedRelease == censusRelease)
+        if (generatedRelease is not null)
         {
+            // A census injected by a test replaces the embedded one, but only applies to its own release.
+            var candidate = injectedCensus ?? KnownExceptions.PlaneCCensusForRelease(generatedRelease);
+            var census0 = candidate is not null && candidate.CorpusRelease == generatedRelease
+                ? candidate
+                : new KnownExceptions.PlaneCCensus([], generatedRelease);
+            if (census0.Exceptions.Count == 0 && (candidate is null || candidate.CorpusRelease != generatedRelease))
+            {
+                statement += $"; no plane C census declared for release {generatedRelease}: evaluated with an EMPTY census " +
+                             "(every violation is a failure, nothing can expire)";
+            }
+
             var violatingKeys = violationByKey.Keys.ToHashSet(StringComparer.Ordinal);
-            var (resolved, outcomes) = injectedCensus is null
-                ? KnownExceptions.ApplyOriginAnomalyExceptions("C-MHR-01", violatingKeys, ValidationPlane.C)
-                : KnownExceptions.ApplyOriginAnomalyExceptions("C-MHR-01", violatingKeys, ValidationPlane.C, injectedCensus);
+            var (resolved, outcomes) = KnownExceptions.ApplyOriginAnomalyExceptions("C-MHR-01", violatingKeys, ValidationPlane.C, census0);
             exceptionSink.AddRange(outcomes);
             unresolved = resolved;
         }
         else
         {
             unresolved = violationByKey.Keys.ToList();
-            statement += $"; plane C census (measured on release {censusRelease}) NOT CONSULTED: the cutoff release of " +
-                         $"this output is {generatedRelease ?? "not a single one"}, so every violation is a real failure of this run";
+            statement += "; plane C census NOT CONSULTED: this output does not resolve a single release " +
+                         "(DPM 1.0), so every violation is a real failure of this run";
         }
 
         var samples = unresolved
@@ -346,7 +353,7 @@ public static class PlaneCChecks
     private static CheckResult BuildCDps01(
         SqliteConnection generated, PlaneCResult result, long elapsedMs, List<KnownExceptions.Outcome> exceptionSink)
     {
-        const string statement =
+        var statement =
             "every datapoint signature of the layout is CONTAINED in some signature of ours, and no dimension " +
             "mentioned by the layout carries another member; violations NOT listed in the plane C census of known divergences";
 
@@ -360,43 +367,20 @@ public static class PlaneCChecks
                 "follow \"{framework} {release}\" - DPM 1.0).");
         }
 
-        // Guard (b): the plane C census is tied to the DPM 2.0 release on which it was measured
-        // (KnownExceptions.PlaneCCensusRelease). Against another WELL-DEFINED release (e.g. the
-        // DPM 2.0 4.3 output against the 4.2 census) it is not evaluated; the message names how many of
-        // its entries reproduce equally against this output (structural finding). Identical on
-        // 4.2 and 4.3.
-        var censusRelease = KnownExceptions.PlaneCCensusRelease;
-        var generatedRelease = DetectCutoffRelease(generated);
-        if (censusRelease is not null && generatedRelease is not null && generatedRelease != censusRelease)
-        {
-            var censusKeysSkip = KnownExceptions.All.Where(e => e.Id == "DD-23").Select(e => e.BusinessKey).ToHashSet(StringComparer.Ordinal);
-            var violationKeysSkip = result.Violations.Select(v => v.BusinessKey).ToHashSet(StringComparer.Ordinal);
-            var reproducedSkip = censusKeysSkip.Count(k => violationKeysSkip.Contains(k));
-
-            return CheckResult.Skip(
-                "C-DPS-01", ValidationPlane.C, ValidationLayer.Critical, "mTableCell", statement,
-                $"plane C census measured on DPM 2.0 release {censusRelease}; the cutoff release of this output is " +
-                $"{generatedRelease}: not evaluated (a comparison must state which publication it speaks of). Of the " +
-                $"{censusKeysSkip.Count} declared entries, {reproducedSkip} reproduce the SAME violation against the " +
-                "tables of this output (structural finding, not a defect of this run).");
-        }
-
-        // Guard (b'): the output does NOT resolve a single cutoff release: mRelease.IsCurrent=1 in
-        // more than one row, the case of DPM 1.0 with 128 taxonomies from 2.0 to 4.1 at once
-        // (DetectCutoffRelease returns null). This is NOT "the release does not match the census"
-        // (guard above): it is that there is no SINGLE release to ask whether it matches. Two
-        // different things were being confused under the same condition:
+        // Guard (b'): the output does NOT resolve a single release: mRelease.IsCurrent=1 in more than
+        // one row, the case of DPM 1.0 with 128 taxonomies from 2.0 to 4.1 at once
+        // (DetectCutoffRelease returns null). There is no SINGLE release to select a census by:
         //   - the table-to-layout-sheet MATCHING is already done by each table's OWN release
         //     (PlaneCReleaseMatcher.ClassifyRelease, shared with C-EQU-01). It does NOT depend on
-        //     the output having a single cutoff release, and it already works: it compared 472
+        //     the output having a single release, and it already works: it compared 472
         //     tables / 86,115 signatures with 0 violations on DPM 1.0.
-        //   - the plane C CENSUS is a list of NAMED exceptions, measured and dated on 4.2: there is
-        //     no version of it for "12 DPM 1.0 releases at once", and an empty one is not fabricated
-        //     to make the check pass. So the census is NOT consulted at all here, neither to exempt
-        //     nor to accuse. Every violation that appears is, by construction, a real violation of
-        //     THIS run: nothing names it as a known exception of any applicable census.
-        // The census is not relaxed: it is declared as not applicable and the comparison is measured
-        // without it, so the CRITICAL check can fail again on DPM 1.0.
+        //   - a census is a list of NAMED exceptions measured and dated on ONE release: there is
+        //     none for "12 DPM 1.0 releases at once", and one is not fabricated to make the check pass.
+        //     So no census is consulted, neither to exempt nor to accuse. Every violation that appears
+        //     is, by construction, a real violation of THIS run.
+        // The census is not relaxed: the comparison is measured without it, so the CRITICAL check can
+        // fail on DPM 1.0.
+        var generatedRelease = DetectCutoffRelease(generated);
         if (generatedRelease is null)
         {
             var rawSamples = result.Violations
@@ -405,19 +389,28 @@ public static class PlaneCChecks
 
             return CheckResult.FromViolationCount(
                 "C-DPS-01", ValidationPlane.C, ValidationLayer.Critical, "mTableCell",
-                statement + $"; plane C census (measured on DPM 2.0 release {censusRelease}) NOT CONSULTED: this " +
-                "output does not resolve a single cutoff release (mRelease.IsCurrent=1 in more than one row - DPM " +
-                "1.0, taxonomies of several releases at once), so there is no SINGLE release to contrast " +
-                "the census with. The table-to-layout-sheet matching is already done by each table's OWN release " +
-                "(PlaneCReleaseMatcher), so the comparison remains valid object by object; the only thing that " +
-                "does not apply is the LIST OF EXCEPTIONS, tied to 4.2; an empty one is not invented: every " +
-                "violation from here on is a real failure of this run.",
+                statement + "; plane C census NOT CONSULTED: this output does not resolve a single release " +
+                "(mRelease.IsCurrent=1 in more than one row - DPM 1.0, taxonomies of several releases at once), " +
+                "so there is no SINGLE release to select a census by. The table-to-layout-sheet matching is " +
+                "already done by each table's OWN release (PlaneCReleaseMatcher), so the comparison remains " +
+                "valid object by object; the only thing that does not apply is the LIST OF EXCEPTIONS, tied to " +
+                "one release; an empty one is not invented: every violation from here on is a real failure of this run.",
                 result.Coverage.SignaturesCompared, result.Violations.Count, elapsedMs, rawSamples,
                 totalFailed: result.Violations.Count > CheckResult.MaxSamples ? result.Violations.Count : null);
         }
 
+        // Guard (b): the census of the output's release; with none, an EMPTY census (every violation
+        // fails, nothing can expire). Never the census of another release.
+        var declaredCensus = KnownExceptions.PlaneCCensusForRelease(generatedRelease);
+        if (declaredCensus is null)
+        {
+            statement += $"; no plane C census declared for release {generatedRelease}: evaluated with an EMPTY census " +
+                         "(every violation is a failure, nothing can expire)";
+        }
+
+        var census = declaredCensus ?? new KnownExceptions.PlaneCCensus([], generatedRelease);
         var violatingKeys = result.Violations.Select(v => v.BusinessKey).ToHashSet(StringComparer.Ordinal);
-        var (unresolved, outcomes) = KnownExceptions.ApplyOriginAnomalyExceptions("C-DPS-01", violatingKeys, ValidationPlane.C);
+        var (unresolved, outcomes) = KnownExceptions.ApplyOriginAnomalyExceptions("C-DPS-01", violatingKeys, ValidationPlane.C, census);
         exceptionSink.AddRange(outcomes);
 
         var violationByKey = result.Violations.ToDictionary(v => v.BusinessKey, StringComparer.Ordinal);

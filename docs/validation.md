@@ -56,7 +56,7 @@ Plane A needs nothing but the generated database and always runs. Its check code
 | `A-INT` | Referential integrity: no orphan rows in any foreign key of the schema (dictionary, templates and tables, modules, cell positions, categorisations); no unused `mConcept`; no dangling or zero-valued optional references |
 | `A-UNQ` | Uniqueness of business keys: `DimensionXBRLCode`, `(DomainID, MemberCode)`, `(DomainID, HierarchyCode)`, `BusinessCode` within a table, `(AxisID, OrdinateCode)`, `(OrdinateID, DimensionID)`, template codes per taxonomy and level, module codes per taxonomy |
 | `A-DIC` | Dictionary rules: typed domains have no default member, at most one default per domain, `IsTypedDimension` agrees with the domain, default members belong to the dimension's domain, exactly one metric dimension `MET`, every metric has its member in the `MET` domain, XBRL code shapes |
-| `A-HIE` | Hierarchy trees: no cycles, `Level` consistent with the parent, parent in the same hierarchy, `Path` well formed, unique siblings and order, nodes inside the hierarchy's domain |
+| `A-HIE` | Hierarchy trees: no cycles, `Level` consistent with the parent, parent in the same hierarchy, `Path` well formed, unique siblings and order, nodes inside the hierarchy's domain. In DPM 2.0 (`I-TRE-07b`) the member of a node belongs to the hierarchy's domain or to a domain united to it, with no known exceptions: nodes whose item moved to another domain at R are resolved by the tie-break by consistency ([mapping-dpm2.md](mapping-dpm2.md#mhierarchynode)) |
 | `A-SEN` | Open-axis sentinel conventions of the distribution schema (domain and member `9999` "Open"), and absence of the source's own sentinels (`A-SEN-04`, the DPM 1.0 member `999`, applies to DPM 1.0 outputs only: in DPM 2.0 member IDs are a counter and `999` is an ordinary member). `A-SEN-08.1`..`.6`: the sentinel member (found in the output as the member of domain `9999`) is referenced only by its own `mMember` row and by `mOrdinateCategorisation` rows of ordinates on open axes; `mOpenAxisValueRestriction`, `mOrdinateMetricRestriction`, `mHierarchyNode`, `mDimension` and `mMetric` never point at it, so a column that misses the DPM 1.0 `MemberID` renumbering fails instead of silently pointing at "Open" |
 | `A-TPL` | Template and table tree: node types and levels, parents, taxonomy consistency, table links, frameworks used by at least one taxonomy |
 | `A-AXE` | Axes and ordinates: one closed X axis per table and at most one closed Y axis, open-axis ordinate shape, `Order` reproducible in pre-order from the tree, fixed-value columns |
@@ -162,8 +162,9 @@ every stale one individually; the JSON report lists all of them object by object
 ### Plane C known divergences
 
 The layout comparison has its own list of known divergences, kept as data rather than code:
-[`plane-c-known-divergences-4.2.tsv`](../src/EbaDpm.Converter.Core/Resources/plane-c-known-divergences-4.2.tsv),
-embedded in the assembly. Each line names a table code, the divergence type (`contradicts`: the
+one file per release,
+[`plane-c-known-divergences-<release>.tsv`](../src/EbaDpm.Converter.Core/Resources/) (today
+`plane-c-known-divergences-4.2.tsv`), embedded in the assembly. Each line names a table code, the divergence type (`contradicts`: the
 layout gives a dimension another member; `no-match`: no output signature contains the layout
 signature) and the exact layout signature. A `C-MHR-01` divergence has its own type, `hierarchy`,
 and names one annotated metric by `{release}|{axis}|{ordinate code}|{metric code}`, with a
@@ -171,10 +172,19 @@ mandatory reason. The entries are cases arbitrated against the Access
 database in which the **layout** is wrong: for example, a sheet draws ordinates that the Access
 database does not assign to that table.
 
-The file is measured against one specific release, declared in its `CorpusRelease` header. It is
-applied only to a DPM 2.0 output of that release (`mRelease.IsCurrent = 1`); against any other release
-the list is reported as not evaluated rather than stale. The file is **regenerated for each new
-release**: a new release gets its own file, and no divergence is hard-coded in C#.
+Each file is measured against one specific release, declared in its `CorpusRelease` header. The
+census applied to an output is the one whose `CorpusRelease` equals the output's release
+(`mRelease.IsCurrent = 1` in exactly one row, as in every DPM 2.0 file). Two files that declare the
+same release, or a file without the header, are an error. Entries of the census of another release
+are reported as not applicable, never as stale.
+
+**When no census exists for the output's release**, `C-DPS-01` and `C-MHR-01` are evaluated with an
+**empty census**: every violation fails and nothing can expire. This is not a relaxation, because an
+empty census exempts nothing; it is what makes the comparison of a new release meaningful on the
+day it is published. A census is created for a release only with entries arbitrated against the
+Access database as defects of the layout; a violation that is the converter's is fixed, not listed.
+A DPM 1.0 output has no single release (`mRelease.IsCurrent = 1` in several rows), so no census is
+consulted and every violation fails. No divergence is hard-coded in C#.
 
 ## Validation status at version 1.1.0
 

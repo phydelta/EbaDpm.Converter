@@ -37,6 +37,8 @@ internal sealed class LayoutDictionary : IDisposable
     private readonly Dictionary<string, string?> _dimensionDomainCode = new(StringComparer.Ordinal);
     private readonly HashSet<(string DomainCode, string MemberCode)> _domainMemberPairs = new();
 
+    private Dictionary<string, HashSet<string>>? _frameworksByModuleCode;
+
     public bool IsPresent { get; }
 
     public string? Path { get; }
@@ -151,6 +153,76 @@ internal sealed class LayoutDictionary : IDisposable
         }
 
         return SingleCodeResolution.Unknown;
+    }
+
+    /// <summary>
+    /// The reporting framework of a module, resolved through the dictionary:
+    /// <c>mModule.ModuleCode</c> -&gt; <c>mTaxonomy</c> -&gt; <c>mReportingFramework.FrameworkCode</c>,
+    /// matching the code case-insensitively (<c>mModule.ModuleCode</c> is the upper-cased
+    /// <c>ModuleVersion.Code</c>). Used for layout file names that do not carry the framework (4.4).
+    /// Returns <see langword="false"/> when there is no dictionary or the module is not in it; it
+    /// never guesses. A module that the dictionary maps to more than one framework is an error.
+    /// </summary>
+    public bool TryResolveFramework(string moduleCode, out string frameworkCode)
+    {
+        frameworkCode = string.Empty;
+        if (!IsPresent)
+        {
+            return false;
+        }
+
+        _frameworksByModuleCode ??= LoadFrameworksByModuleCode(Path!);
+        if (!_frameworksByModuleCode.TryGetValue(moduleCode, out var frameworks))
+        {
+            return false;
+        }
+
+        if (frameworks.Count != 1)
+        {
+            throw new InvalidOperationException(
+                $"The dictionary '{Path}' maps the module code '{moduleCode}' to more than one framework " +
+                $"({string.Join(", ", frameworks.OrderBy(f => f, StringComparer.Ordinal))}): the framework of a layout file " +
+                "cannot be resolved without guessing.");
+        }
+
+        frameworkCode = frameworks.Single();
+        return true;
+    }
+
+    private static Dictionary<string, HashSet<string>> LoadFrameworksByModuleCode(string path)
+    {
+        var map = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = path,
+            Mode = SqliteOpenMode.ReadOnly,
+        }.ToString();
+
+        using var connection = new SqliteConnection(connectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText =
+            """
+            SELECT m."ModuleCode", f."FrameworkCode"
+            FROM "mModule" m
+            JOIN "mTaxonomy" t ON t."TaxonomyID" = m."TaxonomyID"
+            JOIN "mReportingFramework" f ON f."FrameworkID" = t."FrameworkID"
+            WHERE m."ModuleCode" IS NOT NULL AND f."FrameworkCode" IS NOT NULL
+            """;
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var moduleCode = reader.GetString(0);
+            if (!map.TryGetValue(moduleCode, out var frameworks))
+            {
+                frameworks = new HashSet<string>(StringComparer.Ordinal);
+                map[moduleCode] = frameworks;
+            }
+
+            frameworks.Add(reader.GetString(1));
+        }
+
+        return map;
     }
 
     public void Dispose()

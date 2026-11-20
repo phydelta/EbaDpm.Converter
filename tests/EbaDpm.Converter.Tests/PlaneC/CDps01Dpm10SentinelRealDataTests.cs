@@ -172,9 +172,12 @@ public sealed class CDps01Dpm10SentinelRealDataTests(AllFixture fixture) : IDisp
 }
 
 /// <summary>
-/// Third direction: on DPM 2.0 4.3 (a WELL-DEFINED release, different from the 4.2 of the
-/// known-divergence census), <c>C-DPS-01</c> STILL comes out <c>skipped</c> -- this guard is
-/// unchanged (explicit comment in <c>PlaneCChecks</c>: unchanged, identical on 4.2 and 4.3).
+/// Third direction: on DPM 2.0 4.3 against the 4.2 layouts, <c>C-DPS-01</c> comes out <c>skipped</c>.
+/// Since #67 (plane C census per release) this is NOT because the 4.2 census does not apply to a 4.3
+/// output (a release with no census is now EVALUATED with an empty census): the 4.2 layouts hold no
+/// sheet of release 4.3, so zero tables are compared and guard (a) of <c>PlaneCChecks</c> skips the check
+/// ("0 tables compared"). The assertions are unchanged; only this explanation was updated. The 4.3 file
+/// against the 4.3 layouts, where tables ARE compared, is <c>PlaneC43RealDataTests</c>.
 /// Complements <see cref="PlaneCCrossOutputDpm2043Tests"/> (which already checks
 /// <c>Failed == 0</c> but does not pin the literal <c>Status</c>) without touching its assertions.
 /// </summary>

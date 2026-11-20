@@ -23,11 +23,12 @@ EbaDpm.Converter --extract-layouts "4.2 table layouts" --out layouts-4.2.db `
 
 The directory is searched recursively for `*.xlsx` files, so both a flat folder and a folder with
 one subfolder per framework work. The framework, release and module of each workbook are taken
-from its file name. Three naming formats have been used by the EBA and all three are recognised:
+from its file name. Four naming formats have been used by the EBA and all four are recognised:
 
 | Era | File name pattern | Example | Granularity |
 |---|---|---|---|
-| 4.2 and later | `<date> Annotated Table Layout  <FW> <REL> <MODULE><FW> <REL>` | `20260106 Annotated Table Layout  COREP 4.2 COREP_ALMCOREP 4.2.xlsx` | One workbook per module |
+| 4.4 | `<date> <MODULE>_table layout <REL>` | `20261007 AML_ELIGIBILITY_table layout 4.4.xlsx` | One workbook per module; no framework in the name |
+| 4.2 and 4.3 | `<date> Annotated Table Layout  <FW> <REL> <MODULE><FW> <REL>` | `20260106 Annotated Table Layout  COREP 4.2 COREP_ALMCOREP 4.2.xlsx` | One workbook per module |
 | 4.0 | `<date> Annotated Table Layout  <MODULE><FW> <REL>` | `20241217 Annotated Table Layout  COREP_LRCOREP 4.0.xlsx` | One workbook per module |
 | 3.2 | `Annotated Table Layout <PHASE>-<FW> <REL>` | `Annotated Table Layout 320-P1-COREP 3.2.xlsx` | One workbook per framework; no module |
 
@@ -37,10 +38,25 @@ followed by `_` (`COREP_LR` + `COREP`), and a module that is the framework itsel
 row (`DORADORA` → framework and module `DORA`). In the 3.2 format there is no module, and
 `ModuleCode` is stored as `NULL` rather than invented.
 
+In the 4.4 format the module code may contain `_`, so the name is anchored on the literal
+`_table layout `. The framework is not in the name: it is resolved from the module code through
+the dictionary (`mModule.ModuleCode`, then its taxonomy and `mReportingFramework.FrameworkCode`),
+case-insensitively. Without a dictionary, or with a module code that the dictionary does not
+contain, the extraction stops with an error that names the file and the code; the framework is
+never guessed. The shading of a cell is read from its fill colour without the alpha byte: the
+grey is `FFD8D8D8` up to 4.3 and `00D8D8D8` from 4.4, `999999` (4.4; the legacy palette index 55
+before) and `595959` (4.4) are also shaded: every `999999` cell (1463/1463) and the single `595959`
+grid cell (K_41.00 r0610 c0080) are `IsExcluded` in the Access 4.4 database. The other 4.4 fills
+(`FFFF00`, `C4D79B`) are not shaded (measured 2026-11-20 on the 4.3 and 4.4 corpora). Relationship
+targets inside the workbook are resolved per OPC (4.4 writes absolute part names such as
+`/xl/worksheets/sheet1.xml`; 4.3 wrote relative ones), a comments relationship whose part does not
+exist is an error, and a Z-sheet name may have a space before the parenthesis (`K_74.00.a (0010)`). The workbook's index sheet is called `TOC` up to 4.3 and `Index` from 4.4; both are
+skipped.
+
 From 4.2 onwards each module corresponds to a return type that institutions report; workbooks of
 the same framework are subsets of that framework, not versions of each other.
 
-A file whose name matches none of the three patterns stops the extraction with an error naming
+A file whose name matches none of the four patterns stops the extraction with an error naming
 the file.
 
 ## Why `--dictionary` is mandatory

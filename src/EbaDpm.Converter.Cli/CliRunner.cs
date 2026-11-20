@@ -907,6 +907,7 @@ public static partial class CliRunner
         summary.AddDiagnostics("mTaxonomy: unresolved label/version/date columns", skeleton.UnresolvedTaxonomyColumns ?? []);
         AddDictionaryDiagnostics(summary, dictionaryDiagnostics);
         summary.AddDiagnostics("Hierarchy tree: MemberID anchored to its own domain", hierarchyNodes.AnchoredMembers);
+        summary.AddDiagnostics("Hierarchy tree: MemberID re-anchored by the consistency tie-break", hierarchyNodes.ReanchoredMembers);
         summary.AddDiagnostics("Structure: unresolved cases", structure.UnresolvedCases);
         summary.AddDiagnostics("Axes and cells: structural anomalies", axesAndCells.StructuralAnomalies);
         summary.AddDiagnostics("Modules: unresolved cases", moduleResult.UnresolvedCases);

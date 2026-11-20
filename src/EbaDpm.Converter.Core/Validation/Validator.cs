@@ -178,10 +178,10 @@ public static class Validator
 
     private static IReadOnlyList<ExceptionInfo> BuildExceptionReport(List<KnownExceptions.Outcome> outcomes, string? referenceRole)
     {
-        var byKey = new Dictionary<(string Id, string BusinessKey, string Reference, string Check), KnownExceptions.Outcome>();
+        var byKey = new Dictionary<(string Id, string BusinessKey, string Reference, string Check, string Reason), KnownExceptions.Outcome>();
         foreach (var outcome in outcomes)
         {
-            byKey[(outcome.Exception.Id, outcome.Exception.BusinessKey, outcome.Exception.Reference, outcome.Exception.Check)] = outcome;
+            byKey[(outcome.Exception.Id, outcome.Exception.BusinessKey, outcome.Exception.Reference, outcome.Exception.Check, outcome.Exception.Reason)] = outcome;
         }
 
         var result = new List<ExceptionInfo>();
@@ -199,7 +199,7 @@ public static class Validator
             // The plane is resolved from the check's declaration (never from the id prefix) -
             // null if the check did not run this session, same as Evaluated=false.
             var plane = PlaneText(KnownExceptions.PlaneOf(exception.Check));
-            var key = (exception.Id, exception.BusinessKey, exception.Reference, exception.Check);
+            var key = (exception.Id, exception.BusinessKey, exception.Reference, exception.Check, exception.Reason);
             if (byKey.TryGetValue(key, out var outcome))
             {
                 result.Add(new ExceptionInfo(

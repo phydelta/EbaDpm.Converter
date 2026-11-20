@@ -54,6 +54,16 @@ internal static class RepoPaths
     public const string AccessDpm20Release43DatabaseFileName = "DPM2 Database_v 4_3_20260622.accdb";
 
     /// <summary>
+    /// File name of the DPM 2.0 Access database of the 4.4 publication. Its last release is "4.4",
+    /// converted with <c>--release 4.4</c> (<c>Dpm2044ValidateFixture</c>). Only read by the tests
+    /// that exercise that publication.
+    /// </summary>
+    public const string AccessDpm20Release44DatabaseFileName = "DPM2 Database_v 4_4_20261006.accdb";
+
+    /// <summary><c>Release.Code</c> of the 4.4 release (<c>--release 4.4</c>).</summary>
+    public const string Release44Code = "4.4";
+
+    /// <summary>
     /// Walks up from the test execution directory until it finds <c>EbaDpm.Converter.sln</c>,
     /// which marks the repository root.
     /// </summary>
@@ -111,6 +121,14 @@ internal static class RepoPaths
 
     public static string AccessDpm20Release43DatabasePath => Path.Join(DataDirectory, AccessDpm20Release43DatabaseFileName);
 
+    public static string AccessDpm20Release44DatabasePath => Path.Join(DataDirectory, AccessDpm20Release44DatabaseFileName);
+
+    /// <summary>Name of the directory with the 4.4 Annotated Table Layouts, under the data directory.</summary>
+    public const string TableLayouts44DirectoryName = "4.4 table layouts";
+
+    /// <summary>Directory with the 4.4 Annotated Table Layouts (Phase 1: 13 files, one per module).</summary>
+    public static string TableLayouts44Directory => Path.Join(DataDirectory, TableLayouts44DirectoryName);
+
     /// <summary>Name of the directory with the 4.2 Annotated Table Layouts, under the data directory.</summary>
     public const string TableLayouts42DirectoryName = "4.2 table layouts";
 
@@ -166,6 +184,22 @@ internal static class RepoPaths
                 "See docs/test-data.md.");
         }
     }
+
+    /// <summary>Verifies that the 4.4 layouts directory exists.</summary>
+    public static void EnsureTableLayouts44DirectoryExists()
+    {
+        if (!Directory.Exists(TableLayouts44Directory))
+        {
+            throw new InvalidOperationException(
+                $"Directory '{TableLayouts44Directory}' does not exist. These tests " +
+                "require the 4.4 Annotated Table Layouts and cannot run without them. " +
+                "See docs/test-data.md.");
+        }
+    }
+
+    /// <summary>Verifies that the DPM 2.0 Access database of the 4.4 publication exists.</summary>
+    public static void EnsureAccessDpm20Release44DatabaseExists() => EnsureFileExists(
+        AccessDpm20Release44DatabasePath, $"the DPM 2.0 4.4 Access database '{AccessDpm20Release44DatabaseFileName}'");
 
     /// <summary>
     /// Verifies that the 4.2 reference database exists. If not, it throws an actionable message

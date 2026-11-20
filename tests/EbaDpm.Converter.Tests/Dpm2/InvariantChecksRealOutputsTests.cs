@@ -173,8 +173,8 @@ public sealed class InvariantChecksDpm2042Tests(Dpm20SkeletonFixture fixture)
         var newChecks = InvariantChecksAssertions.NewInvariantChecks(result.Report);
         Assert.True(newChecks.Count > 0, "DPM 2.0 4.2: no 'I-*' check appeared in the report.");
 
-        // AO-3 (I-TRE-07b) is specific to the 4.3 edge - in 4.2 it must give 0/0 WITHOUT needing
-        // any exception (measured: 0 anchors in 4.2).
+        // I-TRE-07b is a plain critical check (no exception exists): in 4.2 it gives 0 failures
+        // (measured: 0 re-anchored nodes at --release 4.2).
         var itre07b = Assert.Single(result.Report.Checks, c => c.Id == "I-TRE-07b");
         Assert.Equal("pass", itre07b.Status);
         Assert.Equal(0, itre07b.Failed);
@@ -305,15 +305,17 @@ public sealed class InvariantChecksDpm2043Tests(Dpm2043ValidateFixture fixture)
     }
 
     /// <summary>
-    /// AO-3 (I-TRE-07b): the 104 declared are emitted as a named exception - the check PASSES in
-    /// 4.3 (0 UNDECLARED violations), even though the 104 DO exist in the data (the source
-    /// contradicts itself). Positive control: if the exception stopped being applied (or the census
-    /// dropped below 104 without anyone reviewing it), Examined would remain the same but the
-    /// meaning of "pass" would change - that is why examined&gt;0 is not enough here and it is
-    /// recorded explicitly that it is still AO-3 that absorbs the failure.
+    /// Old: <c>Dpm20Release43_All_ITre07bPassesWithThe104OfAo3Absorbed</c> (passed because 104 nodes were
+    /// absorbed as the named exception AO-3; asserted "named exception" in the statement).
+    /// New: I-TRE-07b passes in 4.3 BECAUSE the loader re-anchors those 104 nodes (tie-break by
+    /// consistency): 0 failures, nodes examined, and NO exception of any kind attached to the check
+    /// (the statement does not mention an exception and the report lists none for I-TRE-07b / AO-3).
+    /// Positive control: the synthetic <c>ITre07b_AFormerlyDeclaredKeyAlone_NowFails</c> shows the same
+    /// check fails on a cross-domain node, and <c>Dpm20HierarchyNodeLoaderSyntheticTests</c> shows the
+    /// loader does the re-anchoring.
     /// </summary>
     [DataFact]
-    public void Dpm20Release43_All_ITre07bPassesWithThe104OfAo3Absorbed()
+    public void Dpm20Release43_All_ITre07bPassesWithNoExceptionApplied()
     {
         var result = ValidatorRunCache.Run(fixture.GeneratedDatabasePath, referencePath: null);
         var itre07b = Assert.Single(result.Report.Checks, c => c.Id == "I-TRE-07b");
@@ -321,7 +323,8 @@ public sealed class InvariantChecksDpm2043Tests(Dpm2043ValidateFixture fixture)
         Assert.Equal("pass", itre07b.Status);
         Assert.Equal(0, itre07b.Failed);
         Assert.True(itre07b.Examined > 0, "DPM 2.0 4.3: I-TRE-07b examined 0 rows (positive control).");
-        Assert.Contains("named exception", itre07b.Statement, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("exception", itre07b.Statement, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(result.Report.Exceptions, e => e.Scope == "I-TRE-07b" || e.Id == "AO-3");
     }
 
     /// <summary>

@@ -205,9 +205,9 @@ public static class DictionaryCensusChecks
         var missing = referenceKeys.Except(generatedKeys, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
 
         // The 59 declared hierarchies live in the single KnownExceptions registry; they are read
-        // filtered by Check + EXACT Reference, never by pattern. This is a TWO-SIDED census, unlike
-        // the release-boundary exception of I-TRE-07b: the divergence does NOT depend on the
-        // release cut (0 in SubCategory of both 4.2 and 4.3), it is source-shaped, not
+        // filtered by Check + EXACT Reference, never by pattern. This is a TWO-SIDED census: the
+        // divergence does NOT depend on the release cut (0 in SubCategory of both 4.2 and 4.3), it
+        // is source-shaped, not
         // boundary-shaped (Sidedness.TwoSided in the registry). Both directions are therefore real
         // signal: "grows" (an undeclared key is missing) is a new violation; "shrinks" (one of the
         // 59 declared ones is NO LONGER missing because the mapping started to produce it) means

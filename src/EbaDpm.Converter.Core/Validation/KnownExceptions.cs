@@ -21,8 +21,8 @@ public enum ExceptionKind
 }
 
 /// <summary>
-/// Whether the exception depends on the release cut (boundary-shaped, e.g. <c>AO-3</c>, which exists
-/// ONLY at the 4.3 boundary) or not (source-shaped, e.g. <c>DD-16</c>/<c>AO-1</c>, identical at every
+/// Whether the exception depends on the release cut (boundary-shaped, present only at some
+/// release cuts) or not (source-shaped, e.g. <c>DD-16</c>/<c>AO-1</c>, identical at every
 /// measured cut). It decides whether the census is one-sided (only "grows" counts) or two-sided
 /// (both "grows" AND "shrinks" count). It is an ATTRIBUTE OF THE EXCEPTION, measured, not an ad-hoc
 /// decision inside each check.
@@ -74,7 +74,7 @@ public sealed record KnownException(
     Sidedness Sidedness);
 
 /// <summary>
-/// Single registry of exceptions: E-2..E-7, DD-1..DD-23, DD-25, DD-26, AO-1 and AO-3. It replaces text-duplicated
+/// Single registry of exceptions: E-2..E-7, DD-1..DD-23, DD-25, DD-26, AO-1, AO-4 and AO-5. It replaces text-duplicated
 /// copies in individual tests and in several production files. The report ALWAYS lists these
 /// exceptions, applied or not.
 /// </summary>
@@ -182,40 +182,6 @@ public static class KnownExceptions
     ];
 
     /// <summary>
-    /// AO-3: 104 <c>mHierarchyNode</c> nodes whose resolved member does NOT belong to the domain of
-    /// their hierarchy. <c>ItemCategory</c> revises the item right at the 4.3 release cut and the
-    /// containing subcategory does not follow it; the source asserts both things at once, so it is
-    /// not resolved but declared. Key <c>HierarchyCode:MemberDomainCode:MemberCode</c>.
-    /// One-sided: there is no candidate under the own domain for these 104 (unlike the 33 of GA30,
-    /// which ARE anchored by <c>Dpm20HierarchyNodeLoader</c> and need no exception); only "grows"
-    /// counts.
-    /// </summary>
-    private static readonly string[] MembersOutsideHierarchyDomainKeys =
-    [
-        "GA4:qIO:q1B", "GA4:qIO:q1C", "GA4:qIO:q1D", "GA4:qIO:q1N", "GA4:qIO:q5C", "GA4:qIO:q5E",
-        "GA4:qIO:q5F", "GA4:qIO:q5J", "GA4:qIO:q5K", "GA4:qIO:q5M", "GA4:qIO:q5N", "GA4:qIO:q5O",
-        "GA4:qIO:q5P", "GA4:qIO:q5Q", "GA4:qIO:q5R", "GA4:qIO:q5S", "GA4:qIO:q5T", "GA4:qIO:q5U",
-        "GA4:qIO:q5V", "GA4:qIO:q5W", "GA4:qIO:q5X", "GA4:qIO:q5Y", "GA4:qIO:q5Z", "GA4:qIO:q6A",
-        "GA4:qIO:q6B", "GA4:qIO:q6C", "GA4:qIO:q6D", "GA4:qIO:q6E", "GA4:qIO:q6F", "GA4:qIO:q6G",
-        "GA4:qIO:q6I", "GA4:qIO:q6J", "GA4:qIO:q6K", "GA4:qIO:q6L", "GA4:qIO:q6M", "GA4:qIO:q6N",
-        "GA4:qIO:q6O", "GA4:qIO:q6P", "GA4:qIO:q6Q", "GA4:qIO:q6R", "GA4:qIO:q6S", "GA4:qIO:q6T",
-        "GA4:qIO:q6U", "GA4:qIO:q6Z", "GA4:qIO:q7Y", "GA4:qIO:q7Z", "GA4:qIO:q8A", "GA4:qIO:q9B",
-        "GA4:qIO:qx2108",
-        "GA4_1:qIO:q1B", "GA4_1:qIO:q1C", "GA4_1:qIO:q1D", "GA4_1:qIO:q1N", "GA4_1:qIO:q5C",
-        "GA4_1:qIO:q5E", "GA4_1:qIO:q5F", "GA4_1:qIO:q5J", "GA4_1:qIO:q5K", "GA4_1:qIO:q5M",
-        "GA4_1:qIO:q5N", "GA4_1:qIO:q5O", "GA4_1:qIO:q5P", "GA4_1:qIO:q5Q", "GA4_1:qIO:q5R",
-        "GA4_1:qIO:q5S", "GA4_1:qIO:q5T", "GA4_1:qIO:q5U", "GA4_1:qIO:q5V", "GA4_1:qIO:q5W",
-        "GA4_1:qIO:q5X", "GA4_1:qIO:q5Y", "GA4_1:qIO:q5Z", "GA4_1:qIO:q6A", "GA4_1:qIO:q6B",
-        "GA4_1:qIO:q6C", "GA4_1:qIO:q6D", "GA4_1:qIO:q6E", "GA4_1:qIO:q6F", "GA4_1:qIO:q6G",
-        "GA4_1:qIO:q6I", "GA4_1:qIO:q6J", "GA4_1:qIO:q6K", "GA4_1:qIO:q6L", "GA4_1:qIO:q6M",
-        "GA4_1:qIO:q6N", "GA4_1:qIO:q6O", "GA4_1:qIO:q6P", "GA4_1:qIO:q6Q", "GA4_1:qIO:q6R",
-        "GA4_1:qIO:q6S", "GA4_1:qIO:q6T", "GA4_1:qIO:q6U", "GA4_1:qIO:q6Z", "GA4_1:qIO:q7Y",
-        "GA4_1:qIO:q7Z", "GA4_1:qIO:q8A", "GA4_1:qIO:q9B", "GA4_1:qIO:qx2108",
-        "MC150:qCM:qx2135", "MC150:qCM:qx2136", "MC150:qCM:qx2137", "MC150:qCM:qx2138",
-        "MC150:qCM:qx2139", "MC150:qCM:qx2140",
-    ];
-
-    /// <summary>
     /// DD-16: 59 hierarchies, by <c>DomainCode:HierarchyCode</c>, that <c>EBA_4.2_Hotfix.db</c>
     /// inherits from DPM 1.0 and that the DPM 2.0 Access does not contain; by design decision these
     /// 59 hierarchies are lost. Two-sided: it does not depend on the release cut (0/59 in
@@ -244,9 +210,6 @@ public static class KnownExceptions
 
     private const string ColonInMemberCodeReason =
         "AO-1: the MemberCode itself contains ':' - the same phenomenon that makes 49 MemberXBRLCode values duplicated (A-UNQ-03, informative). Closed census.";
-
-    private const string MembersOutsideHierarchyDomainReason =
-        "AO-3: ItemCategory revises the item right at the 4.3 release cut and the containing subcategory does not follow it - the source asserts both things at once, so it is declared, not resolved.";
 
     private const string LegacyDpm10HierarchyReason =
         "DD-16: DPM 1.0 leftover in the 4.2 reference, not present in the DPM 2.0 Access - by design decision, these 59 hierarchies are lost.";
@@ -482,77 +445,114 @@ public static class KnownExceptions
         "AO-4: the source declares the dimension with the same member on ordinates of more than one axis of the table " +
         "(measured on the 4.4 database 2026-11-16; present in the 3.4 and 4.0 files). Reported as a structural anomaly (docs/mapping-dpm2.md, Signatures).";
 
-    private const string PlaneCTsvResourceName = "EbaDpm.Converter.Core.Resources.plane-c-known-divergences-4.2.tsv";
+    /// <summary>Prefix and suffix of the embedded plane C census resources: one
+    /// <c>plane-c-known-divergences-&lt;release&gt;.tsv</c> per release, all picked up by the .csproj
+    /// glob and enumerated here, so a new release adds a file and not a line of C#.</summary>
+    private const string PlaneCTsvResourcePrefix = "EbaDpm.Converter.Core.Resources.plane-c-known-divergences-";
+
+    private const string PlaneCTsvResourceSuffix = ".tsv";
 
     /// <summary>The <c>Type</c> value of a census row that names a <c>C-MHR-01</c> unit instead of a
     /// <c>C-DPS-01</c> signature (4 columns, the 4th is the mandatory reason).</summary>
     private const string PlaneCHierarchyType = "hierarchy";
 
-    private const string PlaneCCensusReason =
-        "DD-23: DATED census of the live plane C violations against the EBA Annotated Table Layout " +
-        "(src/EbaDpm.Converter.Core/Resources/plane-c-known-divergences-4.2.tsv). Regenerated per release, never relaxed by threshold.";
-
     /// <summary>
-    /// DD-23: the NAMED violations of <c>C-DPS-01</c>, read from
-    /// <c>src/EbaDpm.Converter.Core/Resources/plane-c-known-divergences-4.2.tsv</c>, embedded as a
-    /// resource (same pattern as the destination schema SQL in <c>SchemaCreator</c>) so it can be
-    /// regenerated per release without touching this file. <c>Kind = OriginAnomaly</c> (mechanical,
-    /// not a business statement): plane C does not depend on <c>--reference</c>, so, like
-    /// <c>AO-1</c>/<c>AO-3</c>, <c>Reference = "-"</c> and it is applied with
-    /// <see cref="ApplyOriginAnomalyExceptions"/>, which already reports an entry that stops
-    /// violating as EXPIRED. <c>Sidedness = TwoSided</c>: a new violation (grows) and a declared one
-    /// that stops violating (shrinks) are both real signal.
+    /// DD-23 / DD-27: every embedded plane C census, one per release. A census carries its SCOPE (the
+    /// <c>"# CorpusRelease: 4.2"</c> header of its TSV) because it is not portable across publications:
+    /// applying the 4.2 census to a 4.3 output would trigger the "shrinks" side of
+    /// <see cref="ApplyOriginAnomalyExceptions(string, IReadOnlySet{string}, ValidationPlane)"/> for the
+    /// wrong reason ("this table was not even compared", not "the defect was fixed"). The census applied
+    /// to an output is the one whose release equals the output's release
+    /// (<see cref="PlaneCCensusForRelease"/>); <c>PlaneCChecks</c> evaluates an EMPTY census when there is
+    /// none (an empty census exempts nothing and nothing can expire: it is not a relaxation).
+    /// Entries are <c>Kind = OriginAnomaly</c> (mechanical, not a business statement): plane C does not
+    /// depend on <c>--reference</c>, so <c>Reference = "-"</c>. <c>Sidedness = TwoSided</c>: a new violation
+    /// and a declared one that stops violating are both real signal.
     ///
-    /// The key is <c>(TableCode, LayoutSignature)</c>, WITHOUT the <c>Type</c> column:
-    /// <c>contradicts</c>/<c>no-match</c> is a DIAGNOSIS (classified by
-    /// <see cref="PlaneC.PlaneCComparer"/>), not identity; the finding is the same object whichever
-    /// way it is labelled. The TSV keeps the second column (the 3-column shape is still read and
-    /// validated) and it is included in <see cref="KnownException.Reason"/> row by row, but NOT in
-    /// the business key.
-    ///
-    /// The census carries its SCOPE, <see cref="PlaneCCensusRelease"/> (the
-    /// <c>"# CorpusRelease: 4.2"</c> header of the TSV), because it is not portable across
-    /// publications: it was measured on DPM 2.0 release 4.2, and applying it to an output of another
-    /// release (DPM 1.0, or DPM 2.0 4.3) would trigger the "shrinks" side of
-    /// <see cref="ApplyOriginAnomalyExceptions"/> for the wrong reason ("this table was not even
-    /// compared", not "the defect was fixed"). The check that decides NOT to evaluate the census
-    /// outside its scope is <c>PlaneCChecks</c>; only the scope DATUM lives here, so a future
-    /// <c>plane-c-known-divergences-4.3.tsv</c> declares its own without touching a line of C#.
+    /// The key of a <c>C-DPS-01</c> entry is <c>(TableCode, LayoutSignature)</c>, WITHOUT the <c>Type</c>
+    /// column: <c>contradicts</c>/<c>no-match</c> is a DIAGNOSIS (classified by
+    /// <see cref="PlaneC.PlaneCComparer"/>), not identity. The TSV keeps the second column (validated) and
+    /// it is included in <see cref="KnownException.Reason"/> row by row, but NOT in the business key.
     /// </summary>
-    private static readonly Lazy<PlaneCCensus> PlaneCCensusLazy = new(LoadPlaneCDivergences);
+    private static readonly Lazy<IReadOnlyList<PlaneCCensus>> PlaneCCensusesLazy = new(LoadPlaneCCensuses);
 
-    private static IReadOnlyList<KnownException> PlaneCExceptions => PlaneCCensusLazy.Value.Exceptions;
+    private static IEnumerable<KnownException> PlaneCExceptions => PlaneCCensusesLazy.Value.SelectMany(c => c.Exceptions);
 
-    /// <summary>The DPM 2.0 release on which the plane C divergences TSV was measured
-    /// (<c>"# CorpusRelease: ..."</c> header), or <see langword="null"/> if the TSV does not declare
-    /// it (defensive: with no declared scope, <c>PlaneCChecks</c> cannot confirm that it applies,
-    /// so it does not compare).</summary>
-    public static string? PlaneCCensusRelease => PlaneCCensusLazy.Value.CorpusRelease;
+    /// <summary>The releases for which an embedded plane C census exists (ordinal order).</summary>
+    public static IReadOnlyList<string> PlaneCCensusReleases =>
+        PlaneCCensusesLazy.Value.Select(c => c.CorpusRelease!).OrderBy(r => r, StringComparer.Ordinal).ToList();
+
+    /// <summary>The embedded census whose <c># CorpusRelease</c> equals <paramref name="release"/>, or
+    /// <see langword="null"/> when there is none.</summary>
+    internal static PlaneCCensus? PlaneCCensusForRelease(string release) =>
+        PlaneCCensusesLazy.Value.FirstOrDefault(c => string.Equals(c.CorpusRelease, release, StringComparison.Ordinal));
 
     /// <summary>A parsed plane C divergences census: its exceptions and the release it was measured on.</summary>
     internal sealed record PlaneCCensus(IReadOnlyList<KnownException> Exceptions, string? CorpusRelease);
 
-    private static PlaneCCensus LoadPlaneCDivergences()
+    private static IReadOnlyList<PlaneCCensus> LoadPlaneCCensuses()
     {
         var assembly = typeof(KnownExceptions).Assembly;
-        using var stream = assembly.GetManifestResourceStream(PlaneCTsvResourceName)
-            ?? throw new InvalidOperationException(
-                $"Embedded resource '{PlaneCTsvResourceName}' not found (DD-23): " +
-                "plane-c-known-divergences-4.2.tsv is not registered as an EmbeddedResource in the .csproj.");
+        var sources = new List<(string Name, string Text)>();
+        foreach (var resourceName in assembly.GetManifestResourceNames()
+                     .Where(n => n.StartsWith(PlaneCTsvResourcePrefix, StringComparison.Ordinal)
+                                 && n.EndsWith(PlaneCTsvResourceSuffix, StringComparison.Ordinal))
+                     .OrderBy(n => n, StringComparer.Ordinal))
+        {
+            using var stream = assembly.GetManifestResourceStream(resourceName)!;
+            using var reader = new StreamReader(stream);
+            var fileName = "plane-c-known-divergences-" + resourceName[PlaneCTsvResourcePrefix.Length..];
+            sources.Add((fileName, reader.ReadToEnd()));
+        }
 
-        using var reader = new StreamReader(stream);
-        return ParsePlaneCCensus(reader);
+        return LoadPlaneCCensuses(sources);
     }
 
-    /// <summary>Parses a plane C divergences TSV given as text (the parser of the embedded resource).</summary>
-    internal static PlaneCCensus ParsePlaneCCensus(string tsvText)
+    /// <summary>
+    /// Parses a set of census files (name, text). Every census must declare its
+    /// <c># CorpusRelease</c> (without it no output could select it), and two censuses may not declare the
+    /// same release: both are errors, never resolved by picking one.
+    /// </summary>
+    internal static IReadOnlyList<PlaneCCensus> LoadPlaneCCensuses(IEnumerable<(string Name, string Text)> sources)
+    {
+        var censuses = new List<PlaneCCensus>();
+        var nameByRelease = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (name, text) in sources)
+        {
+            var census = ParsePlaneCCensus(text, name);
+            if (string.IsNullOrEmpty(census.CorpusRelease))
+            {
+                throw new InvalidOperationException(
+                    $"Plane C census '{name}' (DD-23) does not declare its release: a '# CorpusRelease: <release>' " +
+                    "header is required, otherwise no output can select it.");
+            }
+
+            if (nameByRelease.TryGetValue(census.CorpusRelease, out var other))
+            {
+                throw new InvalidOperationException(
+                    $"Plane C censuses '{other}' and '{name}' (DD-23) both declare '# CorpusRelease: {census.CorpusRelease}': " +
+                    "one census per release.");
+            }
+
+            nameByRelease[census.CorpusRelease] = name;
+            censuses.Add(census);
+        }
+
+        return censuses;
+    }
+
+    /// <summary>Parses a plane C divergences TSV given as text (the parser of the embedded resources).</summary>
+    internal static PlaneCCensus ParsePlaneCCensus(string tsvText, string sourceName = "plane-c-known-divergences.tsv")
     {
         using var reader = new StringReader(tsvText);
-        return ParsePlaneCCensus(reader);
+        return ParsePlaneCCensus(reader, sourceName);
     }
 
-    private static PlaneCCensus ParsePlaneCCensus(TextReader textReader)
+    private static PlaneCCensus ParsePlaneCCensus(TextReader textReader, string sourceName)
     {
+        var censusReason =
+            "DD-23: DATED census of the live plane C violations against the EBA Annotated Table Layout " +
+            $"(src/EbaDpm.Converter.Core/Resources/{sourceName}). Regenerated per release, never relaxed by threshold.";
         var result = new List<KnownException>();
         string? corpusRelease = null;
         string? line;
@@ -580,7 +580,7 @@ public static class KnownExceptions
                 if (parts.Length != 4 || string.IsNullOrWhiteSpace(parts[3]))
                 {
                     throw new InvalidOperationException(
-                        $"Malformed row in plane-c-known-divergences-4.2.tsv (DD-27): '{line}' - a '{PlaneCHierarchyType}' " +
+                        $"Malformed row in {sourceName} (DD-27): '{line}' - a '{PlaneCHierarchyType}' " +
                         "row expects 4 tab-separated columns (TableCode, hierarchy, " +
                         "{ReleaseLabel}|{Axis}|{OrdinateCode}|{MetricCode}, Reason) with a non-empty reason.");
                 }
@@ -588,7 +588,7 @@ public static class KnownExceptions
                 result.Add(new KnownException(
                     "DD-27", ExceptionKind.OriginAnomaly, $"{parts[0]}\t{parts[2]}", "-", null, "C-MHR-01",
                     "DD-27: plane C hierarchy divergence of one metric use " +
-                    $"(src/EbaDpm.Converter.Core/Resources/plane-c-known-divergences-4.2.tsv). {parts[3]}",
+                    $"(src/EbaDpm.Converter.Core/Resources/{sourceName}). {parts[3]}",
                     ValidationLayer.Critical, Sidedness.TwoSided));
                 continue;
             }
@@ -596,14 +596,14 @@ public static class KnownExceptions
             if (parts.Length != 3)
             {
                 throw new InvalidOperationException(
-                    $"Malformed row in plane-c-known-divergences-4.2.tsv (DD-23): '{line}' - expected 3 " +
+                    $"Malformed row in {sourceName} (DD-23): '{line}' - expected 3 " +
                     "tab-separated columns (TableCode, Type, LayoutSignature).");
             }
 
             // Key WITHOUT the type: PlaneCViolation.BusinessKey uses exactly this same
             // "{TableCode}\t{Signature}" shape.
             var businessKey = $"{parts[0]}\t{parts[2]}";
-            var reason = $"{PlaneCCensusReason} Type measured in the census: {parts[1]} (diagnosis, not part of the key).";
+            var reason = $"{censusReason} Type measured in the census: {parts[1]} (diagnosis, not part of the key).";
             result.Add(new KnownException(
                 "DD-23", ExceptionKind.OriginAnomaly, businessKey, "-", null, "C-DPS-01", reason,
                 ValidationLayer.Critical, Sidedness.TwoSided));
@@ -613,7 +613,7 @@ public static class KnownExceptions
     }
 
     /// <summary>
-    /// The complete registry: the 26 original entries + AO-1 (50) + AO-3 (104) + DD-16 (59) + E-7
+    /// The complete registry: the 26 original entries + AO-1 (50) + DD-16 (59) + E-7
     /// (109) + DD-17..DD-22 + the plane C census, generated by projection from their compact lists
     /// so that Reason/Check/Layer/Sidedness are not repeated by hand per entry (applying an exception
     /// requires an exact key, not one literal line per entry in the DECLARATION).
@@ -622,7 +622,6 @@ public static class KnownExceptions
     [
         .. LegacyExceptions,
         .. ColonInMemberCodeKeys.Select(k => new KnownException("AO-1", ExceptionKind.OriginAnomaly, k, "-", null, "I-XBR-01c", ColonInMemberCodeReason, ValidationLayer.Critical, Sidedness.TwoSided)),
-        .. MembersOutsideHierarchyDomainKeys.Select(k => new KnownException("AO-3", ExceptionKind.OriginAnomaly, k, "-", null, "I-TRE-07b", MembersOutsideHierarchyDomainReason, ValidationLayer.Critical, Sidedness.OneSided)),
         .. DimensionOnSeveralAxesKeys.Select(k => new KnownException("AO-4", ExceptionKind.OriginAnomaly, k, "-", null, "A-OCA-10", DimensionOnSeveralAxesReason, ValidationLayer.Critical, Sidedness.TwoSided)),
         .. TableMetricBeforeItemCategoryKeys.Select(k => new KnownException("AO-5", ExceptionKind.OriginAnomaly, k, "-", null, "I-SIG-07", TableMetricBeforeItemCategoryReason, ValidationLayer.Critical, Sidedness.TwoSided)),
         .. LegacyDpm10HierarchyKeys.Select(k => new KnownException("DD-16", ExceptionKind.DeclaredDivergence, k, Ref42, Sha42, "B-DIC-01.8", LegacyDpm10HierarchyReason, ValidationLayer.Critical, Sidedness.TwoSided)),
@@ -782,7 +781,7 @@ public static class KnownExceptions
     /// plane A, WITHOUT a reference file to compare (<c>Reference == "-"</c>, always applies).
     /// <paramref name="violatingKeys"/> is the set of business keys that violate the invariant
     /// TODAY. <see cref="Sidedness"/> decides whether "shrinks" (a declared one stops violating)
-    /// counts as a failure: <c>TwoSided</c> (AO-1) yes, <c>OneSided</c> (AO-3) no.
+    /// counts as a failure: <c>TwoSided</c> (AO-1) yes, <c>OneSided</c> no.
     /// </summary>
     public static (IReadOnlyList<string> UnresolvedViolations, IReadOnlyList<Outcome> Outcomes) ApplyOriginAnomalyExceptions(
         string checkId, IReadOnlySet<string> violatingKeys, ValidationPlane plane)

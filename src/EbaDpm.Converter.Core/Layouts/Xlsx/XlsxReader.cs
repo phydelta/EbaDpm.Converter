@@ -37,7 +37,7 @@ internal static class XlsxReader
             .Where(r => (string?)r.Attribute("Type") is { } t && t.EndsWith("/worksheet", StringComparison.Ordinal))
             .ToDictionary(
                 r => (string)r.Attribute("Id")!,
-                r => "xl/" + (string)r.Attribute("Target")!);
+                r => ResolveTarget("xl", (string)r.Attribute("Target")!));
 
         var sheets = new List<XlsxSheet>();
         foreach (var sheetEl in workbookXml.Descendants(Main + "sheet"))
@@ -51,7 +51,7 @@ internal static class XlsxReader
 
             var sheetXml = LoadEntry(zip, target)
                 ?? throw new InvalidOperationException($"'{path}': sheet '{name}' references '{target}', which does not exist.");
-            var comments = ReadComments(zip, target);
+            var comments = ReadComments(zip, target, path, name);
             sheets.Add(ReadSheet(name, sheetXml, sharedStrings, shadedFillIds, cellXfFillIds, comments));
         }
 
@@ -69,7 +69,8 @@ internal static class XlsxReader
     /// soon as a sheet carries no comments (the following commentsN.xml shift) — only the
     /// relationship in the file itself can be trusted.
     /// </summary>
-    private static Dictionary<(int Row, int Col), string> ReadComments(ZipArchive zip, string sheetTarget)
+    private static Dictionary<(int Row, int Col), string> ReadComments(
+        ZipArchive zip, string sheetTarget, string workbookPath, string sheetName)
     {
         var result = new Dictionary<(int, int), string>();
 
@@ -94,12 +95,10 @@ internal static class XlsxReader
             return result;
         }
 
-        var commentsEntryName = ResolveRelativePath(sheetDir, commentsTarget);
-        var commentsXml = LoadEntry(zip, commentsEntryName);
-        if (commentsXml is null)
-        {
-            return result;
-        }
+        var commentsEntryName = ResolveTarget(sheetDir, commentsTarget);
+        var commentsXml = LoadEntry(zip, commentsEntryName)
+            ?? throw new InvalidOperationException(
+                $"'{workbookPath}': sheet '{sheetName}' declares a comments relationship to '{commentsTarget}' (part '{commentsEntryName}'), which does not exist.");
 
         foreach (var commentEl in commentsXml.Descendants(Main + "comment"))
         {
@@ -122,12 +121,17 @@ internal static class XlsxReader
         return result;
     }
 
-    /// <summary>Resolves a RELATIVE relationship <c>Target</c> (it may carry <c>../</c>) against the
-    /// directory of the file that declares it — without <see cref="Path"/>, which on Windows
-    /// normalises with <c>\</c> whereas <see cref="ZipArchive"/> entries always use <c>/</c>.</summary>
-    private static string ResolveRelativePath(string baseDir, string relativeTarget)
+    /// <summary>Resolves a relationship <c>Target</c> per OPC: a Target starting with <c>/</c> is an
+    /// absolute part name from the package root (4.4 writes <c>/xl/worksheets/sheet1.xml</c>);
+    /// otherwise it is relative to the directory of the part that declares it (it may carry
+    /// <c>../</c>; 4.2/4.3 write <c>worksheets/sheet1.xml</c>). Done without <see cref="Path"/>,
+    /// which on Windows normalises with <c>\</c> whereas <see cref="ZipArchive"/> entries always
+    /// use <c>/</c>.</summary>
+    private static string ResolveTarget(string baseDir, string target)
     {
-        var combined = (baseDir.Length > 0 ? baseDir + "/" : string.Empty) + relativeTarget;
+        var combined = target.StartsWith('/')
+            ? target
+            : (baseDir.Length > 0 ? baseDir + "/" : string.Empty) + target;
         var stack = new List<string>();
         foreach (var part in combined.Split('/'))
         {
@@ -276,7 +280,15 @@ internal static class XlsxReader
     /// list (which is the <c>fillId</c> used by the <c>&lt;xf&gt;</c> of <c>cellXfs</c> — not a
     /// separate table of IDs), whether that fill is the disabled GREY:
     /// <c>patternType="solid"</c> with <c>fgColor</c> <c>indexed="55"</c> (legacy Excel palette) or
-    /// <c>rgb="FFD8D8D8"</c>.
+    /// <c>rgb</c> <c>D8D8D8</c>, <c>999999</c> or <c>595959</c>, comparing the colour WITHOUT its alpha byte (the last
+    /// six hex digits, case-insensitive): up to 4.3 the grey is written <c>FFD8D8D8</c>, from 4.4
+    /// <c>00D8D8D8</c>, and the legacy <c>indexed=55</c> appears as <c>00999999</c>. Measured on
+    /// 2026-11-20 on the 4.3 and 4.4 corpora: in AML_RA the 905 cells that are grey in both go from
+    /// <c>FFD8D8D8</c> to <c>00D8D8D8</c>; in 4.4 the <c>999999</c> cells carry no text, as the
+    /// <c>indexed=55</c> ones mostly did. <c>595959</c> is shaded on one cell only: in the 4.4 corpus
+    /// (2026-11-20) the single grid cell with this fill (K_41.00 r0610 c0080) is <c>IsExcluded</c> in
+    /// the Access 4.4 database, as the 999999 cells are (1463/1463 excluded). <c>FFFF00</c> and
+    /// <c>C4D79B</c> are NOT shaded (their cells all carry text).
     ///
     /// "<c>fillId</c> number N is the grey" is deliberately NOT hard-wired: the ORDER of
     /// <c>&lt;fills&gt;</c> —and therefore which <c>fillId</c> number the grey fill gets— is a
@@ -308,7 +320,11 @@ internal static class XlsxReader
             var fgColorEl = patternFillEl?.Element(Main + "fgColor");
             var indexed = (string?)fgColorEl?.Attribute("indexed");
             var rgb = (string?)fgColorEl?.Attribute("rgb");
-            var isShaded = indexed == "55" || string.Equals(rgb, "FFD8D8D8", StringComparison.OrdinalIgnoreCase);
+            var rgbWithoutAlpha = rgb is { Length: 8 } ? rgb[2..] : rgb;
+            var isShaded = indexed == "55"
+                || string.Equals(rgbWithoutAlpha, "D8D8D8", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rgbWithoutAlpha, "999999", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rgbWithoutAlpha, "595959", StringComparison.OrdinalIgnoreCase);
             result.Add(isShaded);
         }
 
