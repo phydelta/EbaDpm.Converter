@@ -262,7 +262,7 @@ public static class Dpm20HierarchyNodeLoader
                     .Select(r => (Row: r, DomainId: DomainIdOfCategory(r.CategoryId)))
                     .Where(x => x.DomainId is { } d && IsAllowedDomain(d, hierarchyDomainId)
                         && memberIdByDomainAndCode.ContainsKey((d, x.Row.Code)))
-                    .Select(x => ((Dpm20ItemCategoryRow Row, int DomainId)?)(x.Row, x.DomainId!.Value))
+                    .Select(x => (x.Row, x.DomainId!.Value))
                     .FirstOrDefault();
 
                 if (reanchoredRow is null)
