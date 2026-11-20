@@ -37,6 +37,15 @@ All notable changes to this project are documented in this file. The format is b
 - **CLI.** With `--release`, an `--output` that is an existing directory is an argument error
   instead of an unhandled exception.
 
+### Fixed
+
+- **CLI: the process exit code is no longer replaced by `0xC0000409` (#82).** After the ACE OLEDB
+  provider had served a connection, the native teardown at process exit crashed (an access
+  violation in the Office module `mso20win32client.dll`, then a fail-fast in `ntdll.dll`) and
+  overrode the exit code, so a successful conversion and an argument error looked alike. `Main` now
+  ends the process with the code computed by the runner, after flushing the console, when the
+  provider is loaded.
+
 ### Added
 
 - **DPM 2.0 output.** The DORA framework is exported like any other framework: its taxonomies,

@@ -18,7 +18,47 @@ if (ShouldRelaunchToX86())
     }
 }
 
-return CliRunner.Run(args, Console.Out, Console.Error);
+var code = CliRunner.Run(args, Console.Out, Console.Error);
+
+// Issue #82: once the ACE OLEDB provider has served a connection, the native teardown at process
+// exit (an access violation in the Office module mso20win32client.dll, then a fail-fast in ntdll)
+// replaces the exit code with 0xC0000409. Disposing every connection and calling
+// OleDbConnection.ReleaseObjectPool() does not avoid it, so end the process with the computed
+// code without running the native DLL detach.
+if (AceProviderLoaded())
+{
+    Console.Out.Flush();
+    Console.Error.Flush();
+    TerminateProcess(GetCurrentProcess(), (uint)code);
+}
+
+return code;
+
+static bool AceProviderLoaded()
+{
+    try
+    {
+        foreach (System.Diagnostics.ProcessModule module in System.Diagnostics.Process.GetCurrentProcess().Modules)
+        {
+            if (module.ModuleName.StartsWith("ACE", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+    }
+    catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException
+                                   or NotSupportedException)
+    {
+    }
+
+    return false;
+}
+
+[DllImport("kernel32.dll")]
+static extern IntPtr GetCurrentProcess();
+
+[DllImport("kernel32.dll", SetLastError = true)]
+static extern bool TerminateProcess(IntPtr process, uint exitCode);
 
 static bool ShouldRelaunchToX86()
 {
