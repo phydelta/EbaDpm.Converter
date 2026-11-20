@@ -18,7 +18,12 @@ if (ShouldRelaunchToX86())
     }
 }
 
-return CliRunner.Run(args, Console.Out, Console.Error);
+// A terminal gets colours, tables with borders and live progress; redirected output (pipes,
+// files, CI, a relaunched child) stays plain text.
+return CliRunner.Run(
+    args,
+    CliConsole.Detect(Console.Out, Console.IsOutputRedirected),
+    CliConsole.Detect(Console.Error, Console.IsErrorRedirected));
 
 static bool ShouldRelaunchToX86()
 {
