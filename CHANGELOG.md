@@ -6,6 +6,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## 3.0.0 - 2026-11-20
+
 ### Changed
 
 - **Breaking: one SQLite file per release for DPM 2.0 sources.** Each file is the snapshot of one
@@ -23,7 +25,6 @@ All notable changes to this project are documented in this file. The format is b
   the members of a newer one: in each release file the version of every header is the one current
   in that release (0 differences on the 4.4 database, against 68 headers when the 4.3 conversion
   read every module version as of 4.3). (#62)
-
 - **DPM 2.0 output.** A metric declared on the table version (`TableVersion.PropertyID`) when no
   header declares one is now part of the categorisation and the signatures (`C_96.05.2`, releases
   3.5 to 4.2, which no earlier output contained).
