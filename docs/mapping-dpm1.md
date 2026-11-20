@@ -123,8 +123,14 @@ From `Member`, XBRL codes verbatim (no release suffix).
 - One extra row is added for the target sentinel: `MemberID = 9999`, domain 9999, label `Open`,
   empty code, `NULL` XBRL code, with a synthetic concept.
 - If a real member uses `MemberID = 9999`, it is renumbered to `MAX(MemberID) + 1`. The same
-  translation is applied everywhere the member appears (hierarchy nodes, including inside
-  `Path`, and categorisations).
+  translation is applied everywhere the member appears: hierarchy nodes (including inside
+  `Path`), `mOrdinateCategorisation.MemberID`, `mOpenAxisValueRestriction.HierarchyStartingMemberID`,
+  `mOrdinateMetricRestriction.HierarchyStartingMemberID` and the starting-member ID inside the
+  `DimensionMemberSignature` of a restricted open pair (the `DPS` and datapoint signatures carry
+  codes, not IDs). Inside the loader the Access open sentinel (`999`) is kept apart from Access `9999`
+  until that translation, so renumbering the real member never interferes with the `999` → `9999`
+  mapping. Check `A-SEN-08` fails if any column other than the open-axis categorisations refers to
+  the sentinel.
 
 Note the two sentinels are different: **999** in the Access file, **9999** in the target.
 Searching the Access file for 9999 finds an ordinary NACE member and no open dimensions at all.
