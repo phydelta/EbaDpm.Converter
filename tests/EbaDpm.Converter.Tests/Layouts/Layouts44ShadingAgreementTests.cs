@@ -116,9 +116,10 @@ internal static class ShadingAgreement
         var accessByCoordinate = accessSide.GroupBy(k => (k.ZCode, k.RowCode)).ToDictionary(g => g.Key, g => g.ToList());
         var pairedLayout = new List<LayoutGridCell>();
         var pairedAccess = new List<Key>();
-        foreach (var cell in layoutSide)
+        foreach (var cell in layoutSide.Where(cell => accessByCoordinate.TryGetValue((cell.ZCode, cell.RowCode), out var keys) && keys.Count == 1))
         {
-            if (accessByCoordinate.TryGetValue((cell.ZCode, cell.RowCode), out var keys) && keys.Count == 1 && !pairedAccess.Contains(keys[0]))
+            var keys = accessByCoordinate[(cell.ZCode, cell.RowCode)];
+            if (!pairedAccess.Contains(keys[0]))
             {
                 pairedLayout.Add(cell);
                 pairedAccess.Add(keys[0]);
