@@ -50,12 +50,15 @@ File and folder names must match **exactly** — the tests look them up by name.
 ├─ DPM 1.0 Database_v4_1_20250709.accdb
 ├─ DPM2 Database_v 4_2_1.accdb
 ├─ DPM2 Database_v 4_3_20260622.accdb
+├─ DPM2 Database_v 4_4_20261006.accdb
 ├─ 3.2 table layouts/
 │    └─ *.xlsx
 ├─ 4.2 table layouts/
 │    └─ *.xlsx                (subfolders are fine; the folder is searched recursively)
 ├─ 4.3 table layouts/
 │    └─ *.xlsx
+├─ 4.4 table layouts/
+│    └─ *.xlsx                (13 files dated 20261007, one per module)
 ├─ EBA_3.2_phase_1.db
 ├─ EBA_4.0_ERRATA_5.db
 └─ EBA_4.2_Hotfix.db
@@ -66,9 +69,11 @@ File and folder names must match **exactly** — the tests look them up by name.
 | `DPM 1.0 Database_v4_1_20250709.accdb` | EBA DPM database, DPM 1.0 model, release 4.1 | DPM 1.0 conversion tests (dictionary, templates, axes and cells, signatures, modules, integrity) |
 | `DPM2 Database_v 4_2_1.accdb` | EBA DPM database, DPM 2.0 model, release 4.2.1 (2026-02-27) | DPM 2.0 conversion tests (reader, skeleton, full pipeline, validation) |
 | `DPM2 Database_v 4_3_20260622.accdb` | EBA DPM database, DPM 2.0 model, release 4.3 | Cutoff-release derivation on a later publication (it must resolve to `4.3`), and validation of a 4.3 conversion |
+| `DPM2 Database_v 4_4_20261006.accdb` | EBA DPM database, DPM 2.0 model, release 4.4 | Release catalogue (4.4 publishes 13 module versions in 6 taxonomies; 4.3.0.1 publishes none), per-release conversion with `--release 4.4`, and plane C of the 4.4 file |
 | `3.2 table layouts/` | EBA Annotated Table Layouts, release 3.2 | Layout extraction of the DPM 1.0 era (file names without date or module), and the layout-based checks on DPM 1.0 output |
 | `4.2 table layouts/` | EBA Annotated Table Layouts, release 4.2 | Layout extraction (with and without dictionary) and plane C comparison of the DPM 2.0 4.2 conversion |
 | `4.3 table layouts/` | EBA Annotated Table Layouts, release 4.3 | Layout extraction on the 4.3 publication |
+| `4.4 table layouts/` | EBA Annotated Table Layouts, release 4.4 (Phase 1): 13 workbooks named `<date> <MODULE>_table layout 4.4.xlsx`, exactly the 13 module versions that start in 4.4 | Layout extraction of the 4.4 file-name format (the framework is resolved from `dpm-4.4.db`, used as dictionary) and plane C of the 4.4 file |
 | `EBA_3.2_phase_1.db`, `EBA_4.0_ERRATA_5.db`, `EBA_4.2_Hotfix.db` | SQLite editions of the DPM dictionary in the distribution schema, produced outside this project and shipped compressed in [`tests/reference-exports/`](../tests/reference-exports/) | Regression comparisons (plane B) and tests that check the converter's schema and conventions against an independent export. They are not needed to *run* the converter, but the data-dependent test suite expects them: if the data directory exists and one of them is missing, the tests that use it fail with a message naming the file. |
 
 What the planes of validation are, and why the reference SQLite databases are an instrument and
@@ -105,9 +110,15 @@ the addresses and may move them):
 | DPM 1.0 database, release 4.1 | [DPM 1.0 Database_v4_1_20250709.accdb_.zip](https://www.eba.europa.eu/sites/default/files/2025-07/cf160041-aa49-41d3-af2b-d7e840158d65/DPM%201.0%20Database_v4_1_20250709.accdb_.zip) |
 | DPM 2.0 database, release 4.2.1 | [DPM2 Database_v_4_2_1.zip](https://www.eba.europa.eu/sites/default/files/2026-02/ad0d2577-a1eb-4826-a249-a1f7701c6796/DPM2%20Database_v_4_2_1.zip) |
 | DPM 2.0 database, release 4.3 | [DPM2 Database_v 4_3.zip](https://ebprstaewspublic01.blob.core.windows.net/public/tools-prod/documents/Big_Files/files/Reporting%20framework%204.3/DPM2%20Database_v%204_3.zip) |
+| DPM 2.0 database, release 4.4 | [DPM2 Database_v 4_4.zip](https://ebprstaewspublic01.blob.core.windows.net/public/tools-prod/assets/Reporting%20Framework/DPM2%20Database_v%204_4.zip) |
 | Table layouts, release 3.2 | [3.2 table layouts.zip](https://www.eba.europa.eu/sites/default/files/2023-11/7e727bbe-83e4-4faa-938e-7580a29d5482/3.2%20table%20layouts.zip) |
 | Table layouts, release 4.2 | [260106 Annotated templates_with_finpre9dp_4.2.1.zip](https://www.eba.europa.eu/sites/default/files/2026-02/c92d5e2b-bcd7-4767-ab5b-cdf0b1737368/260106%20Annotated%20templates_with_finpre9dp_4.2.1.zip) |
 | Table layouts, release 4.3 | [c. DPM Table Layouts and data point categorisation.zip](https://www.eba.europa.eu/sites/default/files/2026-07/71f710c3-111a-4976-9731-bc9bdaa2036c/c.%20DPM%20Table%20Layouts%20and%20data%20point%20categorisation.zip) |
+
+The 4.4 layouts package is [20261007 Annotated table layouts 4.4 (Phase 1).zip](https://www.eba.europa.eu/sites/default/files/2026-10/f46f5057-537a-4158-b77f-2ec0d00d5d8e/20261007%20Annotated%20table%20layouts%204.4%20%28Phase%201%29.zip).
+It is **Phase 1**: if the EBA publishes a later phase, that is a new corpus to measure, not an
+update of this one. The two 4.4 files are placed by hand for now (the download script does not
+fetch them yet).
 
 ### Reference SQLite exports
 

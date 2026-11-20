@@ -180,7 +180,7 @@ public static class LayoutExtractor
         {
             fileId++;
             var nameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
-            var fileNameInfo = LayoutFileNameParser.Parse(nameWithoutExtension);
+            var fileNameInfo = LayoutFileNameParser.Parse(nameWithoutExtension, dictionary);
             var sha256 = ComputeSha256(filePath);
 
             fileInsert.Insert(fileId, filePath, sha256, fileNameInfo.FrameworkCode, fileNameInfo.ModuleCode, fileNameInfo.ReleaseLabel);
@@ -188,7 +188,9 @@ public static class LayoutExtractor
             var workbook = XlsxReader.Read(filePath);
             foreach (var sheet in workbook.Sheets)
             {
-                if (string.Equals(sheet.Name, "TOC", StringComparison.Ordinal))
+                // Non-table sheets: the index of the workbook, "TOC" up to 4.3 and "Index" from 4.4.
+                if (string.Equals(sheet.Name, "TOC", StringComparison.Ordinal)
+                    || string.Equals(sheet.Name, "Index", StringComparison.Ordinal))
                 {
                     continue;
                 }

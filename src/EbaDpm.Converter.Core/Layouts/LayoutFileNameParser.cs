@@ -8,9 +8,9 @@ namespace EbaDpm.Converter.Core.Layouts;
 internal sealed record LayoutFileNameInfo(string FrameworkCode, string ReleaseLabel, string? ModuleCode);
 
 /// <summary>
-/// Parses the file name of an Annotated Table Layout. There are THREE different formats
-/// depending on the publication era, and all three are resolvable in code, with no external
-/// dictionary or hard-wired list of frameworks.
+/// Parses the file name of an Annotated Table Layout. There are FOUR different formats
+/// depending on the publication era. Three are resolvable in code, with no external dictionary or
+/// hard-wired list of frameworks; the 4.4 one does not carry the framework and needs the dictionary.
 ///
 /// <list type="bullet">
 /// <item><b>4.2 / 4.3</b> — <c>"{date} Annotated Table Layout  {FW} {REL} {MODULE}{FW} {REL}"</c>:
@@ -27,6 +27,11 @@ internal sealed record LayoutFileNameInfo(string FrameworkCode, string ReleaseLa
 /// <c>Annotated Table Layout 320-P1-COREP 3.2.xlsx</c> → FW=COREP, REL=3.2, MODULE=null. The
 /// file is per complete framework (publication phase, not module): the module granularity
 /// that 4.2 brings does not exist yet.</item>
+/// <item><b>4.4</b> — <c>"{date} {MODULE}_table layout {REL}"</c>: NO framework in the name.
+/// <c>20261007 AML_ELIGIBILITY_table layout 4.4.xlsx</c> → MODULE=AML_ELIGIBILITY, REL=4.4. The module
+/// code may contain "_", so the name is anchored on the literal <c>_table layout </c>. The framework is
+/// resolved from the module code through the SQLite dictionary (<see cref="LayoutDictionary"/>):
+/// without a dictionary, or with a module that is not in it, the parse fails; it never guesses.</item>
 /// </list>
 /// </summary>
 internal static class LayoutFileNameParser
@@ -44,17 +49,51 @@ internal static class LayoutFileNameParser
     private static readonly Regex PhaseAndFrameworkPattern = new(
         @"^\d+-P\d+-(?<fw>.+)$", RegexOptions.Compiled);
 
-    public static LayoutFileNameInfo Parse(string fileNameWithoutExtension)
+    // 4.4: "{date} {MODULE}_table layout {REL}". Anchored on the literal "_table layout " because the
+    // module code may contain "_" (AML_ELIGIBILITY, MREL_DECISIONS).
+    private static readonly Regex ModuleTableLayoutPattern = new(
+        @"^(?<date>\d+)\s+(?<module>\S+)_table layout (?<rel>\S+)$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Parses the name. <paramref name="dictionary"/> is only consulted by the 4.4 format, to resolve
+    /// the framework from the module code.
+    /// </summary>
+    public static LayoutFileNameInfo Parse(string fileNameWithoutExtension, LayoutDictionary? dictionary = null)
     {
+        var moduleLayoutMatch = ModuleTableLayoutPattern.Match(fileNameWithoutExtension);
+        if (moduleLayoutMatch.Success)
+        {
+            var moduleCode = moduleLayoutMatch.Groups["module"].Value;
+            if (dictionary is null || !dictionary.IsPresent)
+            {
+                throw new InvalidOperationException(
+                    $"The file name '{fileNameWithoutExtension}' follows the 4.4 pattern " +
+                    "'<date> <MODULE>_table layout <REL>', which does not carry the framework: it is resolved from " +
+                    $"the module code '{moduleCode}' through the SQLite dictionary, and no dictionary was given " +
+                    "(--dictionary, the file of the layouts' release).");
+            }
+
+            if (!dictionary.TryResolveFramework(moduleCode, out var framework))
+            {
+                throw new InvalidOperationException(
+                    $"The file '{fileNameWithoutExtension}' names the module '{moduleCode}', which is not in the " +
+                    $"dictionary '{dictionary.Path}' (mModule.ModuleCode, case-insensitive): its framework cannot be " +
+                    "resolved and is not guessed. --dictionary must be the file of the layouts' release.");
+            }
+
+            return new LayoutFileNameInfo(framework, moduleLayoutMatch.Groups["rel"].Value, moduleCode);
+        }
+
         var match = Pattern.Match(fileNameWithoutExtension);
         if (!match.Success)
         {
             throw new InvalidOperationException(
-                $"The file name '{fileNameWithoutExtension}' does not follow any of the three " +
+                $"The file name '{fileNameWithoutExtension}' does not follow any of the four " +
                 "known Annotated Table Layout patterns: " +
                 "'<date> Annotated Table Layout  <FW> <REL> <MODULE><FW> <REL>' (4.2/4.3), " +
-                "'<date> Annotated Table Layout  <MODULE><FW> <REL>' (4.0), or " +
-                "'Annotated Table Layout <PHASE>-<FW> <REL>' (3.2, no date or module).");
+                "'<date> Annotated Table Layout  <MODULE><FW> <REL>' (4.0), " +
+                "'Annotated Table Layout <PHASE>-<FW> <REL>' (3.2, no date or module), or " +
+                "'<date> <MODULE>_table layout <REL>' (4.4, framework resolved from the dictionary).");
         }
 
         var hasDate = match.Groups["date"].Success;

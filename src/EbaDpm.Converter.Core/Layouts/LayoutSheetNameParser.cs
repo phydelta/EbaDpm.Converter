@@ -5,11 +5,12 @@ namespace EbaDpm.Converter.Core.Layouts;
 /// <summary>
 /// Splits a sheet name into <c>TableCode</c> and, if present, the parenthesised suffix that
 /// materialises a combination of the Z axis: <c>"C_14.01(0010)"</c> →
-/// (<c>"C_14.01"</c>, <c>"0010"</c>); <c>"C_02.00.a"</c> → (<c>"C_02.00.a"</c>, <see langword="null"/>).
+/// (<c>"C_14.01"</c>, <c>"0010"</c>); 4.4 writes a space before the parenthesis
+/// (<c>"K_74.00.a (0010)"</c>), which is not part of the code; <c>"C_02.00.a"</c> → (<c>"C_02.00.a"</c>, <see langword="null"/>).
 /// </summary>
 internal static class LayoutSheetNameParser
 {
-    private static readonly Regex Pattern = new(@"^(.+)\(([^()]+)\)$", RegexOptions.Compiled);
+    private static readonly Regex Pattern = new(@"^(.+?)\s*\(([^()]+)\)$", RegexOptions.Compiled);
 
     public static (string TableCode, string? ZSuffix) Parse(string sheetName)
     {

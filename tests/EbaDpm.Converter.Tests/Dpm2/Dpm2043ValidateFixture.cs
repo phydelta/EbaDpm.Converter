@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Cli;
+using EbaDpm.Converter.Core.Layouts;
 using EbaDpm.Converter.Tests.Schema;
 
 namespace EbaDpm.Converter.Tests.Dpm2;
@@ -31,6 +32,12 @@ public sealed class Dpm2043ValidateFixture : IDisposable
     public string GeneratedDatabasePath { get; } = null!;
     public int ExitCode { get; }
 
+    /// <summary>Console output of the <c>--release 4.3</c> conversion (the diagnostics lists, e.g. the hierarchy tie-break).</summary>
+    public string Stdout { get; } = string.Empty;
+
+    /// <summary>Console output of the <c>--release 4.2</c> conversion of this database; empty until <see cref="Generated42DatabasePath"/> is first read.</summary>
+    public string Generated42Stdout { get; private set; } = string.Empty;
+
     /// <summary><c>Release.Code</c> of the 4.2 release, declared by the 4.3 database too.</summary>
     public const string Release42Code = RepoPaths.Cutoff42ReleaseCode;
 
@@ -41,6 +48,15 @@ public sealed class Dpm2043ValidateFixture : IDisposable
     /// access, once, with no connection left open on it (<c>Validator.Run</c> needs exclusive read access).
     /// </summary>
     public string Generated42DatabasePath => _generated42.Value;
+
+    private readonly Lazy<string> _layouts43 = null!;
+
+    /// <summary>
+    /// The 4.3 Annotated Table Layouts, extracted lazily ONCE with the <c>--release 4.3</c> file of this
+    /// fixture as <c>--dictionary</c> (the dictionary of the layouts' own release, as the usage documents),
+    /// for the plane C checks of the 4.3 file against the 4.3 layouts.
+    /// </summary>
+    public string Layouts43DatabasePath => _layouts43.Value;
 
     public Dpm2043ValidateFixture()
     {
@@ -62,10 +78,21 @@ public sealed class Dpm2043ValidateFixture : IDisposable
             ["--source", RepoPaths.AccessDpm20Release43DatabasePath, "--release", Release43Code, "--output", GeneratedDatabasePath],
             stdout,
             stderr);
+        Stdout = stdout.ToString();
 
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
 
         _generated42 = new Lazy<string>(Convert42);
+        _layouts43 = new Lazy<string>(ExtractLayouts43);
+    }
+
+    private string ExtractLayouts43()
+    {
+        RepoPaths.EnsureTableLayouts43DirectoryExists();
+        var path = Path.Join(TempDirectory, "layouts43-own-dictionary.db");
+        LayoutExtractor.Extract(RepoPaths.TableLayouts43Directory, path, overwrite: false, GeneratedDatabasePath);
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        return path;
     }
 
     private string Convert42()
@@ -77,6 +104,7 @@ public sealed class Dpm2043ValidateFixture : IDisposable
             ["--source", RepoPaths.AccessDpm20Release43DatabasePath, "--release", Release42Code, "--output", path],
             stdout,
             stderr);
+        Generated42Stdout = stdout.ToString();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         if (exitCode != 0 || !File.Exists(path))
         {

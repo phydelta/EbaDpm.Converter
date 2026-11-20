@@ -36,12 +36,33 @@ All notable changes to this project are documented in this file. The format is b
   source and apply to DPM 2.0 outputs only.
 - **CLI.** With `--release`, an `--output` that is an existing directory is an argument error
   instead of an unhandled exception.
+- **Plane C is evaluated for every release.** There is one census of known divergences per
+  release (`plane-c-known-divergences-<release>.tsv`, all embedded) and an output uses the one
+  whose `CorpusRelease` is its own release. When there is none, `C-DPS-01` and `C-MHR-01` are
+  evaluated with an empty census: every violation fails and nothing can expire. Before, they were
+  skipped for any release other than 4.2. Two census files for the same release are an error.
+  DPM 1.0 outputs, which have no single release, keep consulting no census. (#67)
+- **DPM 2.0 output.** A hierarchy node resolves to the member of its item in the hierarchy's
+  domain (or a united one) when the current one falls outside it (tie-break by consistency: the
+  file keeps the elements that make it consistent). Measured 2026-11-20: 123 nodes on the 4.4
+  database at 4.4, 104 at 4.3 (and 0 at 4.2), each with exactly one candidate (in MC150 the root and its 5 children all move, and the paths follow); nodes already in an
+  allowed domain never change. The known exception AO-3 of `I-TRE-07b` (104 nodes) is removed:
+  the check has no exceptions.
 
 ### Added
 
 - **DPM 2.0 output.** The DORA framework is exported like any other framework: its taxonomies,
   modules, tables and table groups (in the 4.4 database, `DORA` 1.2.0 with 15 tables in the 4.2
   file). Document modules stay excluded. (#75)
+- **`--extract-layouts` reads the 4.4 layout file name** `<date> <MODULE>_table layout <REL>`
+  (for example `20261007 AML_ELIGIBILITY_table layout 4.4.xlsx`), which does not carry the
+  framework. The framework is resolved from the module code through the `--dictionary` file
+  (`mModule.ModuleCode`, then its taxonomy and `mReportingFramework`), case-insensitively; a
+  module that is not in the dictionary stops the extraction with an error naming the file, the code
+  and the dictionary. The `Index` sheet is skipped like `TOC`. Shaded cells are recognised by the
+  grey fill colour ignoring its alpha byte (`D8D8D8`, `999999` and `595959`), because the 4.4 files write
+  `00D8D8D8` where 4.3 wrote `FFD8D8D8`; without it no 4.4 cell would be shaded. Relationship targets are resolved per OPC (4.4 writes absolute part
+  names), a missing comments part is an error, and `K_74.00.a (0010)` sheet names are accepted. (#67)
 
 ## 2.0.0 - 2026-10-28
 

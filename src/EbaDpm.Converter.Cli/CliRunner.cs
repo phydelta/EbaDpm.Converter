@@ -696,6 +696,7 @@ public static class CliRunner
             + $"mHierarchyNode, {hierarchyNodes.HierarchiesWithoutNodes} hierarchies without nodes "
             + "(no items in their effective version).");
         WriteDiagnosticList(stdout, "Hierarchy tree: MemberID anchored to its own domain", hierarchyNodes.AnchoredMembers);
+        WriteDiagnosticList(stdout, "Hierarchy tree: MemberID re-anchored by the consistency tie-break", hierarchyNodes.ReanchoredMembers);
         stdout.WriteLine(
             $"DPM 2.0 structure loaded: {structure.TableRows} mTable, "
             + $"{structure.TaxonomyTableRows} mTaxonomyTable, {structure.TemplateOrTableRows} "

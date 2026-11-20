@@ -20,10 +20,11 @@
     <EmbeddedResource Include="Resources\dpm-distribution-schema.sql">
       <LogicalName>EbaDpm.Converter.Core.Resources.dpm-distribution-schema.sql</LogicalName>
     </EmbeddedResource>
-    <!-- Closed census of the known plane C divergences: regenerated per release,
-         never hardcoded in C#. -->
-    <EmbeddedResource Include="Resources\plane-c-known-divergences-4.2.tsv">
-      <LogicalName>EbaDpm.Converter.Core.Resources.plane-c-known-divergences-4.2.tsv</LogicalName>
+    <!-- Closed census of the known plane C divergences, one file per release
+         (plane-c-known-divergences-<release>.tsv): regenerated per release, never hardcoded in C#.
+         KnownExceptions enumerates the manifest resources by this LogicalName prefix. -->
+    <EmbeddedResource Include="Resources\plane-c-known-divergences-*.tsv">
+      <LogicalName>EbaDpm.Converter.Core.Resources.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 

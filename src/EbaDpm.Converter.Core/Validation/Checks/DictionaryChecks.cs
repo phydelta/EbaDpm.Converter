@@ -483,7 +483,7 @@ public static class DictionaryChecks
         // the member is that of the hierarchy OR a domain UNITED to it.
         if (model == ValidationSourceModel.Dpm2)
         {
-            yield return WrongDomainMembersExceptKnownAnomaly(c, exceptionSink);
+            yield return WrongDomainMembers(c);
         }
         else
         {
@@ -514,27 +514,12 @@ public static class DictionaryChecks
     }
 
     /// <summary>
-    /// The 104 nodes of <c>I-TRE-07b</c> that remain after anchoring the 33 of <c>GA30</c>
-    /// (<c>Dpm20HierarchyNodeLoader.ResolveMemberId</c>). The source asserts two incompatible things
-    /// at once (an item re-versioned exactly at the release cut, and the subcategory that does not
-    /// follow it) and it is not for us to arbitrate: they are declared, not relaxed.
-    ///
-    /// Shape of the key: <c>HierarchyCode:DomainCode:MemberCode</c> of the NODE AND THE RESOLVED
-    /// MEMBER. Not <c>MemberID</c> (synthetic: a renumbering breaks it without the fact changing)
-    /// nor <c>HierarchyCode</c> alone (it would survive, but a NEW and DIFFERENT case falling in
-    /// the same hierarchy would be masked by the same entry). The chosen form sits exactly between
-    /// the two: it survives a renumbering (business codes, not IDs) and masks nothing that is not
-    /// THIS exact violation.
-    ///
-    /// Deliberate asymmetry with the other one-sided anomaly: here ONLY undeclared violations
-    /// count as a failure (growth). A declared one that stops violating (shrinkage) is NOT counted:
-    /// this anomaly is specific to the 4.3 release cut, not a permanent property of a single fixed
-    /// Access. A 4.2, a future 4.4, or any output without this defect would have the 104 "absent"
-    /// by design, and counting that as a failure would break --validate on all of them. Growth
-    /// still protects: 105 cases, or 104 different ones, fail all the same. The keys live in the
-    /// single <see cref="KnownExceptions"/> registry (<c>Sidedness.OneSided</c>).
+    /// I-TRE-07b: a plain critical check, with NO exceptions. The nodes that used to be declared
+    /// (AO-3, 104 at 4.3) are resolved by the tie-break by consistency of
+    /// <c>Dpm20HierarchyNodeLoader.ResolveMemberId</c>, so any violation is a failure.
+    /// The allowance for domains united by <c>mDomainUnion</c> is kept.
     /// </summary>
-    private static CheckResult WrongDomainMembersExceptKnownAnomaly(SqliteConnection c, List<KnownExceptions.Outcome> exceptionSink)
+    private static CheckResult WrongDomainMembers(SqliteConnection c)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var total = SqlHelpers.Scalar(c, "SELECT COUNT(*) FROM \"mHierarchyNode\"");
@@ -554,15 +539,12 @@ public static class DictionaryChecks
             1);
         sw.Stop();
 
-        var violating = rows.Select(r => r[0]!).ToHashSet(StringComparer.Ordinal);
-        var (unresolved, outcomes) = KnownExceptions.ApplyOriginAnomalyExceptions("I-TRE-07b", violating, ValidationPlane.A);
-        exceptionSink.AddRange(outcomes);
-        var unexpected = unresolved.Select(k => new CheckSample(k)).ToList();
+        var violating = rows.Select(r => new CheckSample(r[0]!)).ToList();
 
         return CheckResult.FromViolationCount(
             "I-TRE-07b", ValidationPlane.A, ValidationLayer.Critical, "mHierarchyNode",
-            "The member of a node belongs to the domain of its hierarchy, to that of a domain united to it, or is one of the 104 declared anomalies (named exception)",
-            total, unexpected.Count, sw.ElapsedMilliseconds, unexpected);
+            "The member of a node belongs to the domain of its hierarchy or to that of a domain united to it",
+            total, violating.Count, sw.ElapsedMilliseconds, violating);
     }
 
     private static CheckResult ExactMatch(SqliteConnection c, string id, string table, string statement, string countSql, long expected) =>

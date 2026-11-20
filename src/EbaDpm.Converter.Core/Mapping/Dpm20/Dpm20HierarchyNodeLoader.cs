@@ -82,20 +82,29 @@ namespace EbaDpm.Converter.Core.Mapping.Dpm20;
 /// The <c>MemberID</c> resolution is GLOBAL across categories (above), and in 4.3 that leaves 137
 /// nodes whose resolved member does NOT belong to the domain of their own hierarchy —
 /// <c>ItemCategory</c> re-versions the item right at the release cutoff and the containing
-/// subcategory does not follow it. The measurement splits the 137 in two: **33** (<c>GA30</c>)
-/// have a TWIN member with the same code under the hierarchy's domain — <c>ResolveMemberId</c>
-/// now ANCHORS there — and **104** (<c>GA4</c>, <c>GA4_1</c>, <c>MC150</c>) have no candidate
-/// under their own domain: anchoring there would make the "no matching row in mMember" exception
-/// throw and break the conversion outright, so they are emitted exactly as before and remain
-/// declared as a named exception in <c>I-TRE-07b</c> — the source asserts both things at once and
-/// it is not for us to arbitrate.
+/// subcategory does not follow it. <b>33</b> (<c>GA30</c>) have a TWIN member with the same code
+/// under the hierarchy's domain — <c>ResolveMemberId</c> ANCHORS there (first rule, unchanged).
+///
+/// <b>Tie-break by consistency</b> (decision 2026-11-20, see docs/mapping-dpm2.md): only when the
+/// member yielded by the rules above is in neither the hierarchy's domain nor a domain united to
+/// it, the item's <c>ItemCategory</c> row with the highest <c>StartReleaseID &lt;= R</c> (ended or
+/// not) whose domain is allowed, and whose member exists in <c>mMember</c>, is used instead. Measured
+/// 2026-11-20: 4.4 database at <c>--release 4.4</c> 123 conflicting nodes (GA4 49, GA4_1 49,
+/// MC150 6, MC40 2, ZZ840 4, ZZ841 2, ZZ842 2, ZZ79 2, ZZ117 2, MC151 2, MC152 3), each
+/// with exactly one candidate in the hierarchy's domain and the same <c>MemberLabel</c>; 4.3
+/// database, and 4.4 database at <c>--release 4.3</c>: 104 (GA4, GA4_1, MC150); <c>--release 4.2</c>:
+/// 0. Pattern: the item's <c>ItemCategory</c> moves to another domain with another code exactly at
+/// R while the containing <c>SubCategoryVersion</c> stays open. The guard is essential: an
+/// unguarded rule would change 268 consistent nodes at 4.4. If no candidate exists the conversion
+/// stops (measured 0 cases).
 /// </summary>
 public static class Dpm20HierarchyNodeLoader
 {
     public sealed record Result(
         int HierarchyNodeRows,
         int HierarchiesWithoutNodes,
-        IReadOnlyList<string> AnchoredMembers);
+        IReadOnlyList<string> AnchoredMembers,
+        IReadOnlyList<string> ReanchoredMembers);
 
     public static Result Load(
         IDpm20HierarchyNodeSource reader,
@@ -157,7 +166,10 @@ public static class Dpm20HierarchyNodeLoader
         var memberIdByDomainAndCode = ReadMemberIdByDomainAndCode(destination, out var memberLabelById);
         var domainUnionPairs = ReadDomainUnionPairs(destination);
         var memberIdByItemIdReleaseAndHierarchyDomain = new Dictionary<(int ItemId, int Release, int HierarchyDomainId), int>();
+        var memberDomainIdByMemberId = memberIdByDomainAndCode.ToDictionary(kv => kv.Value, kv => kv.Key.DomainId);
         var anchoredMembers = new List<string>();
+        var reanchoredMembers = new List<string>();
+        var reanchorNoteByKey = new Dictionary<(int ItemId, int Release, int HierarchyDomainId), string>();
 
         int ResolveMemberId(int itemId, int release, int hierarchyDomainId, int hierarchyId)
         {
@@ -235,8 +247,59 @@ public static class Dpm20HierarchyNodeLoader
                     + $"('{discardedDomainCode}').");
             }
 
+            // TIE-BREAK BY CONSISTENCY (I-TRE-07b). Only when the member yielded above is in neither
+            // the hierarchy's domain nor a domain united to it, the node would break the relation
+            // "the member of a node belongs to the domain of its hierarchy". The item's ItemCategory
+            // history (the dictionary keeps it up to R) is then searched for the row with the
+            // highest StartReleaseID <= R (ended or not) whose domain is allowed. The guard is
+            // essential: a node already in an allowed domain NEVER changes (measured 2026-11-20: an
+            // unguarded rule would change 268 consistent nodes at 4.4).
+            if (!IsAllowedDomain(memberDomainIdByMemberId[memberId], hierarchyDomainId))
+            {
+                var reanchoredRow = rows
+                    .Where(r => r.StartReleaseId <= release)
+                    .OrderByDescending(r => r.StartReleaseId)
+                    .Select(r => (Row: r, DomainId: DomainIdOfCategory(r.CategoryId)))
+                    .Where(x => x.DomainId is { } d && IsAllowedDomain(d, hierarchyDomainId)
+                        && memberIdByDomainAndCode.ContainsKey((d, x.Row.Code)))
+                    .Select(x => ((Dpm20ItemCategoryRow Row, int DomainId)?)(x.Row, x.DomainId!.Value))
+                    .FirstOrDefault();
+
+                if (reanchoredRow is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Hierarchy nodes: HierarchyID={hierarchyId}: ItemID={itemId} resolves to a member outside "
+                        + $"the domain of its hierarchy (DomainID={hierarchyDomainId}) and of the domains united to "
+                        + $"it at release R={release}, and no ItemCategory row of the item with "
+                        + "StartReleaseID <= R falls in an allowed domain with a member in mMember. Measured 0 "
+                        + "such cases — it is not silently dropped.");
+                }
+
+                var (row, newDomainId) = reanchoredRow.Value;
+                var newMemberId = memberIdByDomainAndCode[(newDomainId, row.Code)];
+                var fromDomainCode = domainCodeByDomainId.GetValueOrDefault(memberDomainIdByMemberId[memberId], memberDomainIdByMemberId[memberId].ToString(CultureInfo.InvariantCulture));
+                var toDomainCode = domainCodeByDomainId.GetValueOrDefault(newDomainId, newDomainId.ToString(CultureInfo.InvariantCulture));
+                // Recorded per NODE by the caller (the resolution is cached per item and domain, and
+                // the same item can be a node of several hierarchies of that domain).
+                reanchorNoteByKey[cacheKey] =
+                    $"ItemID={itemId} re-anchored from DomainID="
+                    + $"{memberDomainIdByMemberId[memberId]} ('{fromDomainCode}', code='{itemCategory.Code}') to "
+                    + $"DomainID={newDomainId} ('{toDomainCode}', code='{row.Code}') at release {release}.";
+                memberId = newMemberId;
+            }
+
             memberIdByItemIdReleaseAndHierarchyDomain[cacheKey] = memberId;
             return memberId;
+
+            bool IsAllowedDomain(int memberDomainId, int hierDomainId)
+                => memberDomainId == hierDomainId || domainUnionPairs.Contains((hierDomainId, memberDomainId));
+
+            int? DomainIdOfCategory(int categoryId)
+            {
+                var code = categoryCodeById.GetValueOrDefault(categoryId);
+                var dCode = code == "_PR" ? "MET" : code;
+                return dCode is not null && domainIdByDomainCode.TryGetValue(dCode, out var id) ? id : null;
+            }
         }
 
         // HierarchyNodeLabel comes from Item.Name, NEVER from SubCategoryItem.Label (empty).
@@ -274,6 +337,11 @@ public static class Dpm20HierarchyNodeLoader
             foreach (var node in nodes)
             {
                 var memberId = ResolveMemberId(node.ItemId, release, hierarchy.DomainId, hierarchy.HierarchyId);
+                if (reanchorNoteByKey.TryGetValue((node.ItemId, release, hierarchy.DomainId), out var reanchorNote))
+                {
+                    reanchoredMembers.Add($"HierarchyID={hierarchy.HierarchyId}: {reanchorNote}");
+                }
+
                 var (path, level, parentMemberId) = BuildPathLevelAndParent(node, nodesByItemId, id => ResolveMemberId(id, release, hierarchy.DomainId, hierarchy.HierarchyId), hierarchy.HierarchyId);
                 var label = itemNameById.GetValueOrDefault(node.ItemId);
 
@@ -304,7 +372,7 @@ public static class Dpm20HierarchyNodeLoader
             }
         }
 
-        return new Result((int)writer.RowsWritten, hierarchiesWithoutNodes, anchoredMembers);
+        return new Result((int)writer.RowsWritten, hierarchiesWithoutNodes, anchoredMembers, reanchoredMembers);
     }
 
     /// <summary>

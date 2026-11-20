@@ -13,8 +13,7 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 ///
 /// They protect the decisions that do NOT hold "as is" in the real outputs and that those outputs
 /// do not fully exercise - none of the three conversions today has a case of "one of the 59 DD-16
-/// hierarchies stops missing", nor needs a fabricated case of an UNDECLARED AO-3 violation to prove
-/// the asymmetry. Those are properties of the CODE, not of today's data, so they are tested with
+/// hierarchies stops missing". That is a property of the CODE, not of today's data, so they are tested with
 /// data fabricated on purpose.
 /// </summary>
 public sealed class InvariantChecksSyntheticTests : IDisposable
@@ -130,18 +129,21 @@ public sealed class InvariantChecksSyntheticTests : IDisposable
     }
 
     // -----------------------------------------------------------------------------------------
-    // I-TRE-07b / AO-3: deliberate asymmetry - only what is NOT declared counts (it grows).
+    // I-TRE-07b: a plain critical check. AO-3 (104 declared nodes at 4.3) no longer exists: the
+    // loader re-anchors them (tie-break by consistency), so EVERY node outside its hierarchy's
+    // domain (or a domain united to it) is a failure and nothing absorbs it.
     // -----------------------------------------------------------------------------------------
 
     /// <summary>
-    /// Two nodes cross domains: one with the EXACT key of one of the 104 declared AO-3 anomalies
-    /// ("GA4:qIO:q1B", taken literally from <c>DictionaryChecks.Ao3WrongDomainMembers</c>) and
-    /// another with an UNDECLARED key. Only the second must count as a failure.
+    /// Old: <c>ITre07b_OnlyTheUndeclaredCountsAsAFailure_TheDeclaredOneIsAbsorbed</c> (the former AO-3 key
+    /// "GA4:qIO:q1B" was absorbed, only the undeclared one failed: Failed 1).
+    /// New: the SAME two nodes now BOTH fail (Failed 2) - the former declared key is not absorbed -
+    /// and no exception outcome is reported for I-TRE-07b.
     /// </summary>
     [Fact]
-    public void ITre07b_OnlyTheUndeclaredCountsAsAFailure_TheDeclaredOneIsAbsorbed()
+    public void ITre07b_EveryCrossDomainNodeFails_TheFormerlyDeclaredKeyIsNotAbsorbed()
     {
-        using var c = CreateAndOpen("ao3-mixed.db");
+        using var c = CreateAndOpen("itre07b-mixed.db");
 
         Exec(c, "INSERT INTO mDomain (DomainID, DomainCode) VALUES (1, 'GA4dom'), (2, 'qIO')");
         Exec(c, "INSERT INTO mHierarchy (HierarchyID, HierarchyCode, DomainID) VALUES (1, 'GA4', 1)");
@@ -153,33 +155,25 @@ public sealed class InvariantChecksSyntheticTests : IDisposable
         var itre07b = Assert.Single(results, r => r.Id == "I-TRE-07b");
 
         Assert.Equal(CheckStatus.Fail, itre07b.Status);
-        Assert.Equal(1, itre07b.Failed);
+        Assert.Equal(2, itre07b.Failed);
         Assert.Contains(itre07b.Samples, s => s.BusinessKey == "GA4:qIO:ZZZ_NOT_DECLARED");
-        Assert.DoesNotContain(itre07b.Samples, s => s.BusinessKey.Contains("q1B", StringComparison.Ordinal));
+        Assert.Contains(itre07b.Samples, s => s.BusinessKey == "GA4:qIO:q1B");
 
-        // The declared key that violates is matched; every other AO-3 key is OneSided and not stale.
-        var matched = Assert.Single(sink, o => o.Exception.BusinessKey == "GA4:qIO:q1B");
-        Assert.Equal("AO-3", matched.Exception.Id);
-        Assert.True(matched.AppliesToThisReference);
-        Assert.Equal(1, matched.Matched);
-        Assert.False(matched.Stale);
-        Assert.DoesNotContain(sink, o => o.Exception.BusinessKey == "GA4:qIO:ZZZ_NOT_DECLARED");
-        Assert.All(sink.Where(o => o.Exception.Id == "AO-3" && o.Exception.BusinessKey != "GA4:qIO:q1B"), o =>
-        {
-            Assert.Equal(0, o.Matched);
-            Assert.False(o.Stale);
-        });
+        // No exception is consulted by this check.
+        Assert.DoesNotContain(sink, o => o.Exception.Check == "I-TRE-07b");
+        Assert.DoesNotContain(sink, o => o.Exception.Id == "AO-3");
+        Assert.DoesNotContain(KnownExceptions.All, e => e.Id == "AO-3" || e.Check == "I-TRE-07b");
     }
 
     /// <summary>
-    /// AO-3 is OneSided: with NO violating node at all, none of the 104 declared keys is stale
-    /// (shrinkage is not watched) and each reports Matched 0. Positive control: the previous test
-    /// shows the same sink DOES report Matched 1 for a violating declared key.
+    /// Old: <c>ITre07b_DeclaredKeysThatDoNotViolate_AreNotStale</c> (104 AO-3 outcomes, all Matched 0, none
+    /// stale). New: with no violating node the check passes (and examines the node: positive control is
+    /// the previous test, which makes the same check fail) and the sink carries no I-TRE-07b outcome.
     /// </summary>
     [Fact]
-    public void ITre07b_DeclaredKeysThatDoNotViolate_AreNotStale()
+    public void ITre07b_NoCrossDomainNode_Passes_AndReportsNoExceptionOutcome()
     {
-        using var c = CreateAndOpen("ao3-none-violating.db");
+        using var c = CreateAndOpen("itre07b-none-violating.db");
 
         Exec(c, "INSERT INTO mDomain (DomainID, DomainCode) VALUES (1, 'GA4dom')");
         Exec(c, "INSERT INTO mHierarchy (HierarchyID, HierarchyCode, DomainID) VALUES (1, 'GA4', 1)");
@@ -191,49 +185,66 @@ public sealed class InvariantChecksSyntheticTests : IDisposable
         var itre07b = Assert.Single(results, r => r.Id == "I-TRE-07b");
 
         Assert.Equal(CheckStatus.Pass, itre07b.Status);
-        var ao3 = sink.Where(o => o.Exception.Id == "AO-3").ToList();
-        Assert.Equal(104, ao3.Count);
-        Assert.All(ao3, o =>
-        {
-            Assert.Equal(0, o.Matched);
-            Assert.False(o.Stale);
-        });
+        Assert.Equal(0, itre07b.Failed);
+        Assert.True(itre07b.Examined > 0, "positive control: I-TRE-07b did not examine any mHierarchyNode.");
+        Assert.DoesNotContain(sink, o => o.Exception.Check == "I-TRE-07b");
     }
 
     /// <summary>
-    /// Only the DECLARED violation remains (the undeclared one of the previous test disappears, as
-    /// if the mapping had fixed it) - the check must PASS ENTIRELY: a declared violation that stops
-    /// being in excess is not what is watched (only growth is), so the declared one does not even
-    /// need to disappear for this to pass - it already passes with it present.
+    /// Old: <c>ITre07b_IfOnlyTheDeclaredViolationRemains_ItPassesEntirely</c> (the lone former AO-3 key
+    /// passed). New: that same lone node, with nothing else in the database, FAILS.
     /// </summary>
     [Fact]
-    public void ITre07b_IfOnlyTheDeclaredViolationRemains_ItPassesEntirely()
+    public void ITre07b_AFormerlyDeclaredKeyAlone_NowFails()
     {
-        using var c = CreateAndOpen("ao3-only-declared.db");
+        using var c = CreateAndOpen("itre07b-only-former.db");
 
         Exec(c, "INSERT INTO mDomain (DomainID, DomainCode) VALUES (1, 'GA4dom'), (2, 'qIO')");
         Exec(c, "INSERT INTO mHierarchy (HierarchyID, HierarchyCode, DomainID) VALUES (1, 'GA4', 1)");
         Exec(c, "INSERT INTO mMember (MemberID, DomainID, MemberCode) VALUES (101, 2, 'q1B')");
         Exec(c, "INSERT INTO mHierarchyNode (HierarchyID, MemberID, ParentMemberID, Level, Path) VALUES (1, 101, NULL, 1, '101.')");
 
-        var sink = new List<KnownExceptions.Outcome>();
-        var results = DictionaryChecks.Run(c, ValidationSourceModel.Dpm2, sink).ToList();
+        var results = DictionaryChecks.Run(c, ValidationSourceModel.Dpm2, []).ToList();
+        var itre07b = Assert.Single(results, r => r.Id == "I-TRE-07b");
+
+        Assert.Equal(CheckStatus.Fail, itre07b.Status);
+        Assert.Equal(1, itre07b.Failed);
+        Assert.Equal("GA4:qIO:q1B", Assert.Single(itre07b.Samples).BusinessKey);
+    }
+
+    /// <summary>
+    /// The mDomainUnion allowance is KEPT: the same node, with the member's domain united to the
+    /// hierarchy's, passes. Positive control: <see cref="ITre07b_AFormerlyDeclaredKeyAlone_NowFails"/> is
+    /// the identical database without the mDomainUnion row and fails.
+    /// </summary>
+    [Fact]
+    public void ITre07b_MemberInADomainUnitedToTheHierarchyDomain_Passes()
+    {
+        using var c = CreateAndOpen("itre07b-union.db");
+
+        Exec(c, "INSERT INTO mDomain (DomainID, DomainCode) VALUES (1, 'GA4dom'), (2, 'qIO')");
+        Exec(c, "INSERT INTO mDomainUnion (UnionDomainID, UnitedDomainID) VALUES (1, 2)");
+        Exec(c, "INSERT INTO mHierarchy (HierarchyID, HierarchyCode, DomainID) VALUES (1, 'GA4', 1)");
+        Exec(c, "INSERT INTO mMember (MemberID, DomainID, MemberCode) VALUES (101, 2, 'q1B')");
+        Exec(c, "INSERT INTO mHierarchyNode (HierarchyID, MemberID, ParentMemberID, Level, Path) VALUES (1, 101, NULL, 1, '101.')");
+
+        var results = DictionaryChecks.Run(c, ValidationSourceModel.Dpm2, []).ToList();
         var itre07b = Assert.Single(results, r => r.Id == "I-TRE-07b");
 
         Assert.Equal(CheckStatus.Pass, itre07b.Status);
         Assert.Equal(0, itre07b.Failed);
-        Assert.True(itre07b.Examined > 0, "positive control: I-TRE-07b did not examine any mHierarchyNode.");
+        Assert.True(itre07b.Examined > 0);
     }
 
     // -----------------------------------------------------------------------------------------
-    // B-DIC-01.8 / DD-16: unlike AO-3, BOTH sides count - growing (an undeclared one is missing)
+    // B-DIC-01.8 / DD-16: BOTH sides count - growing (an undeclared one is missing)
     // AND shrinking (one of the 59 declared stops missing) are real signals.
     // -----------------------------------------------------------------------------------------
 
     /// <summary>
     /// LITERAL copy of <c>DictionaryCensusChecks.Dd16LegacyDpm10Hierarchies</c>: if the production
     /// registry changes, this test must be updated at the same time - it is the same deliberately
-    /// closed relationship that already exists between <c>AO-1</c>/<c>AO-3</c> and their censuses.
+    /// closed relationship that already exists between <c>AO-1</c> and its census.
     /// </summary>
     private static readonly string[] Dd16LegacyDpm10HierarchiesMirror =
     [
@@ -281,7 +292,7 @@ public sealed class InvariantChecksSyntheticTests : IDisposable
     /// the 59, which "stops missing" BECAUSE WE ALREADY GENERATE IT) and the mRelease 4.2 IsCurrent,
     /// to pass the publication guard. The other 57 declared keep missing - they must not count. The
     /// new UNDECLARED one MUST count (it grows). "CS:CS4" (declared, stops missing because we
-    /// generate it) MUST ALSO count - that is the difference with AO-3.
+    /// generate it) MUST ALSO count (two-sided census).
     ///
     /// "No longer missing" has THREE states, not two - the message distinguishes "we already
     /// generate it" (this case) from "it is no longer in the reference"
@@ -399,7 +410,7 @@ public sealed class InvariantChecksSyntheticTests : IDisposable
     /// <summary>
     /// LITERAL copy of <c>KnownExceptions.E7Keys</c> (109 entries): if the production registry
     /// changes, this test must be updated at the same time - same deliberate relationship that
-    /// already exists between <c>AO-1</c>/<c>AO-3</c>/<c>DD-16</c> and their censuses.
+    /// already exists between <c>AO-1</c>/<c>DD-16</c> and their censuses.
     /// </summary>
     private static readonly string[] E7KeysMirror =
     [

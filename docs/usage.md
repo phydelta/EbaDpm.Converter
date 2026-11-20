@@ -189,11 +189,18 @@ EbaDpm.Converter --extract-layouts "<directory>" --out "<layouts.db>"
 |---|---|---|
 | `--extract-layouts <dir>` | yes | Directory containing the Annotated Table Layout workbooks (`*.xlsx`), searched recursively |
 | `--out <path>` | yes | The layout repository (SQLite) to create |
-| `--dictionary <path>` | yes | A database already converted by this tool (distribution schema), used to classify annotations |
+| `--dictionary <path>` | yes | A database already converted by this tool (distribution schema), used to classify annotations and, for the 4.4 file-name format, to resolve the framework of each module. It must be the file of the layouts' release |
 | `--overwrite` | no | Replace the repository if it exists |
 
 `--dictionary` is mandatory. See [table-layouts.md](table-layouts.md) for the file-name formats
 recognised, why the dictionary is needed and the structure of the repository.
+
+The 4.4 layouts are named `<date> <MODULE>_table layout <REL>.xlsx` (for example
+`20261007 AML_ELIGIBILITY_table layout 4.4.xlsx`) and do not carry the framework. It is looked up
+from the module code in the dictionary, so `--dictionary` must be the file of the layouts' release
+(`dpm-4.4.db` for the 4.4 layouts: a release publishes layouts only for the module versions that
+start in it, and those are the modules of its file). A module code that is not in the dictionary
+is an error that names the file, the code and the dictionary; a framework is never guessed.
 
 ## Exit codes
 

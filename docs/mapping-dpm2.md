@@ -29,12 +29,19 @@ Loaders run in this order (`src/EbaDpm.Converter.Core/Mapping/Dpm20/`):
 |---|---|
 | **One file per release.** | Each output file is the snapshot of one release R, and carries only the module versions that start in R (`ModuleVersion.StartReleaseID = R`). A module that did not change in R stays in the file of the release that published it. See [usage.md](usage.md#dpm-20-sources). |
 | **Read as of R.** | Versioned structure tables are filtered with `Start <= R AND (End IS NULL OR End > R)`, `EndReleaseID` exclusive. The dictionary is filtered with `Start <= R` and no end condition ([Dictionary](#dictionary)), and the `ModuleVersion` history up to R is read to describe taxonomies ([mTaxonomy](#mtaxonomy)). Nothing that starts after R reaches the file. See [source-models.md](source-models.md#the-release-of-a-file-dpm-20). |
+| **Tie-break by consistency.** | If, after the as-of-R rules, versioned source elements still conflict in the file of release R, the file keeps the elements that make it consistent (every relation of the target holds) and ignores the rest. The rule is abstract and applies to any versioned element; each application is listed below. |
 | **The source decides.** | Where the source has a value, it is exported; where it has none, the column stays empty. Nothing is invented to resemble another export of the format. |
 | **One row per (table, taxonomy) pair.** | A table version that belongs to two derived taxonomies produces its structure twice, once per taxonomy, with fresh IDs. |
 | **IDs are minted deterministically.** | DPM 2.0 has no entity matching axes, ordinates, cells or concepts one-to-one, so their IDs are counters assigned in a fixed order. |
 | **`9999` is a literal.** | The "Open" sentinel domain and member, and the metric dimension `MET`, use ID `9999`, as in the distribution format; the member counter skips that value. |
 | **Roots of `mTemplateOrTable` use parent `0`.** | Same convention as in DPM 1.0. Orphan `BusinessTable` nodes also use `0`. |
 | **Unresolved cases are reported, not forced.** | When a rule cannot decide (for example a dimension appearing on two axes that no source declares an owner for), the case is listed in the conversion log and left as is. |
+
+Applications of the tie-break by consistency:
+
+1. **Hierarchy nodes** (`I-TRE-07b`, see [mHierarchyNode](#mhierarchynode)): when the member a node
+   resolves to is in neither the hierarchy's domain nor a domain united to it, the item's
+   `ItemCategory` row that is consistent with the hierarchy is used.
 
 ---
 
@@ -316,9 +323,18 @@ point to a version that is not current at that release. The positive control, th
 every module version current at 4.3 read as of 4.3, finds the 68 headers of #62. Frameworks
 change between releases, so this is a measurement, not a property.
 
+Measured 2026-11-20 on the tie-break of `MemberID`: the 4.4 database at `--release 4.4` has 123
+nodes whose member falls outside the hierarchy's domain (GA4 49, GA4_1 49, MC150 6, MC40 2, ZZ840 4,
+ZZ841 2, ZZ842 2, ZZ79 2, ZZ117 2, MC151 2, MC152 3), each with exactly one candidate in
+the hierarchy's domain and the same `MemberLabel`; the 4.3 database, and the 4.4 database at
+`--release 4.3`, have 104 (GA4, GA4_1, MC150); at `--release 4.2` there are none. The pattern: the
+item's `ItemCategory` moves to another domain, with another code, exactly at R, while the containing
+sub-category version stays open. Without the guard, the rule would change 268 consistent nodes at
+4.4.
+
 | Column | Rule |
 |---|---|
-| `MemberID` | the item resolved to its `ItemCategory` row valid **in the release of the version being exported**. Resolution is global across categories, because hierarchies over union domains list items of the component domains. When an item resolves outside the hierarchy's domain but a member with the same code exists in that domain, that member is used. |
+| `MemberID` | the item resolved to its `ItemCategory` row valid **in the release of the version being exported**. Resolution is global across categories, because hierarchies over union domains list items of the component domains. When an item resolves outside the hierarchy's domain but a member with the same code exists in that domain, that member is used. Only when the member obtained that way is still in neither the hierarchy's domain nor a domain united to it (`SuperCategoryComposition`), the tie-break by consistency applies: the item's `ItemCategory` row with the highest `StartReleaseID <= R` (ended or not) whose domain is the hierarchy's or a united one, and whose member exists in `mMember`, is used. A node already in an allowed domain never changes. If no such row exists the conversion stops. Each re-anchored node is listed in the conversion summary. |
 | `ParentMemberID` | `ParentItemID` resolved the same way; a parent that is not a node of the same sub-category stops the conversion |
 | `Level`, `Path` | built by walking up the parents (`Path` with `.` as separator and terminator) |
 | `HierarchyNodeLabel` | `Item.Name` (`SubCategoryItem.Label` is empty) |

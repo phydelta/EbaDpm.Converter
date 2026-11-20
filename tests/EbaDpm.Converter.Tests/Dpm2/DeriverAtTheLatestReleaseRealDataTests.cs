@@ -77,4 +77,11 @@ public sealed class DeriverAtTheLatestReleaseRealDataTests
         RepoPaths.EnsureAccessDpm20Release43DatabaseExists();
         Check(RepoPaths.AccessDpm20Release43DatabasePath, Dpm2043ValidateFixture.Release43Code);
     }
+
+    [DataFact]
+    public void Dpm2044Database_AtRelease44_TaxonomiesAndTables_EqualTheIndependentDerivation()
+    {
+        RepoPaths.EnsureAccessDpm20Release44DatabaseExists();
+        Check(RepoPaths.AccessDpm20Release44DatabasePath, RepoPaths.Release44Code);
+    }
 }

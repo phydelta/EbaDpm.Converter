@@ -212,7 +212,7 @@ public sealed class PlaneCMetricHierarchySyntheticTests : IDisposable
     [Fact]
     public void AViolation_OnAnOutputOfTheCensusRelease_IsNotAbsorbedWhenNoDd27EntryNamesIt()
     {
-        Assert.Equal("4.2", KnownExceptions.PlaneCCensusRelease);
+        Assert.Contains("4.2", KnownExceptions.PlaneCCensusReleases);
         Assert.DoesNotContain(KnownExceptions.All, e => e.Id == "DD-27"); // the premise of this test
 
         using var g = Output(restrictionHierarchyId: 2, metricHierarchyId: null, markCurrent: true);
