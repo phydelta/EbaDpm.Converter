@@ -256,16 +256,14 @@ public static class Dpm20HierarchyNodeLoader
             // unguarded rule would change 268 consistent nodes at 4.4).
             if (!IsAllowedDomain(memberDomainIdByMemberId[memberId], hierarchyDomainId))
             {
-                var reanchoredRow = rows
+                var row = rows
                     .Where(r => r.StartReleaseId <= release)
                     .OrderByDescending(r => r.StartReleaseId)
-                    .Select(r => (Row: r, DomainId: DomainIdOfCategory(r.CategoryId)))
-                    .Where(x => x.DomainId is { } d && IsAllowedDomain(d, hierarchyDomainId)
-                        && memberIdByDomainAndCode.ContainsKey((d, x.Row.Code)))
-                    .Select(x => ((Dpm20ItemCategoryRow Row, int DomainId)?)(x.Row, x.DomainId!.Value))
-                    .FirstOrDefault();
+                    .FirstOrDefault(r => DomainIdOfCategory(r.CategoryId) is { } d
+                        && IsAllowedDomain(d, hierarchyDomainId)
+                        && memberIdByDomainAndCode.ContainsKey((d, r.Code)));
 
-                if (reanchoredRow is null)
+                if (row is null)
                 {
                     throw new InvalidOperationException(
                         $"Hierarchy nodes: HierarchyID={hierarchyId}: ItemID={itemId} resolves to a member outside "
@@ -275,7 +273,7 @@ public static class Dpm20HierarchyNodeLoader
                         + "such cases — it is not silently dropped.");
                 }
 
-                var (row, newDomainId) = reanchoredRow.Value;
+                var newDomainId = DomainIdOfCategory(row.CategoryId)!.Value;
                 var newMemberId = memberIdByDomainAndCode[(newDomainId, row.Code)];
                 var fromDomainCode = domainCodeByDomainId.GetValueOrDefault(memberDomainIdByMemberId[memberId], memberDomainIdByMemberId[memberId].ToString(CultureInfo.InvariantCulture));
                 var toDomainCode = domainCodeByDomainId.GetValueOrDefault(newDomainId, newDomainId.ToString(CultureInfo.InvariantCulture));
