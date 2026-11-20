@@ -49,6 +49,7 @@ static bool AceProviderLoaded()
     catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException
                                    or NotSupportedException)
     {
+        Console.Error.WriteLine($"Warning: failed to inspect loaded modules to detect ACE provider: {ex.Message}");
     }
 
     return false;
