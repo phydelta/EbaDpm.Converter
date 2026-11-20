@@ -248,7 +248,7 @@ public abstract class TaxonomyMetadataRealDataTestsBase
     }
 }
 
-/// <summary>4.3 publication, natural cutoff 4.3 (21 taxonomies, one per (framework, start release) of its module versions).</summary>
+/// <summary>The 4.3 file (--release 4.3) of the 4.3 database: 2 taxonomies, AMLA and TCB, the only frameworks with a module version that starts in 4.3.</summary>
 [Collection("Dpm2043ValidateSuite")]
 [Trait("Tier", "RealData")]
 public sealed class Dpm2043TaxonomyMetadataTests(Dpm2043ValidateFixture fixture) : TaxonomyMetadataRealDataTestsBase, IDisposable
@@ -269,10 +269,6 @@ public sealed class Dpm2043TaxonomyMetadataTests(Dpm2043ValidateFixture fixture)
     public void Dispose() => _connection?.Dispose();
 
     [DataTheory]
-    // The module versions of the framework start in 4.2: the taxonomy is corep 4.2 (there is no corep 4.3).
-    [InlineData("corep 4.2", "Common Reporting 4.1.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
-    // The only module version of finrep that starts in 4.2.1 gives finrep 4.2.1.
-    [InlineData("finrep 4.2.1", "Financial Reporting 1.1.0 (DPM 4.2.1)", "4.2.1", "2026-02-15", "2026-03-31", "9999-12-31")]
     // Frameworks new in 4.3: their module versions start in 4.3, FromDate in the future.
     [InlineData("tcb 4.3", "Third-country Branches 1.0.0 (DPM 4.3)", "4.3", "2026-06-28", "2027-03-31", "9999-12-31")]
     [InlineData("amla 4.3", "EBA-AMLA collaboration 1.0.0 (DPM 4.3)", "4.3", "2026-06-28", "2026-12-31", "9999-12-31")]
@@ -282,6 +278,10 @@ public sealed class Dpm2043TaxonomyMetadataTests(Dpm2043ValidateFixture fixture)
     [DataTheory]
     [InlineData("corep 4.3")]
     [InlineData("finrep 4.3")]
+    // Taxonomies of earlier releases live in the file of their own release, not in the 4.3 file.
+    [InlineData("corep 4.2")]
+    [InlineData("finrep 4.2")]
+    [InlineData("finrep 4.2.1")]
     [InlineData("corep 4.0")]
     [InlineData("esg 4.1")]
     [InlineData("pay 4.1")]
@@ -294,7 +294,7 @@ public sealed class Dpm2043TaxonomyMetadataTests(Dpm2043ValidateFixture fixture)
     }
 }
 
-/// <summary>4.2.1 publication, natural cutoff 4.2.1 (19 taxonomies: 18 on 4.2 plus finrep 4.2.1).</summary>
+/// <summary>The 4.2.1 file (--release 4.2.1) of the 4.2.1 database: 1 taxonomy, finrep 4.2.1, the only module version that starts in 4.2.1.</summary>
 [Collection("Dpm2042_1ValidateSuite")]
 [Trait("Tier", "RealData")]
 public sealed class Dpm2042_1TaxonomyMetadataTests(Dpm2042_1ValidateFixture fixture) : TaxonomyMetadataRealDataTestsBase, IDisposable
@@ -308,9 +308,7 @@ public sealed class Dpm2042_1TaxonomyMetadataTests(Dpm2042_1ValidateFixture fixt
     public void Dispose() => _connection?.Dispose();
 
     [DataTheory]
-    [InlineData("corep 4.2", "Common Reporting 4.1.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
-    // finrep starts module versions in 4.2.1 (equal FromDate to 4.2): finrep 4.2 stays open.
-    [InlineData("finrep 4.2", "Financial Reporting 3.3.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
+    // The FromDate equals that of finrep 4.2 (2026-03-31), which is not a later one, so the taxonomy stays open.
     [InlineData("finrep 4.2.1", "Financial Reporting 1.1.0 (DPM 4.2.1)", "4.2.1", "2026-02-15", "2026-03-31", "9999-12-31")]
     public void Anchor_Row(string code, string label, string version, string pub, string from, string to)
         => AssertRow(code, label, version, pub, from, to);
@@ -318,6 +316,9 @@ public sealed class Dpm2042_1TaxonomyMetadataTests(Dpm2042_1ValidateFixture fixt
     [DataTheory]
     [InlineData("corep 4.2.1")]
     [InlineData("esg 4.2.1")]
+    // Taxonomies of 4.2 live in the 4.2 file, not in the 4.2.1 file.
+    [InlineData("corep 4.2")]
+    [InlineData("finrep 4.2")]
     [InlineData("corep 4.0")]
     [InlineData("esg 4.1")]
     [InlineData("rem 3.5")]
@@ -330,7 +331,7 @@ public sealed class Dpm2042_1TaxonomyMetadataTests(Dpm2042_1ValidateFixture fixt
     }
 }
 
-/// <summary>4.2.1 database with the explicit cutoff 4.2 (18 taxonomies, all on 4.2): nothing after 4.2 may appear or influence a row.</summary>
+/// <summary>The 4.2 file (--release 4.2) of the 4.2.1 database: 19 taxonomies, all on 4.2 (the module versions that start in 4.2, DORA included): nothing after 4.2 may appear or influence a row.</summary>
 [Collection("Dpm2Skeleton")]
 [Trait("Tier", "RealData")]
 public sealed class Dpm2042CutoffTaxonomyMetadataTests(Dpm20SkeletonFixture fixture) : TaxonomyMetadataRealDataTestsBase
@@ -341,8 +342,9 @@ public sealed class Dpm2042CutoffTaxonomyMetadataTests(Dpm20SkeletonFixture fixt
 
     [DataTheory]
     [InlineData("corep 4.2", "Common Reporting 4.1.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
-    // Under cutoff 4.2 the 4.2.1 module versions of finrep do not exist: label version is the 4.2 one.
+    // In the 4.2 file the 4.2.1 module versions of finrep do not exist: label version is the 4.2 one.
     [InlineData("finrep 4.2", "Financial Reporting 3.3.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
+    [InlineData("dora 4.2", "Digital operational resilience 1.2.0 (DPM 4.2)", "4.2", "2025-10-31", "2026-03-31", "9999-12-31")]
     public void Anchor_Row(string code, string label, string version, string pub, string from, string to)
         => AssertRow(code, label, version, pub, from, to);
 

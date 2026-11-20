@@ -19,58 +19,22 @@ namespace EbaDpm.Converter.Tests.Dpm2;
 /// </summary>
 internal static class TaxonomyMetadataExpected
 {
-    /// <summary>"DPM2 Database_v 4_3_20260622.accdb", natural cutoff 4.3: 21 taxonomies.</summary>
+    /// <summary>"DPM2 Database_v 4_3_20260622.accdb", release 4.3: 2 taxonomies (AMLA, TCB).</summary>
     public const string Release43 = """
-            ae 4.2|Asset Encumbrance 1.4.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
             amla 4.3|EBA-AMLA collaboration 1.0.0 (DPM 4.3)|4.3|2026-06-28|2026-12-31|9999-12-31
-            corep 4.2|Common Reporting 4.1.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            esg 4.2|ESG 1.3.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            fc 4.2|FICO 1.1.1 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            finrep 4.2|Financial Reporting 3.3.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            finrep 4.2.1|Financial Reporting 1.1.0 (DPM 4.2.1)|4.2.1|2026-02-15|2026-03-31|9999-12-31
-            fp 4.2|Funding Plans 2.2.1 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            gsii 4.2|Global systemic and important Institutions 1.3.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            if 4.2|Investment Firms 1.4.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            imprac 4.2|Impracticability of contractual recognition of bail-in 1.2.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            ipu 4.2|Intermediate Parent Undertaking 1.2.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            irrbb 4.2|Interest Rate Risk in the Banking Book 1.2.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            mica 4.2|MICA 2.0.1 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            mrel 4.2|MREL and TLAC 1.4.0 (DPM 4.2)|4.2|2025-10-31|2025-12-31|9999-12-31
-            pay 4.2|Payments 1.2.0 (DPM 4.2)|4.2|2025-10-31|2022-12-31|9999-12-31
-            pillar3 4.2|Pillar 3 disclosures 2.1.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            rem 4.2|Remuneration 2.3.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            res 4.2|Resolution 2.0.0 (DPM 4.2)|4.2|2025-10-31|2025-12-31|9999-12-31
-            sbp 4.2|Supervisory Benchmarking Portfolios 1.5.0 (DPM 4.2)|4.2|2025-10-31|2026-02-27|9999-12-31
             tcb 4.3|Third-country Branches 1.0.0 (DPM 4.3)|4.3|2026-06-28|2027-03-31|9999-12-31
 """;
 
-    /// <summary>"DPM2 Database_v 4_2_1.accdb", natural cutoff 4.2.1: 19 taxonomies.</summary>
+    /// <summary>"DPM2 Database_v 4_2_1.accdb", release 4.2.1: 1 taxonomy (FINREP).</summary>
     public const string Release421Natural = """
-            ae 4.2|Asset Encumbrance 1.4.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            corep 4.2|Common Reporting 4.1.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            esg 4.2|ESG 1.3.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            fc 4.2|FICO 1.1.1 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            finrep 4.2|Financial Reporting 3.3.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
             finrep 4.2.1|Financial Reporting 1.1.0 (DPM 4.2.1)|4.2.1|2026-02-15|2026-03-31|9999-12-31
-            fp 4.2|Funding Plans 2.2.1 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            gsii 4.2|Global systemic and important Institutions 1.3.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            if 4.2|Investment Firms 1.4.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            imprac 4.2|Impracticability of contractual recognition of bail-in 1.2.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            ipu 4.2|Intermediate Parent Undertaking 1.2.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            irrbb 4.2|Interest Rate Risk in the Banking Book 1.2.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            mica 4.2|MICA 2.0.1 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            mrel 4.2|MREL and TLAC 1.4.0 (DPM 4.2)|4.2|2025-10-31|2025-12-31|9999-12-31
-            pay 4.2|Payments 1.2.0 (DPM 4.2)|4.2|2025-10-31|2022-12-31|9999-12-31
-            pillar3 4.2|Pillar 3 disclosures 2.1.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            rem 4.2|Remuneration 2.3.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
-            res 4.2|Resolution 2.0.0 (DPM 4.2)|4.2|2025-10-31|2025-12-31|9999-12-31
-            sbp 4.2|Supervisory Benchmarking Portfolios 1.5.0 (DPM 4.2)|4.2|2025-10-31|2026-02-27|9999-12-31
 """;
 
-    /// <summary>"DPM2 Database_v 4_2_1.accdb" with the explicit cutoff 4.2: 18 taxonomies.</summary>
+    /// <summary>"DPM2 Database_v 4_2_1.accdb" release 4.2: 19 taxonomies (DORA included since #75).</summary>
     public const string Release42Cutoff = """
             ae 4.2|Asset Encumbrance 1.4.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
             corep 4.2|Common Reporting 4.1.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
+            dora 4.2|Digital operational resilience 1.2.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
             esg 4.2|ESG 1.3.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
             fc 4.2|FICO 1.1.1 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
             finrep 4.2|Financial Reporting 3.3.0 (DPM 4.2)|4.2|2025-10-31|2026-03-31|9999-12-31
