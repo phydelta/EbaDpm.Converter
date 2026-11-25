@@ -16,7 +16,7 @@ public sealed class ConverterSettings : CommandSettings
     // ---- Convert ------------------------------------------------------------------------------
 
     [CommandOption("--source <PATH>")]
-    [Description("Convert and --list-taxonomies: the Access DPM database (.accdb), DPM 1.0 or DPM 2.0 (detected automatically). Opened read-only.")]
+    [Description("Convert and --list-taxonomies: the Access DPM database (.accdb), DPM 1.0 or DPM 2.0 (detected automatically). Opened read-only. With --validate, for a native output only: the Access database it was converted from; it enables the checks against the source (completeness, row counts, content, schema drift).")]
     public string? Source { get; init; }
 
     [CommandOption("--output <PATH>")]
@@ -70,7 +70,7 @@ public sealed class ConverterSettings : CommandSettings
     public bool SchemaOnly { get; init; }
 
     [CommandOption("--validate <PATH>")]
-    [Description("Mode: validate the generated SQLite database at PATH (never modified). Plane A (internal invariants) always runs; --reference adds plane B and --layouts adds plane C. Exit code 3 on critical differences.")]
+    [Description("Mode: validate the generated SQLite database at PATH (never modified). A native DPM 2.0 output (--target native) is detected and has its own rule set: plane A (relationships, schema; with --source also completeness, row counts, content and the schema drift report), no plane B. A 45-table output: plane A (internal invariants) always runs; --reference adds plane B. --layouts adds plane C to either. Exit code 3 on critical differences.")]
     public string? ValidatePath { get; init; }
 
     [CommandOption("--reference <PATH>")]
@@ -90,7 +90,7 @@ public sealed class ConverterSettings : CommandSettings
     public string? Out { get; init; }
 
     [CommandOption("--dictionary <PATH>")]
-    [Description("--extract-layouts: a database already converted by this tool (distribution schema: mDimension, mDomain, mMember), REQUIRED to classify single-term \"(code)\" cells as metric or key dimension and to validate \"(domain:member)\". Its path and SHA-256 are recorded in LayoutExtraction.")]
+    [Description("--extract-layouts: a database already converted by this tool, REQUIRED to classify single-term \"(code)\" cells as metric or key dimension and to validate \"(domain:member)\". Either output: the 45-table distribution schema (mDimension, mDomain, mMember) or a native DPM 2.0 file (--target native; every release of the file is read, and the module framework comes from Module and Framework). Its path and SHA-256 are recorded in LayoutExtraction.")]
     public string? Dictionary { get; init; }
 
     // ---- Output ---------------------------------------------------------------------------------

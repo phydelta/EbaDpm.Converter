@@ -71,14 +71,14 @@ versioned entity carries a validity window in releases instead of dates.
 | Table structure | `Table`, `TableVersion`, `TableGroup`, `TableGroupComposition` |
 | Headers and cells | `Header`, `HeaderVersion`, `TableVersionHeader`, `Cell`, `TableVersionCell` |
 | Modules | `Module`, `ModuleVersion`, `ModuleVersionComposition` |
-| Not used | The DPM-ML validation operations (`Operation*`) — validation rules are out of scope |
+| Validation rules | `Operation`, `OperationVersion`, `OperationVersionData`, `OperationNode`, `OperationScope`, `OperationScopeComposition`, `OperationOutput`, `OperationCodePrefix`, `OperandReference`, `OperandReferenceLocation`, `Operator`, `OperatorArgument`: not used by the 45-table output (its `vValidationRule*` tables stay empty); copied complete by the native output ([target-schema-native.md](target-schema-native.md)) |
 
 Differences from DPM 1.0 that matter to the converter (details in
 [mapping-dpm2.md](mapping-dpm2.md)):
 
 - **There is no `Taxonomy` table.** Taxonomies are derived from frameworks, releases and the
   validity windows of table versions.
-- **There is no `Concept` table.** All concepts are minted by the converter.
+- **The 45-table mapping does not use the `Concept` table.** All concepts of that output are minted by the converter. (The 4.4 database does have a `Concept` table, `ConceptGUID`, `ClassID`, `OwnerID`, 837,042 rows, measured 2026-11-25; the native output copies it.)
 - **There is no separate metric entity.** Metrics and dimensions are both *properties*; which
   role a property plays is decided from how the model uses it (and a property can be both).
 - **Axes and ordinates are a single entity (`Header`).** Axes are rebuilt from header direction
@@ -93,10 +93,37 @@ Differences from DPM 1.0 that matter to the converter (details in
 | `DPM2 Database_v 4_2_20251125.accdb` | 3.4, 3.5, 4.0, 4.1, 4.2 | 4.2 |
 | `DPM2 Database_v 4_2_1.accdb` (2026-02-27) | the above plus 4.2.1 | 4.2.1 |
 | `DPM2 Database_v 4_3_20260622.accdb` | the above plus 4.2.1, 4.2.1.1, 4.2.1.2, 4.3 | 4.3 |
+| `DPM2 Database_v 4_4_20261006.accdb` | the above plus 4.3.0.1, 4.4 | 4.4 |
 
 The `ReleaseID` numbering is not stable between publications (release 4.3 uses IDs in the
 `1010000xxx` range while 4.2 used 1–5), so the converter never relies on ID ranges or positions —
 only on the maximum ID and on `Release.Code`.
+### Catalogue of the 4.4 database
+
+Measured on `DPM2 Database_v 4_4_20261006.accdb` on 2026-11-25; figures of one publication, not
+of the format (the physical schema changes between publications, see below).
+
+- **70 user tables**, no saved queries. 59 are copied by the native output and 11 are excluded
+  (change log and EBA working tables, [target-schema-native.md](target-schema-native.md#content)).
+- **Column types** (all 70 tables): long integer 243, text 132, GUID 51 (`RowGUID` ×47,
+  `ConceptGUID` ×4), Yes/No 46, decimal 3, date 3, byte 1.
+- **Keys**: every user table has a primary key except `ModelViolations`, `VarGeneration_Detail` and
+  `VarGeneration_Summary` (all excluded); 21 primary keys are composite (18 in the exported tables).
+- **Relationships**: 178 between user tables, all on one column, all `ON UPDATE CASCADE`.
+- **Largest tables**: `ContextComposition` 1,757,180 rows, `Concept` 837,042, `OperandReference`
+  623,060, `OperandReferenceLocation` 588,878, `TableVersionCell` 407,898, `VariableVersion`
+  299,573.
+- **Empty tables**: `ChangeLog`, `ChangeLogAttribute`, `Document`, `DocumentVersion`, `Language`,
+  `Reference`, `Role`, `Subdivision`, `SubdivisionType`, `Translation`, `User`, `UserRole`,
+  `OperationCodePrefix`, `OperationOutput`.
+
+**The physical schema changes between publications.** From 4.2.1 to 4.4: booleans went from
+`SMALLINT` to `BIT` (all 46 columns); `ATTT2Hierarchies`, `PSCurrentItemCategory`,
+`PSCurrentPropertyCategory` and `VariableCalculation` disappeared; `OperationOutput` appeared;
+`TableAssociation` gained `StartReleaseID` / `EndReleaseID`; `OperandReference.OperationVID`,
+`OperationVersion.OutputVariableID` and `Organisation.URL` were added. The 4.3 file also shipped
+two leftover temporary tables (`~TMPCLP531411`, `~TMPCLP571251`). This is why the native output
+builds its DDL from the catalogue of the database it converts, against the 4.4 baseline.
 
 A later publication reproduces its earlier releases: every release it contains can be converted
 from it (see [The release of a file](#the-release-of-a-file-dpm-20)). On

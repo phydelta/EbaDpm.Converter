@@ -26,7 +26,14 @@ EbaDpm.Converter.sln
 │  │    Resources/                     Embedded resources
 │  │      dpm-distribution-schema.sql        DDL of the 45 target tables
 │  │      plane-c-known-divergences-4.2.tsv  Known layout divergences for release 4.2
-│  └─ EbaDpm.Converter.Native/         The native DPM 2.0 pipeline (empty for now)
+│  └─ EbaDpm.Converter.Native/         The native DPM 2.0 pipeline (--target native)
+│       Catalog/                       Access catalogue reader, embedded 4.4 baseline, catalogue comparison
+│       Schema/                        Exclusions, type mapping, DDL builder, empty baseline schema
+│       Conversion/                    1:1 copy of the Access tables into one SQLite file
+│       Validation/                    --validate on a native output: plane A, schema drift
+│       PlaneC/                        Plane C through the native model; known divergences
+│       Layouts/                       Layout dictionary loaded from a native file
+│       Resources/                     native-baseline-4.4.json (catalogue of the 4.4 database)
 └─ tests/
    ├─ EbaDpm.Converter.Core.Tests/         xUnit tests of the shared project
    ├─ EbaDpm.Converter.Distribution.Tests/ xUnit tests: unit, integration, schema, validation, existing CLI modes
@@ -121,6 +128,23 @@ with DPM 1.0.
 
 DPM 2.0 outputs record `Source model = DPM 2.0` in `aDatabaseProperties`, which the validator uses
 to select its scope.
+
+### Native DPM 2.0 pipeline
+
+With `--target native` (DPM 2.0 sources only), `EbaDpm.Converter.Native` runs instead of the two
+pipelines above, using only the shared components:
+
+1. Detect the source model (`SourceModelDetector`): DPM 1.0 is an argument error. Check the
+   baseline gate: the `Release` table must contain release 4.4.
+2. Read the Access catalogue (`NativeCatalogReader`): tables, columns, keys, relationships, indexes.
+3. Build the DDL from it (`NativeSchemaBuilder`, with `NativeExclusions` and `NativeTypeMapping`)
+   and compare the catalogue with the embedded 4.4 baseline (schema drift, informative).
+4. Copy every exported table, one at a time, in primary-key order, then create the indexes and
+   `VACUUM` (`NativeConverter`). The output is written to a temporary file and moved into place
+   only when complete.
+
+Nothing is derived: no release selection, no renumbering, no tie-breaks. See
+[target-schema-native.md](target-schema-native.md).
 
 ### Writing
 

@@ -86,12 +86,12 @@ Each Access column type maps to one SQLite declared type and one value form. The
 an Access type that is not in this table stops the conversion with an error naming the column,
 rather than being written in a guessed form.
 
-| Access type (OLE DB) | Columns in 4.4 | SQLite type | Value written |
+| Access type (OLE DB) | Columns in 4.4 (all 70 user tables; exported tables in brackets where it differs) | SQLite type | Value written |
 |---|---|---|---|
 | Long integer (`adInteger`), Integer (`adSmallInt`), Byte (`adUnsignedTinyInt`), Large number (`adBigInt`) | 243 integer, 1 byte (`OperatorArgument.Order`) | `INTEGER` | the integer |
-| Yes/No (`adBoolean`) | 46 | `INTEGER` | `1` for true, `0` for false |
+| Yes/No (`adBoolean`) | 46 (39) | `INTEGER` | `1` for true, `0` for false (Access has no NULL Yes/No value: an unset one is false) |
 | Short and long text (`adWChar`) | 132 | `TEXT` | the text as stored, not trimmed |
-| Replication ID (`adGUID`) | 51 (`RowGUID` ×47, `ConceptGUID` ×4) | `TEXT` | 36 characters, lower case, no braces (`0e40d86d-889c-498e-ae66-46398e615cee`) |
+| Replication ID (`adGUID`) | 51 (50): `RowGUID` ×47, `ConceptGUID` ×4 | `TEXT` | 36 characters, lower case, no braces (`0e40d86d-889c-498e-ae66-46398e615cee`) |
 | Decimal (`adNumeric`) | 2 exported (`OperationNode.AbsoluteTolerance`, `RelativeTolerance`); `ChangeLog.Timestamp` is excluded | `TEXT` | the exact decimal in invariant culture (`0.5`, `12`), so no precision is lost (a SQLite `REAL` would round it). All values are `NULL` in 4.4 |
 | Date/Time (`adDate`) | 1 exported (`Release.ErrorDate`, all `NULL` in 4.4) | `TEXT` | ISO 8601, `yyyy-MM-ddTHH:mm:ss` |
 | `NULL` in any column | | | `NULL` |
@@ -106,7 +106,7 @@ columns and are copied as stored.
   own SQL (`"Table"`, `"Release"`, `"Reference"` are SQL keywords).
 - **Tables** are created in ordinal order of their names, columns in their Access ordinal order.
 - **`NOT NULL`** where the Access column is required.
-- **Primary keys** as declared in Access (on 4.4 every exported table has one; 19 are composite,
+- **Primary keys** as declared in Access (on 4.4 every exported table has one; 18 are composite,
   for example `ContextComposition (ContextID, PropertyID)` and `TableVersionCell (TableVID, CellID)`).
 - **Foreign keys** from the Access relationships, with their rules (`ON UPDATE CASCADE`, and
   `ON DELETE CASCADE` where Access declares it). On 4.4 the user tables have 178 relationships, all on one column (the OLE DB schema lists 179:

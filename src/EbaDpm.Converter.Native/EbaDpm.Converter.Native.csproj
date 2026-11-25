@@ -18,6 +18,13 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- Plane C census of known divergences: one file per release (none yet: an empty census exempts nothing). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\native-plane-c-known-divergences-*.tsv">
+      <LogicalName>EbaDpm.Converter.Native.Resources.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="EbaDpm.Converter" />
     <InternalsVisibleTo Include="EbaDpm.Converter.Native.Tests" />

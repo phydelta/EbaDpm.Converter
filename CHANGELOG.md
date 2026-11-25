@@ -6,7 +6,28 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Added
+
+- **Native DPM 2.0 output** (`--target native`). A 1:1 image of a DPM 2.0 Access database in one
+  SQLite file: same tables, columns, rows, IDs and values, with every release and its history
+  (select a release with `StartReleaseID <= R AND (EndReleaseID IS NULL OR EndReleaseID > R)`).
+  It contains the metamodel and the 12 validation-rule tables (59 tables on 4.4); the change log
+  and the EBA working tables are excluded. The schema is built from the Access catalogue with a
+  fixed type mapping, primary keys, relationships and indexes; differences from the embedded 4.4
+  baseline are reported as schema drift and never block the conversion. Sources before release
+  4.4 and DPM 1.0 sources are rejected. `--schema-only --target native` creates the empty 4.4
+  baseline. The default output is unchanged. (#92, #93, #94, #98)
+- **Validation of a native output.** `--validate` recognises a native file: plane A (content,
+  row counts and completeness against the source given with `--source`, `PRAGMA
+  foreign_key_check`, schema) and the schema drift report; `--layouts` adds plane C against the
+  Annotated Table Layouts through the native model. (#95, #96)
+- `--extract-layouts --dictionary` accepts a native file. (#96)
+
 ### Changed
+
+- The code is split into three projects: shared components (`EbaDpm.Converter.Core`), the
+  45-table pipeline (`EbaDpm.Converter.Distribution`) and the native pipeline
+  (`EbaDpm.Converter.Native`), with the tests split the same way. No output changes. (#91)
 
 - **.NET 11.** The solution targets `net11.0` and `global.json` pins the .NET 11 SDK (11.0.100).
   Building from source needs the .NET 11 SDK; the self-contained executables need no .NET

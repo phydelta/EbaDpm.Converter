@@ -1,6 +1,9 @@
 # Target schema
 
-The converter always produces the same **45-table DPM distribution schema**, whatever the source
+This document describes the default output. The native DPM 2.0 output (`--target native`) is a
+different schema, owned by the EBA, described in [target-schema-native.md](target-schema-native.md).
+
+The default output is always the same **45-table DPM distribution schema**, whatever the source
 model, plus one **extension table**, `mOrdinateMetricRestriction` (see
 [Extension tables](#extension-tables)). The DDL is embedded in the assembly:
 
@@ -88,7 +91,7 @@ followed.
 
 | Table(s) | Why empty |
 |---|---|
-| `vValidationRuleExpressions`, `vValidationRuleTables` | Validation rules are **out of scope**. The DPM 1.0 source has rules in its own format and DPM 2.0 has them as DPM-ML expressions; translating either is a separate project. |
+| `vValidationRuleExpressions`, `vValidationRuleTables` | Validation rules are **out of scope** for this output (the native output copies the DPM 2.0 validation-rule tables, see [target-schema-native.md](target-schema-native.md#validation-rules-in-and-in-development)). The DPM 1.0 source has rules in its own format and DPM 2.0 has them as DPM-ML expressions; translating either is a separate project. |
 | `dInstance`, `dFilingIndicator` | **Instance tables.** They hold reported data, not metadata; a DPM dictionary has nothing to put there. |
 | `aContainerInfo`, `aDDSInfo` | Auxiliary tables of other uses of the format; no DPM source. |
 | `mCustomDataType` | No source in either model. |

@@ -75,6 +75,8 @@ public sealed record NativeTableResult(string Name, long Rows, int Columns, Time
 /// <param name="ExcludedTablesInSource">The tables of the closed exclusion list that the source has, not written.</param>
 /// <param name="Catalog">The catalogue of the source that the DDL was built from (drift: compare with the baseline).</param>
 /// <param name="Schema">The DDL that was run, with the foreign keys declared and dropped.</param>
+/// <param name="Drift">The differences between the baseline catalogue and <paramref name="Catalog"/>
+/// (<see cref="NativeDrift.Compute"/>); informative, empty when the source has the baseline schema.</param>
 /// <param name="StageElapsed">Elapsed time of each stage.</param>
 public sealed record NativeConversionSummary(
     string OutputPath,
@@ -83,6 +85,7 @@ public sealed record NativeConversionSummary(
     IReadOnlyList<string> ExcludedTablesInSource,
     NativeCatalog Catalog,
     NativeSchemaDdl Schema,
+    IReadOnlyList<NativeCatalogDifference> Drift,
     IReadOnlyDictionary<NativeConversionStage, TimeSpan> StageElapsed,
     TimeSpan Elapsed,
     long FileSizeBytes)

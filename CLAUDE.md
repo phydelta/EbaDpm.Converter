@@ -8,7 +8,10 @@ Guidance for Claude Code sessions working on this repository. Human contributors
 A .NET 11 console tool that converts the **EBA DPM Database** from Microsoft Access (`.accdb`) to
 **SQLite** in the 45-table DPM distribution schema. It is a data-model transformation, not a table
 dump, and it supports both source models with automatic detection: **DPM 1.0** (e.g. release 4.1)
-and **DPM 2.0** (releases 4.2, 4.3...).
+and **DPM 2.0** (releases 4.2, 4.3...). For DPM 2.0 sources from release 4.4 on it also produces, on
+explicit request (`--target native`), a **native output**: a 1:1 image of the Access database in
+SQLite ([docs/target-schema-native.md](docs/target-schema-native.md)), implemented separately in
+`src/EbaDpm.Converter.Native`.
 
 The goal is **timeliness**: produce the SQLite dictionary on the day the EBA publishes a release.
 At that moment no other SQLite edition of that release exists, so the internal invariants
@@ -146,7 +149,13 @@ output**, not once per iteration and not only at release time.
   pattern. A stale exception must fail.
 - No figure measured on one release is a property of the format: frameworks change between
   releases. Derive values from the data, or date and scope them explicitly.
-- Validation rules (`vValidationRule*` tables) are out of scope and stay empty.
+- Validation rules, per output: in the 45-table output they are out of scope and the
+  `vValidationRule*` tables stay empty; in the native output the 12 validation-rule tables are
+  copied complete (and documented as in development), but the converter never evaluates or
+  translates DPM-ML expressions.
+- The native schema is the EBA's: the native output follows the Access catalogue, and differences
+  from the 4.4 baseline are reported, never "fixed". The native code never references
+  `src/EbaDpm.Converter.Distribution` (a test enforces it).
 
 ## Git and releases
 

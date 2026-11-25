@@ -186,6 +186,120 @@ Access database as defects of the layout; a violation that is the converter's is
 A DPM 1.0 output has no single release (`mRelease.IsCurrent = 1` in several rows), so no census is
 consulted and every violation fails. No divergence is hard-coded in C#.
 
+## Native output
+
+`--validate` recognises a native DPM 2.0 output ([target-schema-native.md](target-schema-native.md))
+and runs its own rule set instead of the 45-table one. Detection looks at the catalogue of the SQLite
+file, never at data: a file with the tables `Category` and `TableVersionCell` and without `mModule`
+is a native output. The same JSON report and console rendering are used; the report carries
+`"outputKind": "native"` and, with `--source`, the Access database in `inputs.source`. Both fields
+are absent from the report of a 45-table output.
+
+- **`--source <accdb>`** (valid with `--validate` only for a native output) is the Access database
+  the file was converted from. It enables the checks against the source. Without it those checks are
+  reported as **skipped** ("needs --source <accdb>"), never as passed. The summary counts them
+  apart (a `Skipped` column in the console, `skipped` in the JSON summary blocks), and the result
+  line says how many critical checks were skipped.
+- **Plane B does not exist** for this output: there is no reference export of this schema, and
+  `--reference` is an argument error.
+- The validated file is never modified: validation works on a temporary copy.
+- Exit code 3 when a critical check fails, as for the other output.
+
+### Plane A (native)
+
+| Id | Layer | Needs source | What it examines |
+|---|---|---|---|
+| `A-NAT-01` | Critical | yes | Completeness. Every user table of the source catalogue is exported or is in the closed exclusion list of 11 names; every exported table has exactly the columns of the source (names and order); the output has no other table (an excluded table found in the output is an extra table). Samples: the table |
+| `A-NAT-02` | Critical | yes | Row count of every exported table equals Access `COUNT(1)`. Samples: the table, with both counts |
+| `A-NAT-03` | Critical | yes | Content. Every row of every exported table equals the source row with the same primary key, the source values going through the same conversion as the copy (`NativeTypeMapping`); no row is missing, extra or different. The IDs are the business key here (nothing is renumbered). Samples: `Table\|pk=Column=value,...`, with the differing columns on each side. One table at a time, a single thread |
+| `A-NAT-04` | Critical | no | `PRAGMA foreign_key_check` returns no rows (the file is loaded with enforcement off, so this is where relationships are checked). Samples: `Table\|rowid=N`, with the parent table |
+| `A-NAT-05` | Critical with a source, informative without | no | The schema of the output (`sqlite_master`: tables and indexes) equals the DDL that `NativeSchemaBuilder` builds from the catalogue: from the source catalogue when `--source` is given; without it, from the 4.4 baseline, as information (a difference is then drift, not a defect). Samples: `table:Name` or `index:Name` |
+| `A-DRF-01` | Informative | yes | Schema drift report, below. Never fails |
+
+The tables with a primary key made of integer columns are compared by streaming both sides ordered
+by key. The four tables whose key is a Replication ID (`Concept`, `Reference`, `RelatedConcept`,
+`Translation`: Access and SQLite do not order GUIDs alike) and the tables without a primary key
+(`ModelViolations`, `VarGeneration_Detail`, `VarGeneration_Summary` are excluded, but a later
+publication may add one) are compared through a dictionary of the source rows by key, or by the
+whole row when there is no key.
+
+The validation-rule tables are checked like any other table. Evaluating or translating the DPM-ML
+expressions belongs to a future validation engine, not to the converter.
+
+Each check can fail: a missing table, a missing or changed row, an extra column, an orphan foreign key
+and a changed index each make the corresponding check fail (the tests build synthetic outputs with each
+defect).
+
+### Schema drift report
+
+`A-DRF-01` compares the catalogue of the source with the embedded 4.4 baseline
+(`NativeCatalogComparer`): tables and columns added, removed or retyped, nullability, column order,
+primary keys, relationships and indexes. One sample per difference: kind and subject
+(`ColumnRemoved OperationVersion.OutputVariableID`), the baseline description and the actual one. It is
+**informative**: it never fails the validation or the conversion, and the consequences of each EBA
+change are assessed case by case when it appears. The conversion summary shows the same list (one
+computation, `NativeDrift`), and the JSON report includes it as the samples of `A-DRF-01` (at most 50;
+`totalFailed` gives the real count).
+
+Positive control: the 4.3 database differs from the baseline (`VariableCalculation` exists in 4.3 and
+not in 4.4; `OperationOutput` exists in 4.4 and not in 4.3: 27 differences), so the report is not empty
+on it, while it is empty on the 4.4 database.
+
+### Plane C
+
+With `--layouts <file>` a native output is compared with the EBA Annotated Table Layouts (a repository
+built by `--extract-layouts`, see [table-layouts.md](table-layouts.md)). The layout workbook reading
+and the signature normalisation are the shared ones; the comparison itself is written over the native
+model (`src/EbaDpm.Converter.Native/PlaneC`) and shares no code with the 45-table plane C.
+
+**Release.** The native file holds every release, so each layout sheet is compared at **its own
+release R**: the `Release` row whose `Code` equals the sheet's release label (exact match; there is no
+point-release tolerance, because an exact match exists in the file or the sheet is not comparable), and
+the table version whose `Code` is the table code and that is valid at R
+(`StartReleaseID <= R AND (EndReleaseID IS NULL OR EndReleaseID > R)`). A sheet whose release is not in the
+file, whose table code has no table version valid at R, or has two, is not compared; `C-COB-01` counts
+them by reason, per release. The code of an item (a member or a property) at R is `ItemCategory.Code` of
+the row of that `ItemID` valid at R; a code missing at R is reported (count and samples), never guessed,
+and the cells that use it have no native signature.
+
+**Native signature of a cell.** For each `TableVersionCell` of the table version with `IsExcluded = 0`
+and a `VariableVID`: `MET(<code of VariableVersion.PropertyID>)`, plus
+`<property code>(<item code>)` for every `ContextComposition` pair of `VariableVersion.ContextID` whose
+item is not the default item at R (`ItemCategory.IsDefaultItem`; the metric is never dropped), plus
+`<property code>(*)` for every key header (`Header.IsKey = 1`) of the table version
+(`TableVersionHeader.HeaderVID` -> `HeaderVersion.PropertyID`). The terms go through `PlaneCSignature`,
+as on the layout side.
+
+| Check | Layer | What it verifies |
+|---|---|---|
+| `C-DPS-01` | Critical | Every layout signature of a compared sheet is **contained** in one of the native signatures of its table version, and no dimension it mentions carries another member in the signatures that share its dimensions (`contradicts`; otherwise `no-match`). Violations listed in the census of the release are excluded |
+| `C-DPS-02` | Informative | Terms the native signatures emit and the layout does not mention (abstract rows, open-axis keys and table context are legitimately omitted by layouts) |
+| `C-KEY-01` | Informative | Layout signatures excluded because they describe the key column of an open table (the only `MET(m)` names a dimension that the signature carries as `m(*)`): the layout draws it as a grid column, the native model has it as the key header, with no cell |
+| `C-EQU-01` | Critical | Every group of cells declared equal by an `==` rule carries the same native signature. A term is resolved at the release of the rule's sheet: table version by code, then the single `TableVersionCell` whose `Cell.RowID`, `ColumnID` and `SheetID` point to headers whose `HeaderVersion.Code` (through `TableVersionHeader.HeaderVID`) equals the row, column and sheet codes. `9999` is the open-axis sentinel (the cell has no header on that axis); no sheet code or `0000` applies no sheet filter |
+| `C-EQU-02` | Informative | Coverage of `C-EQU-01`: total, checkable, identical and divergent rules, and the reason for each rule not checkable (`release not in the file`, `no table version at the release`, `several table versions at the release`, `cell unresolved`, `ambiguous cell`, `shaded or without signature`, `signature with a missing code`). A rule that cannot be resolved is not a failure |
+| `C-MHR-01` | Critical | Every metric annotated in the layout with a hierarchy (`(qAYV) ...[qCO:new_CO5]`) has, on the matching non-key header of the table version (same direction and ordinate code, `HeaderVersion.PropertyID` = that metric), `HeaderVersion.SubCategoryVID` -> `SubCategoryVersion` -> `SubCategory.Code` equal to the hierarchy and `SubCategory.CategoryID` -> `Category.Code` equal to the domain. Violations listed in the census are excluded |
+| `C-MHR-02` | Informative | Coverage of `C-MHR-01`: annotated metrics compared, matched without a hierarchy on the header, not matched (with the reason), and sheet-level annotations not examined |
+| `C-COB-01` | Informative | Per release of the layouts: sheets, paired and not compared by reason, tables and signatures compared, key-column exclusions, codes missing at the release. Always reported |
+
+A check that examined nothing is reported as skipped, not as passed (`C-DPS-01` with no
+signature compared, whether no table was compared or every layout signature of the compared tables
+was excluded as a key column (`C-KEY-01`), `C-EQU-01` with no checkable rule, `C-MHR-01` with no unit compared). The 4.4 layouts
+contain no `==` rule, so `C-EQU-01` is skipped against them; the 4.2 and 4.3 layouts, whose releases
+the 4.4 file also holds, exercise it.
+
+**Known divergences.** One file per release,
+[`native-plane-c-known-divergences-<release>.tsv`](../src/EbaDpm.Converter.Native/Resources/),
+embedded in the assembly, in the format of the 45-table censuses: a mandatory `# CorpusRelease: <release>`
+header and rows `TableCode<TAB>contradicts|no-match<TAB>LayoutSignature[<TAB>Reason]` (`C-DPS-01`) or
+`TableCode<TAB>hierarchy<TAB>{Release}|{Axis}|{OrdinateCode}|{MetricCode}<TAB>Reason` (`C-MHR-01`, the
+reason is mandatory). The census of release R applies to the sheets of release R. An entry that matches
+nothing in a release that was evaluated (at least one table, or one unit, compared in it) is **stale**
+and fails the check; entries of releases that were not evaluated are reported as *not applicable*, never
+as stale. With no file for a release the check runs with an empty census, which exempts nothing. Entries
+are arbitrated against the Access database as defects of the layout; a violation that is the converter's
+is fixed, not listed. Entries are reported with the ids `NDD-23` (`C-DPS-01`) and `NDD-27`
+(`C-MHR-01`).
+
 ## Validation status at version 1.1.0
 
 Plane A exits with code 0 on the outputs of the three supported sources (DPM 1.0 release 4.1,

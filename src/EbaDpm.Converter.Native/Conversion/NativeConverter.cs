@@ -105,7 +105,7 @@ public static class NativeConverter
             var present = catalog.Tables.Select(t => t.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var excluded = NativeExclusions.ExcludedTables.Where(present.Contains).ToList();
             return new NativeConversionSummary(
-                outputPath, currentRelease ?? string.Empty, results, excluded, catalog, ddl, stageElapsed,
+                outputPath, currentRelease ?? string.Empty, results, excluded, catalog, ddl, NativeDrift.Compute(catalog), stageElapsed,
                 total.Elapsed, new FileInfo(outputPath).Length);
         }
         catch

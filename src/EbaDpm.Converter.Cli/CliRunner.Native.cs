@@ -177,7 +177,7 @@ public static partial class CliRunner
             $"Foreign keys declared: {schema.ForeignKeysDeclared.Count}; not declared (a table is excluded): "
             + $"{schema.ForeignKeysDropped.Count}. Indexes: {schema.IndexStatements.Count}.");
 
-        var differences = NativeCatalogComparer.Compare(baseline.Catalog, summary.Catalog);
+        var differences = summary.Drift;
         if (differences.Count == 0)
         {
             stdout.WriteLine($"Schema: identical to the {baseline.ReleaseCode} baseline.");
@@ -185,16 +185,12 @@ public static partial class CliRunner
         else
         {
             stdout.WriteLine(
-                $"Schema drift against the {baseline.ReleaseCode} baseline: {differences.Count} difference(s).",
+                $"Schema drift against the {baseline.ReleaseCode} baseline: {differences.Count} difference(s) "
+                + "(informative: it does not fail the conversion).",
                 CliStyles.Informative);
-            foreach (var difference in differences.Take(20))
+            foreach (var difference in differences)
             {
                 stdout.WriteLine($"  - {difference.Kind} {difference.Subject}: {difference.Baseline ?? "-"} -> {difference.Actual ?? "-"}");
-            }
-
-            if (differences.Count > 20)
-            {
-                stdout.WriteLine($"  ... and {differences.Count - 20} more.");
             }
         }
 

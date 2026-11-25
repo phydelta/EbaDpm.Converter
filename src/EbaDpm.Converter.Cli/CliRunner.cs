@@ -10,6 +10,8 @@ using EbaDpm.Converter.Distribution.Mapping;
 using EbaDpm.Converter.Distribution.Mapping.Dpm20;
 using EbaDpm.Converter.Distribution.Sqlite;
 using EbaDpm.Converter.Distribution.Validation;
+using EbaDpm.Converter.Native.Layouts;
+using EbaDpm.Converter.Native.Validation;
 using Microsoft.Data.Sqlite;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -1078,7 +1080,9 @@ public static partial class CliRunner
                 summary = phases.Run(
                     "Extract layouts",
                     () => LayoutExtractor.Extract(inputDirectory, outputPath, settings.Overwrite,
-                        () => DistributionLayoutDictionaryLoader.Load(dictionaryPath))));
+                        () => NativeOutputDetector.IsNativeOutput(dictionaryPath)
+                            ? NativeLayoutDictionaryLoader.Load(dictionaryPath)
+                            : DistributionLayoutDictionaryLoader.Load(dictionaryPath))));
 
             stdout.WriteLine($"Layout repository created in '{outputPath}'.");
             stdout.WriteLine(
@@ -1181,7 +1185,8 @@ public static partial class CliRunner
     {
         var generatedPath = settings.ValidatePath!;
 
-        if (FindUnrecognized(settings, "--validate", ValidateOptions) is { } unrecognized)
+        // --source is accepted here and checked below: it applies to a native output only.
+        if (FindUnrecognized(settings, "--validate", [.. ValidateOptions, "--source"]) is { } unrecognized)
         {
             return ArgumentError(stderr, unrecognized);
         }
@@ -1214,19 +1219,57 @@ public static partial class CliRunner
 
         try
         {
-            Validator.Result result = null!;
+            // The validator is chosen by the kind of output: a native DPM 2.0 output has its own rule set.
+            var native = NativeOutputDetector.IsNativeOutput(generatedPath);
+            if (!native && settings.Source is not null)
+            {
+                return ArgumentError(stderr, "--source applies to --validate only for a native output.");
+            }
+
+            if (native && referencePath is not null)
+            {
+                return ArgumentError(stderr, "--reference does not apply to a native output: plane B has no reference export for the native output.");
+            }
+
+            if (native && settings.Source is { } sourcePath && !File.Exists(sourcePath))
+            {
+                stderr.Error($"source file '{sourcePath}' does not exist.");
+                return ExitArgumentError;
+            }
+
+            ValidationReport report = null!;
+            int exitCode = 0;
             Phases.Run(stdout, ["Validate"], phases =>
-                result = phases.Run("Validate", () => Validator.Run(generatedPath, referencePath, layoutsPath)));
-            ValidationConsoleReport.Print(stdout, result.Report);
+                phases.Run("Validate", () =>
+                {
+                    if (native)
+                    {
+                        report = NativeValidator.Validate(generatedPath, settings.Source, layoutsPath);
+                        exitCode = report.Summary.ExitCode;
+                    }
+                    else
+                    {
+                        var result = Validator.Run(generatedPath, referencePath, layoutsPath);
+                        report = result.Report;
+                        exitCode = result.ExitCode;
+                    }
+                }));
+            ValidationConsoleReport.Print(stdout, report);
 
             if (reportPath is not null)
             {
-                WriteReport(reportPath, result.Report);
+                WriteReport(reportPath, report);
             }
 
-            return result.ExitCode;
+            return exitCode;
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+        catch (AceProviderNotFoundException ex)
+        {
+            stderr.Error(ex.Message);
+            return ExitArgumentError;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException or UnauthorizedAccessException
+                                       or NotSupportedException or Microsoft.Data.Sqlite.SqliteException or System.Data.OleDb.OleDbException)
         {
             stderr.Error(ex.Message);
             return ExitArgumentError;

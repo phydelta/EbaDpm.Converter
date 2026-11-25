@@ -8,7 +8,7 @@ anything that is not one of the other modes is a conversion.
 | [Convert](#convert) | Convert an Access DPM database into a SQLite database in the distribution schema, or ([`--target native`](#native-output)) into the native DPM 2.0 output |
 | [`--list-taxonomies`](#list-taxonomies) | List the taxonomies an Access database contains, with their selectors |
 | [`--schema-only`](#schema-only) | Create an empty database with the 45 tables of the distribution schema (or the native baseline schema with `--target native`) |
-| [`--validate`](#validate) | Validate a generated database (planes A, B and C) |
+| [`--validate`](#validate) | Validate a generated database (planes A, B and C; a native output has its own rule set) |
 | [`--extract-layouts`](#extract-layouts) | Build a SQLite repository from the EBA Annotated Table Layout workbooks |
 | `--help`, `-h`, `-?`, `/?` | Print the help and exit with code 0 |
 
@@ -223,6 +223,9 @@ EbaDpm.Converter --validate "<generated.db>" [--reference "<reference.db>"]
 | `--layouts <path>` | no | A layout repository produced by `--extract-layouts`. Enables plane C |
 | `--report <path>` | no | Write the full validation report as JSON |
 
+A **native output** (`--target native`) is detected and validated with its own rule set; see
+[Validate a native output](#validate-a-native-output) below.
+
 - **Plane A** (internal invariants) always runs.
 - **Plane B** runs only with `--reference`. It is informational: its failures are reported and
   counted separately, but never change the exit code.
@@ -256,6 +259,29 @@ EbaDpm.Converter --validate eba-4.2.db --reference EBA_4.2_Hotfix.db --layouts l
 ```
 
 See [validation.md](validation.md) for what each plane checks.
+
+### Validate a native output
+
+```text
+EbaDpm.Converter --validate "<native.db>" [--source "<dpm2.accdb>"]
+                 [--layouts "<layouts.db>"] [--report <file.json>]
+```
+
+`--validate` recognises a native DPM 2.0 output (the tables `Category` and `TableVersionCell` and no
+`mModule`) and runs its own plane A ([validation.md](validation.md#native-output)).
+
+| Option | Description |
+|---|---|
+| `--source <path>` | The Access database the file was converted from. Valid with `--validate` only for a native output (with a 45-table output it is an error). It enables completeness, row counts, content against the source and the schema drift report; without it those checks are reported as skipped, never as passed |
+| `--reference <path>` | Not applicable: plane B has no reference export for the native output (argument error) |
+| `--layouts`, `--report` | As above (`--report` also carries the schema drift) |
+
+```powershell
+EbaDpm.Converter --validate dpm2-native.db --source "DPM2 Database_v 4_4.accdb" --report reports/native.json
+```
+
+Measured on the 4.4 database (2026-11-25, x64): about 36 seconds against the source, with the whole
+content (5,568,105 rows) compared. Figures of one publication and one machine, not of the format.
 
 ## Extract layouts
 
