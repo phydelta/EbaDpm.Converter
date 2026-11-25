@@ -1,4 +1,5 @@
 using EbaDpm.Converter.Core.Validation;
+using EbaDpm.Converter.Distribution.Validation;
 using Spectre.Console;
 
 namespace EbaDpm.Converter.Cli;
@@ -116,9 +117,14 @@ internal static class ValidationConsoleReport
 {
     public static void Print(CliConsole stdout, ValidationReport report)
     {
+        var native = report.OutputKind == "native";
         var referenceText = report.Inputs.Reference is { } reference
             ? $"against '{Path.GetFileName(reference.Path)}'"
-            : "without reference (plane A only)";
+            : native
+                ? report.Inputs.Source is { } source
+                    ? $"(native DPM 2.0 output) against the source '{Path.GetFileName(source.Path)}'"
+                    : "(native DPM 2.0 output) without source: the checks against the source are skipped"
+                : "without reference (plane A only)";
         stdout.WriteLine($"Validation of '{Path.GetFileName(report.Inputs.Generated.Path)}' {referenceText}.", CliStyles.Heading);
         stdout.WriteLine();
 
@@ -137,7 +143,14 @@ internal static class ValidationConsoleReport
             }
         }
 
-        PrintPlane(stdout, report, "A", "PLANE A - internal consistency (no reference)");
+        PrintPlane(stdout, report, "A", native
+            ? "PLANE A - native output: content against the source, relationships, schema, drift"
+            : "PLANE A - internal consistency (no reference)");
+        if (native)
+        {
+            PrintSchemaDrift(stdout, report);
+        }
+
         if (report.Inputs.Reference is not null)
         {
             // Plane B reports and does NOT fail the run: the reference export is another
@@ -164,10 +177,14 @@ internal static class ValidationConsoleReport
         var informativeFailed = report.Summary.Informative.Failed;
         var staleText = report.Summary.StaleExceptions > 0 ? $" {report.Summary.StaleExceptions} stale exception(s)." : string.Empty;
         var clean = criticalFailed == 0 && report.Summary.StaleExceptions == 0;
+        var criticalSkipped = native ? report.Summary.Critical.Skipped ?? 0 : 0;
+        var skippedText = criticalSkipped > 0
+            ? $" {criticalSkipped} critical check(s) skipped{(report.Inputs.Source is null ? " (needs --source)" : string.Empty)}."
+            : string.Empty;
         stdout.WriteLine(
             clean
-                ? $"RESULT: no critical differences. {informativeFailed} informative differences in the report."
-                : $"RESULT: {criticalFailed} critical differences.{staleText} {informativeFailed} informative differences in the report.",
+                ? $"RESULT: no critical differences.{skippedText} {informativeFailed} informative differences in the report."
+                : $"RESULT: {criticalFailed} critical differences.{staleText}{skippedText} {informativeFailed} informative differences in the report.",
             clean ? new Style(Color.Green, decoration: Decoration.Bold) : CliStyles.Critical);
 
         // What plane B no longer fails is counted SEPARATELY, never diluted in the figures above
@@ -181,26 +198,75 @@ internal static class ValidationConsoleReport
         }
     }
 
+    /// <summary>The schema drift list of a native output, in full (it is short): informative, never a failure.</summary>
+    private static void PrintSchemaDrift(CliConsole stdout, ValidationReport report)
+    {
+        var drift = report.Checks.FirstOrDefault(c => c.Id == "A-DRF-01");
+        if (drift is null || drift.Status == "skipped")
+        {
+            return;
+        }
+
+        stdout.WriteLine();
+        if (drift.Failed == 0)
+        {
+            stdout.WriteLine("Schema drift against the 4.4 baseline: none.");
+        }
+        else
+        {
+            stdout.WriteLine($"Schema drift against the 4.4 baseline: {drift.Failed} difference(s) (informative).", CliStyles.Informative);
+            foreach (var sample in drift.Samples)
+            {
+                stdout.WriteLine($"  - {sample.BusinessKey}: {sample.Reference ?? "-"} -> {sample.Generated ?? "-"}");
+            }
+
+            if (drift.Failed > drift.Samples.Count)
+            {
+                stdout.WriteLine($"  ... and {drift.Failed - drift.Samples.Count} more (see report).");
+            }
+        }
+
+        stdout.WriteLine();
+    }
+
     private static void PrintPlane(CliConsole stdout, ValidationReport report, string plane, string header)
     {
         stdout.WriteLine(header, CliStyles.Heading);
 
-        var table = ReportTable.Create(stdout, ("Layer", false), ("Checks", true), ("Passed", true), ("With differences", true));
+        // The native report counts skipped checks apart (they examined nothing); the 45-table
+        // report keeps its historical table, where a skipped check counts as passed.
+        var native = report.OutputKind == "native";
+        var table = native
+            ? ReportTable.Create(stdout, ("Layer", false), ("Checks", true), ("Passed", true), ("Skipped", true), ("With differences", true))
+            : ReportTable.Create(stdout, ("Layer", false), ("Checks", true), ("Passed", true), ("With differences", true));
         var failingByLayer = new List<(string Layer, List<CheckInfo> Failing)>();
         foreach (var layer in new[] { "critical", "informative" })
         {
             var checks = report.Checks.Where(c => c.Plane == plane && c.Layer == layer).ToList();
-            var passed = checks.Count(c => c.Status is "pass" or "skipped");
-            var failed = checks.Count - passed;
+            var skipped = native ? checks.Count(c => c.Status == "skipped") : 0;
+            var passed = checks.Count(c => c.Status == "pass" || (!native && c.Status == "skipped"));
+            var failed = checks.Count - passed - skipped;
             var differencesStyle = failed == 0
                 ? CliStyles.Pass
                 : layer == "critical" ? CliStyles.Critical : CliStyles.Informative;
 
-            table.AddRow(
-                ReportTable.Cell(layer),
-                ReportTable.Cell(checks.Count),
-                ReportTable.Cell(passed),
-                ReportTable.Cell(failed, differencesStyle));
+            if (native)
+            {
+                table.AddRow(
+                    ReportTable.Cell(layer),
+                    ReportTable.Cell(checks.Count),
+                    ReportTable.Cell(passed),
+                    ReportTable.Cell(skipped),
+                    ReportTable.Cell(failed, differencesStyle));
+            }
+            else
+            {
+                table.AddRow(
+                    ReportTable.Cell(layer),
+                    ReportTable.Cell(checks.Count),
+                    ReportTable.Cell(passed),
+                    ReportTable.Cell(failed, differencesStyle));
+            }
             failingByLayer.Add((layer, checks.Where(c => c.Status == "fail" || c.Status == "info").Take(20).ToList()));
         }
 

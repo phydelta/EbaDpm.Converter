@@ -66,14 +66,47 @@ Layout annotations are written as codes in parentheses. A two-term annotation su
 can be the **metric** of a column (a member of the `MET` domain) or a **key dimension** of an open
 axis. The text alone cannot tell them apart, and the distinction changes how the cell is labelled.
 
-The extractor resolves the ambiguity by looking the code up in a dictionary: any SQLite database in
-the distribution schema, normally the output of the conversion for the same release. The
+The extractor resolves the ambiguity by looking the code up in a dictionary: any SQLite database
+converted by this tool, either a 45-table distribution output (normally the conversion of the same
+release) or a native DPM 2.0 output (see below). The
 dictionary is also used to check that two-term `(domain:member)` codes exist. Without it, both
 classifications would fall back to a guess that mislabels cells in a way that cannot be detected
 afterwards, so the command refuses to run instead.
 
 The dictionary's path and SHA-256 hash are recorded in the repository (`LayoutExtraction`), so a
 repository always states which dictionary it was resolved against.
+
+### Dictionary from a native output
+
+`--dictionary` also accepts a native DPM 2.0 output ([target-schema-native.md](target-schema-native.md)),
+recognised by its catalogue (`Category` and `TableVersionCell`, no `mModule`). The native file holds
+every release, so the dictionary is the union of the history of the file, as the dictionary of the
+latest 45-table release is; it is built from the native tables with the rules of the 45-table mapping,
+and only as far as the extractor needs:
+
+- **Metrics** (members of `MET`): the codes (every `ItemCategory` row) of the `_PR` items that are
+  metrics: the property of a `fact` variable (`VariableVersion.PropertyID` of a `Variable` with
+  `Type = 'fact'`), or of a non-key header (`HeaderVersion.PropertyID`, `Header.IsKey = 0`), or whose
+  own code matches `^[A-Za-z]{2}[0-9]+$`.
+- **Dimensions**: the properties used in `ContextComposition.PropertyID` or as the property of a `key`
+  variable, with each of their codes. The domain code is the `Category.Code` of the `PropertyCategory`
+  row whose release window overlaps the one of the code (the first row when none does); `_NA` is
+  `INT_NA` for data type `i` and `STR_NA` for `s`. As in the 45-table mapping, the metric dimension
+  `MET` is added, and a property whose values live in a structural category (`_TE`: `TEM`) is not a
+  dimension.
+- **(Domain, member) pairs**: every `ItemCategory` row whose category is not `SE`, `_NA`, `_PR` or `_TE`,
+  with the `Category.Code` as domain, plus (`MET`, metric code).
+- **Module to framework** (layout names that do not carry the framework, 4.4): `ModuleVersion.Code` ->
+  `Module.FrameworkID` -> `Framework.Code`, without document modules, case-insensitively. A module that
+  maps to more than one framework is an error.
+
+On the 4.4 database the repository extracted with the native dictionary is identical, table by table,
+to the one extracted with the 45-table dictionary of release 4.4 (all `Layout*` tables except
+`LayoutExtraction`). The two can differ for layouts of an older release, because the native dictionary
+does not know the release of the layout: a code that is a dimension in 4.2 and a metric in a later
+release (`qINC`, `qNCO`, `qCCP`) resolves as a metric. Measured on 2026-11-25 with the 4.4 file and
+the 4.2 layouts: 10 of 11,515 declarations differ (for example `C_27.00` `D9` `qINC`). To extract
+the layouts of a release before 4.4, use a 45-table dictionary of that release (per-release resolution from a native file: #110).
 
 ## The layout repository
 

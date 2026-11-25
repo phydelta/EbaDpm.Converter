@@ -1,10 +1,8 @@
-using Microsoft.Data.Sqlite;
-
-namespace EbaDpm.Converter.Core.Layouts;
+﻿namespace EbaDpm.Converter.Core.Layouts;
 
 /// <summary>What a single-term code "(A)" is, according to what really exists in the
 /// dictionary (it is NOT decided by the shape of the text).</summary>
-internal enum SingleCodeResolution
+public enum SingleCodeResolution
 {
     /// <summary>Not a real DPM code (neither a member of <c>MET</c> nor a dimension): a rhetorical
     /// parenthesis such as "(a)", "(EU)", "(call)" — it is not an annotation, and it is not recorded
@@ -20,22 +18,23 @@ internal enum SingleCodeResolution
 }
 
 /// <summary>
-/// Dictionary of DPM codes (<c>mDimension</c>/<c>mDomain</c>/<c>mMember</c>) against which the
-/// single-code ambiguity is resolved. It relies on ANY SQLite database with the distribution
-/// schema: a reference database, or the converter's own generated output — the extractor does not
-/// impose which one, because this is a MECHANICAL query of which codes exist, not an arbitration
-/// of content (disputes about the VALUE of a cell are a different matter from which table to use as
-/// the list of valid codes to disambiguate a syntactic shape).
+/// Dictionary of DPM codes (metric members, dimension codes, (domain, member) pairs and the
+/// framework of each module) against which the single-code ambiguity is resolved. It only HOLDS
+/// the data: a loader fills it from a concrete source (for the 45-table distribution schema, a
+/// reference database or the converter's own generated output, see the distribution project) —
+/// this is a MECHANICAL query of which codes exist, not an arbitration of content.
 ///
 /// Without a dictionary (<paramref name="path"/> null), every single-term code resolves to
 /// <see cref="SingleCodeResolution.Unknown"/>: the caller decides the conservative default
 /// (treat it as a metric, with a warning) — see <c>LayoutSheetParser</c>.
 /// </summary>
-internal sealed class LayoutDictionary : IDisposable
+public sealed class LayoutDictionary : IDisposable
 {
     private readonly HashSet<string> _metMembers = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string?> _dimensionDomainCode = new(StringComparer.Ordinal);
     private readonly HashSet<(string DomainCode, string MemberCode)> _domainMemberPairs = new();
+
+    private readonly Func<Dictionary<string, HashSet<string>>>? _frameworksByModuleCodeLoader;
 
     private Dictionary<string, HashSet<string>>? _frameworksByModuleCode;
 
@@ -43,80 +42,25 @@ internal sealed class LayoutDictionary : IDisposable
 
     public string? Path { get; }
 
-    public LayoutDictionary(string? path)
+    public LayoutDictionary(string? path, Func<Dictionary<string, HashSet<string>>>? frameworksByModuleCodeLoader = null)
     {
         IsPresent = path is not null;
         Path = path;
-        if (path is null)
-        {
-            return;
-        }
-
-        var connectionString = new SqliteConnectionStringBuilder
-        {
-            DataSource = path,
-            Mode = SqliteOpenMode.ReadOnly,
-        }.ToString();
-
-        using var connection = new SqliteConnection(connectionString);
-        connection.Open();
-
-        using (var cmd = connection.CreateCommand())
-        {
-            cmd.CommandText =
-                """
-                SELECT m."MemberCode"
-                FROM "mMember" m
-                JOIN "mDomain" d ON d."DomainID" = m."DomainID"
-                WHERE d."DomainCode" = 'MET' AND m."MemberCode" IS NOT NULL
-                """;
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                _metMembers.Add(reader.GetString(0));
-            }
-        }
-
-        using (var cmd = connection.CreateCommand())
-        {
-            cmd.CommandText =
-                """
-                SELECT dim."DimensionCode", dom."DomainCode"
-                FROM "mDimension" dim
-                LEFT JOIN "mDomain" dom ON dom."DomainID" = dim."DomainID"
-                WHERE dim."DimensionCode" IS NOT NULL
-                """;
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var code = reader.GetString(0);
-                var domainCode = reader.IsDBNull(1) ? null : reader.GetString(1);
-                // The same DimensionCode may be repeated (several versions of the common base):
-                // if there was already one, the first is kept — this is a dictionary of SHAPE
-                // ("does this code exist?"), not of unique identity.
-                _dimensionDomainCode.TryAdd(code, domainCode);
-            }
-        }
-
-        using (var cmd = connection.CreateCommand())
-        {
-            // Real (domain, member) pairs — to validate the "(domain:member)" form: a two-code
-            // value paired POSITIONALLY with a declaration is not, by that alone, a real DPM
-            // value. "ZZFAKE:ZZFAKE2" has the right shape and neither code exists.
-            cmd.CommandText =
-                """
-                SELECT dom."DomainCode", m."MemberCode"
-                FROM "mMember" m
-                JOIN "mDomain" dom ON dom."DomainID" = m."DomainID"
-                WHERE dom."DomainCode" IS NOT NULL AND m."MemberCode" IS NOT NULL
-                """;
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                _domainMemberPairs.Add((reader.GetString(0), reader.GetString(1)));
-            }
-        }
+        _frameworksByModuleCodeLoader = frameworksByModuleCodeLoader;
     }
+
+    /// <summary>Registers a member of the <c>MET</c> domain (a metric code).</summary>
+    public void AddMetMember(string memberCode) => _metMembers.Add(memberCode);
+
+    /// <summary>Registers a dimension code with its domain code. The same code may be repeated
+    /// (several versions of the common base): the first is kept — this is a dictionary of SHAPE
+    /// ("does this code exist?"), not of unique identity.</summary>
+    public void AddDimension(string dimensionCode, string? domainCode) =>
+        _dimensionDomainCode.TryAdd(dimensionCode, domainCode);
+
+    /// <summary>Registers a real (domain, member) pair — to validate the "(domain:member)" form.</summary>
+    public void AddDomainMember(string domainCode, string memberCode) =>
+        _domainMemberPairs.Add((domainCode, memberCode));
 
     /// <summary>Does the member <paramref name="memberCode"/> really exist in the domain
     /// <paramref name="domainCode"/>? Without a dictionary it can be neither confirmed nor denied:
@@ -171,7 +115,8 @@ internal sealed class LayoutDictionary : IDisposable
             return false;
         }
 
-        _frameworksByModuleCode ??= LoadFrameworksByModuleCode(Path!);
+        _frameworksByModuleCode ??= _frameworksByModuleCodeLoader?.Invoke()
+            ?? new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         if (!_frameworksByModuleCode.TryGetValue(moduleCode, out var frameworks))
         {
             return false;
@@ -189,44 +134,8 @@ internal sealed class LayoutDictionary : IDisposable
         return true;
     }
 
-    private static Dictionary<string, HashSet<string>> LoadFrameworksByModuleCode(string path)
-    {
-        var map = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        var connectionString = new SqliteConnectionStringBuilder
-        {
-            DataSource = path,
-            Mode = SqliteOpenMode.ReadOnly,
-        }.ToString();
-
-        using var connection = new SqliteConnection(connectionString);
-        connection.Open();
-        using var cmd = connection.CreateCommand();
-        cmd.CommandText =
-            """
-            SELECT m."ModuleCode", f."FrameworkCode"
-            FROM "mModule" m
-            JOIN "mTaxonomy" t ON t."TaxonomyID" = m."TaxonomyID"
-            JOIN "mReportingFramework" f ON f."FrameworkID" = t."FrameworkID"
-            WHERE m."ModuleCode" IS NOT NULL AND f."FrameworkCode" IS NOT NULL
-            """;
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            var moduleCode = reader.GetString(0);
-            if (!map.TryGetValue(moduleCode, out var frameworks))
-            {
-                frameworks = new HashSet<string>(StringComparer.Ordinal);
-                map[moduleCode] = frameworks;
-            }
-
-            frameworks.Add(reader.GetString(1));
-        }
-
-        return map;
-    }
-
     public void Dispose()
     {
-        // Connections are opened and closed inside the constructor: nothing to release here.
+        // The data is held in memory: nothing to release here.
     }
 }

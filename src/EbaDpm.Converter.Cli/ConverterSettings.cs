@@ -16,11 +16,11 @@ public sealed class ConverterSettings : CommandSettings
     // ---- Convert ------------------------------------------------------------------------------
 
     [CommandOption("--source <PATH>")]
-    [Description("Convert and --list-taxonomies: the Access DPM database (.accdb), DPM 1.0 or DPM 2.0 (detected automatically). Opened read-only.")]
+    [Description("Convert and --list-taxonomies: the Access DPM database (.accdb), DPM 1.0 or DPM 2.0 (detected automatically). Opened read-only. With --validate, for a native output only: the Access database it was converted from; it enables the checks against the source (completeness, row counts, content, schema drift).")]
     public string? Source { get; init; }
 
     [CommandOption("--output <PATH>")]
-    [Description("Convert and --schema-only: the SQLite database to create. DPM 2.0 without --release: a DIRECTORY (created if missing) that receives one file dpm-<release code>.db per release.")]
+    [Description("Convert and --schema-only: the SQLite database to create. With --target native: the file path. DPM 2.0 without --release: a DIRECTORY (created if missing) that receives one file dpm-<release code>.db per release.")]
     public string? Output { get; init; }
 
     [CommandOption("--taxonomies <LIST>")]
@@ -40,8 +40,12 @@ public sealed class ConverterSettings : CommandSettings
     public bool All { get; init; }
 
     [CommandOption("--release <CODE>")]
-    [Description("DPM 2.0 only: convert only the release with that Release.Code (e.g. 4.3); --output is then the file path. A release in which no exportable module version starts is an error. An error with a DPM 1.0 source. Also narrows --list-taxonomies.")]
+    [Description("DPM 2.0 only: convert only the release with that Release.Code (e.g. 4.3); --output is then the file path. A release in which no exportable module version starts is an error. An error with a DPM 1.0 source and with --target native. Also narrows --list-taxonomies.")]
     public string? Release { get; init; }
+
+    [CommandOption("--target <TARGET>")]
+    [Description("Convert and --schema-only: the output schema. distribution (default): the 45-table DPM distribution schema. native: the DPM 2.0 Access database table for table (the same tables, columns, rows and IDs, every release in one file); DPM 2.0 sources that contain release 4.4 or later only; --output is a file path; --release and the DPM 1.0 selectors do not apply. With --schema-only: the empty baseline (4.4) schema.")]
+    public string? Target { get; init; }
 
     [CommandOption("--overwrite")]
     [Description("Replace output files that already exist (convert, --schema-only, --extract-layouts). Without it an existing output file is an error and, for DPM 2.0 without --release, nothing is written.")]
@@ -62,11 +66,11 @@ public sealed class ConverterSettings : CommandSettings
     public bool ListTaxonomies { get; init; }
 
     [CommandOption("--schema-only")]
-    [Description("Mode: create an empty database with the 45 tables of the distribution schema in --output. No Access database is needed.")]
+    [Description("Mode: create an empty database with the 45 tables of the distribution schema in --output (with --target native: the empty native schema, baseline 4.4). No Access database is needed.")]
     public bool SchemaOnly { get; init; }
 
     [CommandOption("--validate <PATH>")]
-    [Description("Mode: validate the generated SQLite database at PATH (never modified). Plane A (internal invariants) always runs; --reference adds plane B and --layouts adds plane C. Exit code 3 on critical differences.")]
+    [Description("Mode: validate the generated SQLite database at PATH (never modified). A native DPM 2.0 output (--target native) is detected and has its own rule set: plane A (relationships, schema; with --source also completeness, row counts, content and the schema drift report), no plane B. A 45-table output: plane A (internal invariants) always runs; --reference adds plane B. --layouts adds plane C to either. Exit code 3 on critical differences.")]
     public string? ValidatePath { get; init; }
 
     [CommandOption("--reference <PATH>")]
@@ -86,7 +90,7 @@ public sealed class ConverterSettings : CommandSettings
     public string? Out { get; init; }
 
     [CommandOption("--dictionary <PATH>")]
-    [Description("--extract-layouts: a database already converted by this tool (distribution schema: mDimension, mDomain, mMember), REQUIRED to classify single-term \"(code)\" cells as metric or key dimension and to validate \"(domain:member)\". Its path and SHA-256 are recorded in LayoutExtraction.")]
+    [Description("--extract-layouts: a database already converted by this tool, REQUIRED to classify single-term \"(code)\" cells as metric or key dimension and to validate \"(domain:member)\". Either output: the 45-table distribution schema (mDimension, mDomain, mMember) or a native DPM 2.0 file (--target native; every release of the file is read, and the module framework comes from Module and Framework). Its path and SHA-256 are recorded in LayoutExtraction.")]
     public string? Dictionary { get; init; }
 
     // ---- Output ---------------------------------------------------------------------------------
@@ -120,6 +124,7 @@ public sealed class ConverterSettings : CommandSettings
         Add(Releases is not null, "--releases");
         Add(All, "--all");
         Add(Release is not null, "--release");
+        Add(Target is not null, "--target");
         Add(Overwrite, "--overwrite");
         Add(Report is not null, "--report");
         Add(Verbose, "--verbose");

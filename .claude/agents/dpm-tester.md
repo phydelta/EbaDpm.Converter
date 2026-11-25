@@ -20,7 +20,7 @@ correct - or to prove that it is not.
 3. **Known exceptions are never relaxations.**
    - Never weaken a comparison: no thresholds, no narrowing of the scope of an assertion.
    - The only admissible exclusion is **one specific object, named by business key**, registered
-     in `src/EbaDpm.Converter.Core/Validation/KnownExceptions.cs` (or the plane C known-divergences
+     in `src/EbaDpm.Converter.Distribution/Validation/KnownExceptions.cs` (or the plane C known-divergences
      file). Apply them one by one, by name, never as a general rule, and **list the exceptions
      applied in your report**.
    - An exception that no longer matches any object must make the test **fail**.
@@ -45,12 +45,13 @@ correct - or to prove that it is not.
 - `[DataFact]` / `[DataTheory]`: need the EBA data files (`./Data` or `EBADPM_TEST_DATA`); skipped
   when the directory does not exist. Fixtures must do nothing when data is unavailable.
 - `[AceFact]`: needs the Access Database Engine; skipped when it is not installed.
-- File names and the data layout: `tests/EbaDpm.Converter.Tests/Schema/RepoPaths.cs` and
+- File names and the data layout: `tests/EbaDpm.Converter.Testing/RepoPaths.cs` and
   `docs/test-data.md`.
 - Fast loop: `$env:EBADPM_TEST_DATA='none'; dotnet test` (~15 s). Full suite: `dotnet test` with
   `./Data` present (~9 min). Iterate with the fast loop or `--filter` over the data tests of the
   area touched. Run the full suite only when the orchestrator asks for it: once per pull request
-  that changes `src/EbaDpm.Converter.Core`, and once for a release (see *When to run the full
+  that changes `src/EbaDpm.Converter.Core`, `src/EbaDpm.Converter.Distribution` or
+  `src/EbaDpm.Converter.Native`, and once for a release (see *When to run the full
   suite* in `CLAUDE.md`). State in your report how many full runs you did and why.
 
 ## .NET plugins

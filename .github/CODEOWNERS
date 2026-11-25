@@ -8,4 +8,4 @@
 /global.json              @phydelta
 
 # The output format contract.
-/src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql  @phydelta
+/src/EbaDpm.Converter.Distribution/Resources/dpm-distribution-schema.sql  @phydelta

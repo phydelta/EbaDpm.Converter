@@ -5,10 +5,13 @@ Guidance for Claude Code sessions working on this repository. Human contributors
 
 ## What this project is
 
-A .NET 10 console tool that converts the **EBA DPM Database** from Microsoft Access (`.accdb`) to
+A .NET 11 console tool that converts the **EBA DPM Database** from Microsoft Access (`.accdb`) to
 **SQLite** in the 45-table DPM distribution schema. It is a data-model transformation, not a table
 dump, and it supports both source models with automatic detection: **DPM 1.0** (e.g. release 4.1)
-and **DPM 2.0** (releases 4.2, 4.3...).
+and **DPM 2.0** (releases 4.2, 4.3...). For DPM 2.0 sources from release 4.4 on it also produces, on
+explicit request (`--target native`), a **native output**: a 1:1 image of the Access database in
+SQLite ([docs/target-schema-native.md](docs/target-schema-native.md)), implemented separately in
+`src/EbaDpm.Converter.Native`.
 
 The goal is **timeliness**: produce the SQLite dictionary on the day the EBA publishes a release.
 At that moment no other SQLite edition of that release exists, so the internal invariants
@@ -56,16 +59,21 @@ Work is split between the main session (orchestrator) and two subagents defined 
 ## Repository layout
 
 ```
-src/EbaDpm.Converter.Cli    command-line entry point (EbaDpm.Converter.exe)
-src/EbaDpm.Converter.Core   Access readers, DPM 1.0 / DPM 2.0 mapping, SQLite writer, validation, layouts
-tests/EbaDpm.Converter.Tests  xUnit tests (synthetic + data-dependent)
-docs/                       public documentation
-Data/                       EBA data files, NOT versioned, read-only (see docs/test-data.md)
+src/EbaDpm.Converter.Cli           command-line entry point (EbaDpm.Converter.exe)
+src/EbaDpm.Converter.Core          shared: ACE provider, source detection, SQLite batch writer, report types, layouts
+src/EbaDpm.Converter.Distribution  existing pipeline: DPM 1.0 / DPM 2.0 to the 45 tables (readers, mapping, validation)
+src/EbaDpm.Converter.Native        native DPM 2.0 pipeline (references only Core)
+tests/EbaDpm.Converter.Core.Tests          xUnit tests of the shared project (synthetic + data-dependent)
+tests/EbaDpm.Converter.Distribution.Tests  xUnit tests of the distribution pipeline and the existing CLI modes
+tests/EbaDpm.Converter.Native.Tests        xUnit tests of the native pipeline and the project-graph rules
+tests/EbaDpm.Converter.Testing             shared test support: data/ACE skip attributes, RepoPaths, fabricated inputs
+docs/                              public documentation
+Data/                              EBA data files, NOT versioned, read-only (see docs/test-data.md)
 ```
 
 ## Environment
 
-- Windows x64, .NET SDK 10 (`global.json`), ACE OLEDB 16.0 x64 and x86 installed (Office x64 and
+- Windows x64, .NET SDK 11 (`global.json`), ACE OLEDB 16.0 x64 and x86 installed (Office x64 and
   the 2016 Redistributable). The tool resolves the provider itself (`AceProvider`).
 - No `sqlite3` CLI: use Python's `sqlite3` module for SQLite files.
 - GitHub repository `phydelta/EbaDpm.Converter`, with the `gh` CLI available.
@@ -108,7 +116,7 @@ output**, not once per iteration and not only at release time.
 | Situation | What to run |
 |---|---|
 | Iterating (developer → tester cycles) | Fast loop, plus `--filter` over the data tests of the area touched. Never the full suite. |
-| Pull request that changes `src/EbaDpm.Converter.Core` (readers, mapping, SQLite writer, validation, layouts, resources such as the schema DDL, `KnownExceptions.cs` or the plane C divergences files), or bumps a dependency the conversion uses | Full suite **once**, after the last change to that code and before the pull request is opened or marked ready. State the result in the pull request. Rerun only if that code changes again. |
+| Pull request that changes `src/EbaDpm.Converter.Core`, `src/EbaDpm.Converter.Distribution` or `src/EbaDpm.Converter.Native` (readers, mapping, SQLite writer, validation, layouts, resources such as the schema DDL, `KnownExceptions.cs` or the plane C divergences files), or bumps a dependency the conversion uses | Full suite **once**, after the last change to that code and before the pull request is opened or marked ready. State the result in the pull request. Rerun only if that code changes again. |
 | Pull request with docs, CI, CLI-only or test-only changes | Fast loop, plus `--filter` over any data test added or changed (a test that has not run does not count). |
 | Release pull request (`release/X.Y.Z`) | Full suite once, as a confirmation ([docs/releasing.md](docs/releasing.md)). It should pass without surprises; a failure there means a pull request skipped this policy, and finding which one comes before the release. |
 
@@ -136,12 +144,18 @@ output**, not once per iteration and not only at release time.
 - **Compare by business key**, never by surrogate ID: IDs differ between source, output and
   references.
 - **Known exceptions are never relaxations.** An exception names one object by its business key,
-  for one check, with its reason (`src/EbaDpm.Converter.Core/Validation/KnownExceptions.cs` and
+  for one check, with its reason (`src/EbaDpm.Converter.Distribution/Validation/KnownExceptions.cs` and
   `Resources/plane-c-known-divergences-<release>.tsv`). Never lower a threshold or exclude by
   pattern. A stale exception must fail.
 - No figure measured on one release is a property of the format: frameworks change between
   releases. Derive values from the data, or date and scope them explicitly.
-- Validation rules (`vValidationRule*` tables) are out of scope and stay empty.
+- Validation rules, per output: in the 45-table output they are out of scope and the
+  `vValidationRule*` tables stay empty; in the native output the 12 validation-rule tables are
+  copied complete (and documented as in development), but the converter never evaluates or
+  translates DPM-ML expressions.
+- The native schema is the EBA's: the native output follows the Access catalogue, and differences
+  from the 4.4 baseline are reported, never "fixed". The native code never references
+  `src/EbaDpm.Converter.Distribution` (a test enforces it).
 
 ## Git and releases
 

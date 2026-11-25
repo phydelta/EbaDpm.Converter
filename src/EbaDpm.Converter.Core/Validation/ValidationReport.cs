@@ -17,7 +17,10 @@ public sealed record ValidationReport(
     // ALWAYS populated: "plane C: not evaluated, --layouts missing" when the layouts repository was
     // not supplied, never a silence (a plane that does not run and does not announce itself is a
     // hollow zero).
-    [property: JsonPropertyName("planeCNotice")] string? PlaneCNotice = null);
+    [property: JsonPropertyName("planeCNotice")] string? PlaneCNotice = null,
+    // Only written for the native DPM 2.0 output ("native"); absent from the report of the 45-table
+    // output, whose JSON is unchanged.
+    [property: JsonPropertyName("outputKind"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? OutputKind = null);
 
 public sealed record ToolInfo(
     [property: JsonPropertyName("name")] string Name,
@@ -30,7 +33,9 @@ public sealed record FileInfo(
 
 public sealed record InputsInfo(
     [property: JsonPropertyName("generated")] FileInfo Generated,
-    [property: JsonPropertyName("reference")] FileInfo? Reference);
+    [property: JsonPropertyName("reference")] FileInfo? Reference,
+    // The Access database a native output is validated against (--source); absent otherwise.
+    [property: JsonPropertyName("source"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] FileInfo? Source = null);
 
 public sealed record UniverseInfo(
     [property: JsonPropertyName("comparableTaxonomies")] IReadOnlyList<string> ComparableTaxonomies,
@@ -99,7 +104,8 @@ public sealed record CheckInfo(
 public sealed record SummaryBlock(
     [property: JsonPropertyName("checks")] long Checks,
     [property: JsonPropertyName("passed")] long Passed,
-    [property: JsonPropertyName("failed")] long Failed);
+    [property: JsonPropertyName("failed")] long Failed,
+    [property: JsonPropertyName("skipped"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] long? Skipped = null);
 
 /// <summary>
 /// Summary of the validation run: checks per layer, stale exceptions and the exit code.

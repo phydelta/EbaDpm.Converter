@@ -41,15 +41,18 @@ public sealed record LayoutExtractionSummary(
 /// for <c>*.xlsx</c> — so it covers both 4.2 (subfolders per framework) and 4.3 (loose files)
 /// without distinguishing cases.
 ///
-/// <paramref name="dictionaryPath"/> is OPTIONAL at this level (Core): several tests extract
-/// deliberately WITHOUT a dictionary to document what is lost without it. The CLI is what makes it
+/// The dictionary arrives through <paramref name="dictionaryFactory"/> (invoked after the input and
+/// output checks, as before; the extractor disposes it): the shared project does not know which
+/// schema the dictionary is read from. It is OPTIONAL at this level (Core): several tests extract
+/// deliberately WITHOUT a dictionary (<c>new LayoutDictionary(null)</c>) to document what is lost
+/// without it. The CLI is what makes it
 /// mandatory (<c>--extract-layouts</c> requires <c>--dictionary</c>) — the library keeps the
 /// flexibility so the difference can be MEASURED, not to recommend using it without a dictionary.
 /// </summary>
 public static class LayoutExtractor
 {
     public static LayoutExtractionSummary Extract(
-        string inputDirectory, string outputPath, bool overwrite, string? dictionaryPath)
+        string inputDirectory, string outputPath, bool overwrite, Func<LayoutDictionary> dictionaryFactory)
     {
         if (!Directory.Exists(inputDirectory))
         {
@@ -74,7 +77,8 @@ public static class LayoutExtractor
 
         var files = Directory.GetFiles(inputDirectory, "*.xlsx", SearchOption.AllDirectories).OrderBy(f => f, StringComparer.Ordinal).ToList();
 
-        using var dictionary = new LayoutDictionary(dictionaryPath);
+        using var dictionary = dictionaryFactory();
+        var dictionaryPath = dictionary.Path;
         var dictionarySha256 = dictionaryPath is not null ? ComputeSha256(dictionaryPath) : null;
 
         var connectionString = new SqliteConnectionStringBuilder

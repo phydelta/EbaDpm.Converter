@@ -19,7 +19,7 @@ source metamodel.
 |---|---|
 | **Version** | See the [latest release](https://github.com/phydelta/EbaDpm.Converter/releases/latest) |
 | **Sources** | DPM 1.0 (e.g. release 4.1) and DPM 2.0 (e.g. releases 4.2, 4.3), detected automatically |
-| **Output** | SQLite database with the 45 tables of the DPM distribution schema |
+| **Output** | SQLite database with the 45 tables of the DPM distribution schema; or, for DPM 2.0 from release 4.4, a native 1:1 image of the Access database (`--target native`) |
 | **Platform** | Windows, x64 or x86 (matching the installed Office) |
 | **License** | MIT |
 
@@ -41,7 +41,7 @@ on any other SQLite edition existing.
   EBA release, or into the file of a single release with `--release`. DPM 1.0 databases are
   converted into one file, selecting by taxonomy code, taxonomy key or DPM release.
 - **Exact target schema.** The output is created from an embedded DDL
-  ([`dpm-distribution-schema.sql`](src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql))
+  ([`dpm-distribution-schema.sql`](src/EbaDpm.Converter.Distribution/Resources/dpm-distribution-schema.sql))
   and is structurally identical to the distribution schema.
 - **Reproducible output.** The same input and parameters produce the same content; the file is
   vacuumed at the end so its size is stable too.
@@ -60,7 +60,7 @@ on any other SQLite edition existing.
 | Windows | The tool is Windows-only because of the Access provider below |
 | Microsoft Office, 32-bit or 64-bit | Provides the Access database engine (`Microsoft.ACE.OLEDB.16.0` or `12.0`) used to read the `.accdb`. The tool picks the provider itself, 16.0 first, and runs with the architecture of the installed Office |
 | *or* Microsoft Access Database Engine 2016 Redistributable | Alternative on machines without Office. It registers the same providers. It is a system component and cannot be bundled |
-| .NET 10 SDK | Only to build from source. The self-contained executable needs no .NET installation |
+| .NET 11 SDK | Only to build from source. The self-contained executable needs no .NET installation |
 
 ## Download
 
@@ -149,8 +149,13 @@ difference against it is reported but never treated as a defect on its own. Deta
 
 ## Known limitations
 
-- **DPM validation rules are not exported.** `vValidationRuleExpressions` and
-  `vValidationRuleTables` are created empty. This is a deliberate scope decision.
+- **DPM validation rules are not exported to the 45-table schema.** `vValidationRuleExpressions`
+  and `vValidationRuleTables` are created empty. This is a deliberate scope decision. The native
+  output (`--target native`) carries the DPM 2.0 validation-rule tables as the Access database
+  has them; they are not evaluated or translated.
+- **The native output needs a DPM 2.0 database of release 4.4 or later.** Earlier publications
+  (4.2.1, 4.3) have a different physical schema and are rejected; the 4.4 database contains
+  their releases.
 - **Windows-only**, because of the ACE OLEDB (Access database engine) dependency.
 - **No in-process concurrency over Access.** The ACE OLEDB provider is not safe for concurrent
   use from several threads of the same process, even on different files (it can crash with
@@ -175,6 +180,7 @@ difference against it is reported but never treated as a defect on its own. Deta
 | [docs/mapping-dpm1.md](docs/mapping-dpm1.md) | Mapping rules from DPM 1.0 to the distribution schema |
 | [docs/mapping-dpm2.md](docs/mapping-dpm2.md) | Mapping rules from DPM 2.0 to the distribution schema |
 | [docs/target-schema.md](docs/target-schema.md) | The 45-table DPM distribution schema |
+| [docs/target-schema-native.md](docs/target-schema-native.md) | The native DPM 2.0 output: content, type mapping, keys, schema drift |
 | [docs/test-data.md](docs/test-data.md) | Obtaining the EBA data files used by the data-dependent tests |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing, branching strategy and pull requests |

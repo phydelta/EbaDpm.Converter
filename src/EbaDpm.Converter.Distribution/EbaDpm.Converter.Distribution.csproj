@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>EbaDpm.Converter.Distribution</RootNamespace>
+    <!-- Windows-only, x64 or x86 (AnyCPU; the bitness comes from the runtime identifier):
+         reading the source depends on ACE OLEDB (16.0 or 12.0) -->
+    <SupportedOSPlatform>windows</SupportedOSPlatform>
+  </PropertyGroup>
+
+  <!-- The existing pipeline: DPM 1.0 and DPM 2.0 to the 45-table distribution schema (readers,
+       mapping, schema DDL, writer, validation, known exceptions). Removable as a whole. -->
+  <ItemGroup>
+    <ProjectReference Include="..\EbaDpm.Converter.Core\EbaDpm.Converter.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EbaDpm.Converter" />
+    <InternalsVisibleTo Include="EbaDpm.Converter.Distribution.Tests" />
+    <InternalsVisibleTo Include="EbaDpm.Converter.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="11.0.0" />
+    <PackageReference Include="System.Data.OleDb" Version="11.0.0" />
+  </ItemGroup>
+
+  <!-- Namespaces of the shared project that the moved code used to see as its own. -->
+  <ItemGroup>
+    <Using Include="EbaDpm.Converter.Core.Access" />
+    <Using Include="EbaDpm.Converter.Core.Sqlite" />
+    <Using Include="EbaDpm.Converter.Core.Validation" />
+    <Using Include="EbaDpm.Converter.Core.Validation.PlaneC" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\dpm-distribution-schema.sql">
+      <LogicalName>EbaDpm.Converter.Distribution.Resources.dpm-distribution-schema.sql</LogicalName>
+    </EmbeddedResource>
+    <!-- Closed census of the known plane C divergences, one file per release
+         (plane-c-known-divergences-<release>.tsv): regenerated per release, never hardcoded in C#.
+         KnownExceptions enumerates the manifest resources by this LogicalName prefix. -->
+    <EmbeddedResource Include="Resources\plane-c-known-divergences-*.tsv">
+      <LogicalName>EbaDpm.Converter.Distribution.Resources.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,6731 @@
+{
+  "ReleaseCode": "4.4",
+  "SourceFile": "DPM2 Database_v 4_4_20261006.accdb",
+  "Catalog": {
+    "Tables": [
+      {
+        "Name": "Aux_CellMapping",
+        "Columns": [
+          {
+            "Name": "NewCellID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "NewTableVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "OldCellID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "OldTableVID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "NewCellID",
+          "NewTableVID"
+        ]
+      },
+      {
+        "Name": "Aux_CellStatus",
+        "Columns": [
+          {
+            "Name": "TableVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "CellID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Status",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "IsNewCell",
+            "DataType": 11,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "TableVID",
+          "CellID"
+        ]
+      },
+      {
+        "Name": "Category",
+        "Columns": [
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "IsEnumerated",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsActive",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsExternalRefData",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "RefDataSource",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "CreatedRelease",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "CategoryID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "CategoryID"
+        ]
+      },
+      {
+        "Name": "Cell",
+        "Columns": [
+          {
+            "Name": "TableID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ColumnID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "SheetID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "CellID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "CellID"
+        ]
+      },
+      {
+        "Name": "ChangeLog",
+        "Columns": [
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": false
+          },
+          {
+            "Name": "ClassID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Timestamp",
+            "DataType": 131,
+            "Nullable": false
+          },
+          {
+            "Name": "ChangeType",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Status",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "UserEmail",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EntityID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "EntityCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ActionID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "ActionID"
+        ]
+      },
+      {
+        "Name": "ChangeLogAttribute",
+        "Columns": [
+          {
+            "Name": "ActionID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "AttributeID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "OldValue",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "NewValue",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ChangeLogAttributeID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "ChangeLogAttributeID"
+        ]
+      },
+      {
+        "Name": "CompoundItemContext",
+        "Columns": [
+          {
+            "Name": "ItemID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ContextID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "ItemID",
+          "StartReleaseID"
+        ]
+      },
+      {
+        "Name": "CompoundKey",
+        "Columns": [
+          {
+            "Name": "Signature",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "KeyID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "KeyID"
+        ]
+      },
+      {
+        "Name": "Concept",
+        "Columns": [
+          {
+            "Name": "ConceptGUID",
+            "DataType": 72,
+            "Nullable": false
+          },
+          {
+            "Name": "ClassID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "ConceptGUID"
+        ]
+      },
+      {
+        "Name": "ConceptRelation",
+        "Columns": [
+          {
+            "Name": "Type",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "ConceptRelationID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "ConceptRelationID"
+        ]
+      },
+      {
+        "Name": "Context",
+        "Columns": [
+          {
+            "Name": "Signature",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ContextID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "ContextID"
+        ]
+      },
+      {
+        "Name": "ContextComposition",
+        "Columns": [
+          {
+            "Name": "ContextID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "PropertyID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ItemID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "ContextID",
+          "PropertyID"
+        ]
+      },
+      {
+        "Name": "DPMAttribute",
+        "Columns": [
+          {
+            "Name": "ClassID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "HasTranslations",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "AttributeID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "AttributeID"
+        ]
+      },
+      {
+        "Name": "DPMClass",
+        "Columns": [
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Type",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerClassID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "HasReferences",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "ClassID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "ClassID"
+        ]
+      },
+      {
+        "Name": "DataType",
+        "Columns": [
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "ParentDataTypeID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "IsActive",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "DataTypeID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "DataTypeID"
+        ]
+      },
+      {
+        "Name": "Document",
+        "Columns": [
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "Type",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "OrgID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "DocumentID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "DocumentID"
+        ]
+      },
+      {
+        "Name": "DocumentVersion",
+        "Columns": [
+          {
+            "Name": "DocumentID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Version",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "PublicationDate",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "DocumentVID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "DocumentVID"
+        ]
+      },
+      {
+        "Name": "Framework",
+        "Columns": [
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "FrameworkID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "FrameworkID"
+        ]
+      },
+      {
+        "Name": "Header",
+        "Columns": [
+          {
+            "Name": "TableID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Direction",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "IsKey",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "IsAttribute",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "HeaderID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "HeaderID"
+        ]
+      },
+      {
+        "Name": "HeaderVersion",
+        "Columns": [
+          {
+            "Name": "HeaderID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "Label",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "PropertyID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ContextID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "SubCategoryVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "KeyVariableVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "HeaderVID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "HeaderVID"
+        ]
+      },
+      {
+        "Name": "Item",
+        "Columns": [
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "IsProperty",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsActive",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ItemID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "ItemID"
+        ]
+      },
+      {
+        "Name": "ItemCategory",
+        "Columns": [
+          {
+            "Name": "ItemID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "CategoryID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "IsDefaultItem",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "Signature",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "ItemID",
+          "StartReleaseID"
+        ]
+      },
+      {
+        "Name": "KeyComposition",
+        "Columns": [
+          {
+            "Name": "KeyID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "VariableVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "KeyID",
+          "VariableVID"
+        ]
+      },
+      {
+        "Name": "KeyHeaderMapping",
+        "Columns": [
+          {
+            "Name": "AssociationID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ForeignKeyHeaderID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "PrimaryKeyHeaderID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "AssociationID",
+          "ForeignKeyHeaderID"
+        ]
+      },
+      {
+        "Name": "Language",
+        "Columns": [
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "LanguageCode",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "LanguageCode"
+        ]
+      },
+      {
+        "Name": "ModelViolations",
+        "Columns": [
+          {
+            "Name": "ViolationCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "Violation",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "isBlocking",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "TableVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "OldTableVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "TableCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "HeaderID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "HeaderCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "HeaderVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "OldHeaderVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "KeyHeader",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "HeaderDirection",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "HeaderPropertyID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "HeaderPropertyCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "HeaderSubcategoryID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "HeaderSubcategoryName",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "HeaderContextID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "CategoryID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "CategoryCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ItemID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ItemCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "CellID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "CellCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "Cell2ID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "Cell2Code",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "VVEndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "NewAspect",
+            "DataType": 130,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": []
+      },
+      {
+        "Name": "Module",
+        "Columns": [
+          {
+            "Name": "FrameworkID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "isDocumentModule",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ModuleID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "ModuleID"
+        ]
+      },
+      {
+        "Name": "ModuleParameters",
+        "Columns": [
+          {
+            "Name": "ModuleVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "VariableVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "ModuleVID",
+          "VariableVID"
+        ]
+      },
+      {
+        "Name": "ModuleVersion",
+        "Columns": [
+          {
+            "Name": "ModuleID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "GlobalKeyID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "VersionNumber",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "FromReferenceDate",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "ToReferenceDate",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "IsReported",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsCalculated",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "ModuleVID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "ModuleVID"
+        ]
+      },
+      {
+        "Name": "ModuleVersionComposition",
+        "Columns": [
+          {
+            "Name": "ModuleVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "TableID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "TableVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Order",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "ModuleVID",
+          "TableID"
+        ]
+      },
+      {
+        "Name": "OperandReference",
+        "Columns": [
+          {
+            "Name": "NodeID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "x",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "y",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "z",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "OperandReference",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "ItemID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "PropertyID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "VariableID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "SubCategoryID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "OperandReferenceID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "OperationVID",
+            "DataType": 3,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "OperandReferenceID"
+        ]
+      },
+      {
+        "Name": "OperandReferenceLocation",
+        "Columns": [
+          {
+            "Name": "OperandReferenceID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "CellID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Table",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Row",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "Column",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "Sheet",
+            "DataType": 130,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "OperandReferenceID"
+        ]
+      },
+      {
+        "Name": "Operation",
+        "Columns": [
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Type",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Source",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "GroupOperID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "OperationID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "OperationID"
+        ]
+      },
+      {
+        "Name": "OperationCodePrefix",
+        "Columns": [
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "ListName",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "FrameworkID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "OperationCodePrefixID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "OperationCodePrefixID"
+        ]
+      },
+      {
+        "Name": "OperationNode",
+        "Columns": [
+          {
+            "Name": "OperationVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ParentNodeID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "OperatorID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ArgumentID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "AbsoluteTolerance",
+            "DataType": 131,
+            "Nullable": true
+          },
+          {
+            "Name": "RelativeTolerance",
+            "DataType": 131,
+            "Nullable": true
+          },
+          {
+            "Name": "FallbackValue",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "UseIntervalArithmetics",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "OperandType",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "IsLeaf",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "Scalar",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "NodeID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "NodeID"
+        ]
+      },
+      {
+        "Name": "OperationOutput",
+        "Columns": [
+          {
+            "Name": "OperationVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ModuleVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "OperationVID",
+          "ModuleVID"
+        ]
+      },
+      {
+        "Name": "OperationScope",
+        "Columns": [
+          {
+            "Name": "OperationVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "IsActive",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "Severity",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "FromSubmissionDate",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OperationScopeID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "CreatedReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "OperationScopeID"
+        ]
+      },
+      {
+        "Name": "OperationScopeComposition",
+        "Columns": [
+          {
+            "Name": "OperationScopeID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ModuleVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "OperationScopeID",
+          "ModuleVID"
+        ]
+      },
+      {
+        "Name": "OperationVersion",
+        "Columns": [
+          {
+            "Name": "OperationVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "OperationID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "PreconditionOperationVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "SeverityOperationVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "Expression",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "Endorsement",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "IsVariantApproved",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "OutputVariableID",
+            "DataType": 3,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "OperationVID"
+        ]
+      },
+      {
+        "Name": "OperationVersionData",
+        "Columns": [
+          {
+            "Name": "OperationVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Error",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ErrorCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "IsApplying",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "ProposingStatus",
+            "DataType": 130,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "OperationVID"
+        ]
+      },
+      {
+        "Name": "Operator",
+        "Columns": [
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Symbol",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Type",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "OperatorID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "OperatorID"
+        ]
+      },
+      {
+        "Name": "OperatorArgument",
+        "Columns": [
+          {
+            "Name": "OperatorID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Order",
+            "DataType": 17,
+            "Nullable": false
+          },
+          {
+            "Name": "IsMandatory",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "ArgumentID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "ArgumentID"
+        ]
+      },
+      {
+        "Name": "Organisation",
+        "Columns": [
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Acronym",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "IDPrefix",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OrgID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "URL",
+            "DataType": 130,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "OrgID"
+        ]
+      },
+      {
+        "Name": "Property",
+        "Columns": [
+          {
+            "Name": "PropertyID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "IsComposite",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsMetric",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "DataTypeID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ValueLength",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "PeriodType",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "PropertyID"
+        ]
+      },
+      {
+        "Name": "PropertyCategory",
+        "Columns": [
+          {
+            "Name": "PropertyID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "CategoryID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "PropertyID",
+          "StartReleaseID"
+        ]
+      },
+      {
+        "Name": "Reference",
+        "Columns": [
+          {
+            "Name": "SubdivisionID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ConceptGUID",
+            "DataType": 72,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "SubdivisionID",
+          "ConceptGUID"
+        ]
+      },
+      {
+        "Name": "RelatedConcept",
+        "Columns": [
+          {
+            "Name": "ConceptGUID",
+            "DataType": 72,
+            "Nullable": false
+          },
+          {
+            "Name": "ConceptRelationID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "IsRelatedConcept",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "ConceptGUID",
+          "ConceptRelationID"
+        ]
+      },
+      {
+        "Name": "Release",
+        "Columns": [
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Date",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "Status",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "IsCurrent",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "ErrorDate",
+            "DataType": 7,
+            "Nullable": true
+          },
+          {
+            "Name": "Type",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Error",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "ReleaseID"
+        ]
+      },
+      {
+        "Name": "Role",
+        "Columns": [
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "RoleID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "RoleID"
+        ]
+      },
+      {
+        "Name": "SubCategory",
+        "Columns": [
+          {
+            "Name": "CategoryID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "SubCategoryID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "SubCategoryID"
+        ]
+      },
+      {
+        "Name": "SubCategoryItem",
+        "Columns": [
+          {
+            "Name": "ItemID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "SubCategoryVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Order",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "Label",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ParentItemID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ComparisonOperatorID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ArithmeticOperatorID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "ItemID",
+          "SubCategoryVID"
+        ]
+      },
+      {
+        "Name": "SubCategoryVersion",
+        "Columns": [
+          {
+            "Name": "SubCategoryID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "SubCategoryVID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "SubCategoryVID"
+        ]
+      },
+      {
+        "Name": "Subdivision",
+        "Columns": [
+          {
+            "Name": "DocumentVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "SubdivisionTypeID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Number",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ParentSubdivisionID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "StructurePath",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "TextExcerpt",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "SubdivisionID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "SubdivisionID"
+        ]
+      },
+      {
+        "Name": "SubdivisionType",
+        "Columns": [
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "SubdivisionTypeID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "SubdivisionTypeID"
+        ]
+      },
+      {
+        "Name": "SuperCategoryComposition",
+        "Columns": [
+          {
+            "Name": "SuperCategoryID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "CategoryID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "SuperCategoryID",
+          "CategoryID",
+          "StartReleaseID"
+        ]
+      },
+      {
+        "Name": "Table",
+        "Columns": [
+          {
+            "Name": "IsAbstract",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "HasOpenColumns",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "HasOpenRows",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "HasOpenSheets",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsNormalised",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsFlat",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "TableID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "TableID"
+        ]
+      },
+      {
+        "Name": "TableAssociation",
+        "Columns": [
+          {
+            "Name": "ChildTableVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ParentTableVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "IsIdentifying",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsSubtype",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "SubtypeDiscriminator",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ParentCardinalityAndOptionality",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "ChildCardinalityAndOptionality",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "AssociationID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "AssociationID"
+        ]
+      },
+      {
+        "Name": "TableGroup",
+        "Columns": [
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "Type",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ParentTableGroupID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "TableGroupID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "TableGroupID"
+        ]
+      },
+      {
+        "Name": "TableGroupComposition",
+        "Columns": [
+          {
+            "Name": "TableGroupID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "TableID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Order",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "TableGroupID",
+          "TableID"
+        ]
+      },
+      {
+        "Name": "TableVersion",
+        "Columns": [
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "Description",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "TableID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "AbstractTableID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "KeyID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "PropertyID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ContextID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "TableVID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "TableVID"
+        ]
+      },
+      {
+        "Name": "TableVersionCell",
+        "Columns": [
+          {
+            "Name": "TableVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "CellID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "CellCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "IsNullable",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsExcluded",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsVoid",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "Sign",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "VariableVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "TableVID",
+          "CellID"
+        ]
+      },
+      {
+        "Name": "TableVersionHeader",
+        "Columns": [
+          {
+            "Name": "TableVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "HeaderID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "HeaderVID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "ParentHeaderID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ParentFirst",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "Order",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "IsAbstract",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "IsUnique",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "TableVID",
+          "HeaderID"
+        ]
+      },
+      {
+        "Name": "Translation",
+        "Columns": [
+          {
+            "Name": "ConceptGUID",
+            "DataType": 72,
+            "Nullable": false
+          },
+          {
+            "Name": "AttributeID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "TranslatorID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "LanguageCode",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Translation",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": [
+          "ConceptGUID",
+          "AttributeID",
+          "TranslatorID",
+          "LanguageCode"
+        ]
+      },
+      {
+        "Name": "User",
+        "Columns": [
+          {
+            "Name": "OrgID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "UserID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "UserID"
+        ]
+      },
+      {
+        "Name": "UserRole",
+        "Columns": [
+          {
+            "Name": "UserID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "RoleID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "UserID",
+          "RoleID"
+        ]
+      },
+      {
+        "Name": "VarGeneration_Detail",
+        "Columns": [
+          {
+            "Name": "noofcells",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "NewAspect",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ModuleVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ModuleCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "TableCode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "TableVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "CellID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "cellcode",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "outcomeID",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "outcomeVID",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ReportMsg",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "isVoid",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "tvstartReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "mvStartReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "vvOldEndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "OldAspect",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "IsNewCell",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "isnewPropertyDataType",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "isNewKey",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "OldVariableID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "NewVarID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "OldVariableVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "NewVVID",
+            "DataType": 3,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": []
+      },
+      {
+        "Name": "VarGeneration_Summary",
+        "Columns": [
+          {
+            "Name": "outcomeid",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "outcomevid",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ReportMsg",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "noofcells",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "mincell",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "maxcell",
+            "DataType": 130,
+            "Nullable": true
+          }
+        ],
+        "PrimaryKey": []
+      },
+      {
+        "Name": "Variable",
+        "Columns": [
+          {
+            "Name": "Type",
+            "DataType": 130,
+            "Nullable": false
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "OwnerID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "VariableID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "VariableID"
+        ]
+      },
+      {
+        "Name": "VariableGeneration",
+        "Columns": [
+          {
+            "Name": "StartDate",
+            "DataType": 7,
+            "Nullable": false
+          },
+          {
+            "Name": "EndDate",
+            "DataType": 7,
+            "Nullable": true
+          },
+          {
+            "Name": "Status",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "ReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "Error",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "VariableGenerationID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "VariableGenerationID"
+        ]
+      },
+      {
+        "Name": "VariableVersion",
+        "Columns": [
+          {
+            "Name": "VariableID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "PropertyID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "SubCategoryVID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "ContextID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "KeyID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "IsMultiValued",
+            "DataType": 11,
+            "Nullable": false
+          },
+          {
+            "Name": "Code",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "Name",
+            "DataType": 130,
+            "Nullable": true
+          },
+          {
+            "Name": "StartReleaseID",
+            "DataType": 3,
+            "Nullable": false
+          },
+          {
+            "Name": "EndReleaseID",
+            "DataType": 3,
+            "Nullable": true
+          },
+          {
+            "Name": "RowGUID",
+            "DataType": 72,
+            "Nullable": true
+          },
+          {
+            "Name": "VariableVID",
+            "DataType": 3,
+            "Nullable": false
+          }
+        ],
+        "PrimaryKey": [
+          "VariableVID"
+        ]
+      }
+    ],
+    "ForeignKeys": [
+      {
+        "Name": "FKCategory743377",
+        "ChildTable": "Category",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCategory_Release",
+        "ChildTable": "Category",
+        "ChildColumns": [
+          "CreatedRelease"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Category_Owner",
+        "ChildTable": "Category",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCell154740",
+        "ChildTable": "Cell",
+        "ChildColumns": [
+          "TableID"
+        ],
+        "ParentTable": "Table",
+        "ParentColumns": [
+          "TableID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCell197808",
+        "ChildTable": "Cell",
+        "ChildColumns": [
+          "RowID"
+        ],
+        "ParentTable": "Header",
+        "ParentColumns": [
+          "HeaderID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCell269161",
+        "ChildTable": "Cell",
+        "ChildColumns": [
+          "SheetID"
+        ],
+        "ParentTable": "Header",
+        "ParentColumns": [
+          "HeaderID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCell269422",
+        "ChildTable": "Cell",
+        "ChildColumns": [
+          "ColumnID"
+        ],
+        "ParentTable": "Header",
+        "ParentColumns": [
+          "HeaderID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCell802206",
+        "ChildTable": "Cell",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Cell_Owner",
+        "ChildTable": "Cell",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_ChangeLog_DPMClass",
+        "ChildTable": "ChangeLog",
+        "ChildColumns": [
+          "ClassID"
+        ],
+        "ParentTable": "DPMClass",
+        "ParentColumns": [
+          "ClassID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_ChangeLog_Release",
+        "ChildTable": "ChangeLog",
+        "ChildColumns": [
+          "ReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_ChangeLogAttribute_Action",
+        "ChildTable": "ChangeLogAttribute",
+        "ChildColumns": [
+          "ActionID"
+        ],
+        "ParentTable": "ChangeLog",
+        "ParentColumns": [
+          "ActionID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_ChangeLogAttribute_Attribute",
+        "ChildTable": "ChangeLogAttribute",
+        "ChildColumns": [
+          "AttributeID"
+        ],
+        "ParentTable": "DPMAttribute",
+        "ParentColumns": [
+          "AttributeID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCompoundIt265848",
+        "ChildTable": "CompoundItemContext",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCompoundIt363990",
+        "ChildTable": "CompoundItemContext",
+        "ChildColumns": [
+          "ItemID"
+        ],
+        "ParentTable": "Item",
+        "ParentColumns": [
+          "ItemID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCompoundIt742108",
+        "ChildTable": "CompoundItemContext",
+        "ChildColumns": [
+          "ContextID"
+        ],
+        "ParentTable": "Context",
+        "ParentColumns": [
+          "ContextID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCompoundIt823291",
+        "ChildTable": "CompoundItemContext",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKCompoundKe582932",
+        "ChildTable": "CompoundKey",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_CompoundKey_Owner",
+        "ChildTable": "CompoundKey",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKConcept762157",
+        "ChildTable": "Concept",
+        "ChildColumns": [
+          "ClassID"
+        ],
+        "ParentTable": "DPMClass",
+        "ParentColumns": [
+          "ClassID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKConcept928356",
+        "ChildTable": "Concept",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKContext288100",
+        "ChildTable": "Context",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Context_Owner",
+        "ChildTable": "Context",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKContextCom783218",
+        "ChildTable": "ContextComposition",
+        "ChildColumns": [
+          "ItemID"
+        ],
+        "ParentTable": "Item",
+        "ParentColumns": [
+          "ItemID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKContextCom82273",
+        "ChildTable": "ContextComposition",
+        "ChildColumns": [
+          "ContextID"
+        ],
+        "ParentTable": "Context",
+        "ParentColumns": [
+          "ContextID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKContextCom93794",
+        "ChildTable": "ContextComposition",
+        "ChildColumns": [
+          "PropertyID"
+        ],
+        "ParentTable": "Property",
+        "ParentColumns": [
+          "PropertyID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKDPMAttribu969215",
+        "ChildTable": "DPMAttribute",
+        "ChildColumns": [
+          "ClassID"
+        ],
+        "ParentTable": "DPMClass",
+        "ParentColumns": [
+          "ClassID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKDocument532809",
+        "ChildTable": "Document",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKDocument854565",
+        "ChildTable": "Document",
+        "ChildColumns": [
+          "OrgID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKDocumentVe733361",
+        "ChildTable": "DocumentVersion",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKDocumentVe77896",
+        "ChildTable": "DocumentVersion",
+        "ChildColumns": [
+          "DocumentID"
+        ],
+        "ParentTable": "Document",
+        "ParentColumns": [
+          "DocumentID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKFramework245233",
+        "ChildTable": "Framework",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Framework_Owner",
+        "ChildTable": "Framework",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKHeader347644",
+        "ChildTable": "Header",
+        "ChildColumns": [
+          "TableID"
+        ],
+        "ParentTable": "Table",
+        "ParentColumns": [
+          "TableID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKHeader666999",
+        "ChildTable": "Header",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Header_Owner",
+        "ChildTable": "Header",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKHeaderVers165467",
+        "ChildTable": "HeaderVersion",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKHeaderVers371312",
+        "ChildTable": "HeaderVersion",
+        "ChildColumns": [
+          "HeaderID"
+        ],
+        "ParentTable": "Header",
+        "ParentColumns": [
+          "HeaderID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKHeaderVers395590",
+        "ChildTable": "HeaderVersion",
+        "ChildColumns": [
+          "PropertyID"
+        ],
+        "ParentTable": "Property",
+        "ParentColumns": [
+          "PropertyID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKHeaderVers399933",
+        "ChildTable": "HeaderVersion",
+        "ChildColumns": [
+          "ContextID"
+        ],
+        "ParentTable": "Context",
+        "ParentColumns": [
+          "ContextID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKHeaderVers608023",
+        "ChildTable": "HeaderVersion",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKHeaderVers699034",
+        "ChildTable": "HeaderVersion",
+        "ChildColumns": [
+          "KeyVariableVID"
+        ],
+        "ParentTable": "VariableVersion",
+        "ParentColumns": [
+          "VariableVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKHeaderVers717070",
+        "ChildTable": "HeaderVersion",
+        "ChildColumns": [
+          "SubCategoryVID"
+        ],
+        "ParentTable": "SubCategoryVersion",
+        "ParentColumns": [
+          "SubCategoryVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKHeaderVers859687",
+        "ChildTable": "HeaderVersion",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKItem609261",
+        "ChildTable": "Item",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Item_Owner",
+        "ChildTable": "Item",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKItemCatego390588",
+        "ChildTable": "ItemCategory",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKItemCatego525178",
+        "ChildTable": "ItemCategory",
+        "ChildColumns": [
+          "CategoryID"
+        ],
+        "ParentTable": "Category",
+        "ParentColumns": [
+          "CategoryID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKItemCatego833144",
+        "ChildTable": "ItemCategory",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKItemCatego931286",
+        "ChildTable": "ItemCategory",
+        "ChildColumns": [
+          "ItemID"
+        ],
+        "ParentTable": "Item",
+        "ParentColumns": [
+          "ItemID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKKeyComposi60275",
+        "ChildTable": "KeyComposition",
+        "ChildColumns": [
+          "KeyID"
+        ],
+        "ParentTable": "CompoundKey",
+        "ParentColumns": [
+          "KeyID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKKeyComposi605606",
+        "ChildTable": "KeyComposition",
+        "ChildColumns": [
+          "VariableVID"
+        ],
+        "ParentTable": "VariableVersion",
+        "ParentColumns": [
+          "VariableVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKKeyHeaderM108065",
+        "ChildTable": "KeyHeaderMapping",
+        "ChildColumns": [
+          "PrimaryKeyHeaderID"
+        ],
+        "ParentTable": "Header",
+        "ParentColumns": [
+          "HeaderID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKKeyHeaderM189933",
+        "ChildTable": "KeyHeaderMapping",
+        "ChildColumns": [
+          "AssociationID"
+        ],
+        "ParentTable": "TableAssociation",
+        "ParentColumns": [
+          "AssociationID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKKeyHeaderM636398",
+        "ChildTable": "KeyHeaderMapping",
+        "ChildColumns": [
+          "ForeignKeyHeaderID"
+        ],
+        "ParentTable": "Header",
+        "ParentColumns": [
+          "HeaderID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModule154031",
+        "ChildTable": "Module",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModule328191",
+        "ChildTable": "Module",
+        "ChildColumns": [
+          "FrameworkID"
+        ],
+        "ParentTable": "Framework",
+        "ParentColumns": [
+          "FrameworkID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Module_Owner",
+        "ChildTable": "Module",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModulePara120772",
+        "ChildTable": "ModuleParameters",
+        "ChildColumns": [
+          "VariableVID"
+        ],
+        "ParentTable": "VariableVersion",
+        "ParentColumns": [
+          "VariableVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModulePara783919",
+        "ChildTable": "ModuleParameters",
+        "ChildColumns": [
+          "ModuleVID"
+        ],
+        "ParentTable": "ModuleVersion",
+        "ParentColumns": [
+          "ModuleVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModuleVers207386",
+        "ChildTable": "ModuleVersion",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModuleVers404440",
+        "ChildTable": "ModuleVersion",
+        "ChildColumns": [
+          "GlobalKeyID"
+        ],
+        "ParentTable": "CompoundKey",
+        "ParentColumns": [
+          "KeyID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModuleVers49266",
+        "ChildTable": "ModuleVersion",
+        "ChildColumns": [
+          "ModuleID"
+        ],
+        "ParentTable": "Module",
+        "ParentColumns": [
+          "ModuleID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModuleVers649942",
+        "ChildTable": "ModuleVersion",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModuleVers675097",
+        "ChildTable": "ModuleVersion",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModuleVers2767",
+        "ChildTable": "ModuleVersionComposition",
+        "ChildColumns": [
+          "TableVID"
+        ],
+        "ParentTable": "TableVersion",
+        "ParentColumns": [
+          "TableVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModuleVers724892",
+        "ChildTable": "ModuleVersionComposition",
+        "ChildColumns": [
+          "ModuleVID"
+        ],
+        "ParentTable": "ModuleVersion",
+        "ParentColumns": [
+          "ModuleVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKModuleVers801841",
+        "ChildTable": "ModuleVersionComposition",
+        "ChildColumns": [
+          "TableID"
+        ],
+        "ParentTable": "Table",
+        "ParentColumns": [
+          "TableID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperandRef200461",
+        "ChildTable": "OperandReference",
+        "ChildColumns": [
+          "VariableID"
+        ],
+        "ParentTable": "Variable",
+        "ParentColumns": [
+          "VariableID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperandRef220623",
+        "ChildTable": "OperandReference",
+        "ChildColumns": [
+          "PropertyID"
+        ],
+        "ParentTable": "Property",
+        "ParentColumns": [
+          "PropertyID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperandRef468801",
+        "ChildTable": "OperandReference",
+        "ChildColumns": [
+          "ItemID"
+        ],
+        "ParentTable": "Item",
+        "ParentColumns": [
+          "ItemID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperandRef7492",
+        "ChildTable": "OperandReference",
+        "ChildColumns": [
+          "SubCategoryID"
+        ],
+        "ParentTable": "SubCategory",
+        "ParentColumns": [
+          "SubCategoryID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperandRef996703",
+        "ChildTable": "OperandReference",
+        "ChildColumns": [
+          "NodeID"
+        ],
+        "ParentTable": "OperationNode",
+        "ParentColumns": [
+          "NodeID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_OperandReference_OperationVersion",
+        "ChildTable": "OperandReference",
+        "ChildColumns": [
+          "OperationVID"
+        ],
+        "ParentTable": "OperationVersion",
+        "ParentColumns": [
+          "OperationVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperandRef286522",
+        "ChildTable": "OperandReferenceLocation",
+        "ChildColumns": [
+          "OperandReferenceID"
+        ],
+        "ParentTable": "OperandReference",
+        "ParentColumns": [
+          "OperandReferenceID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperandRef881860",
+        "ChildTable": "OperandReferenceLocation",
+        "ChildColumns": [
+          "CellID"
+        ],
+        "ParentTable": "Cell",
+        "ParentColumns": [
+          "CellID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperation195728",
+        "ChildTable": "Operation",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Operation_Owner",
+        "ChildTable": "Operation",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK__Operation__Frame__22401542",
+        "ChildTable": "OperationCodePrefix",
+        "ChildColumns": [
+          "FrameworkID"
+        ],
+        "ParentTable": "Framework",
+        "ParentColumns": [
+          "FrameworkID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperationN128256",
+        "ChildTable": "OperationNode",
+        "ChildColumns": [
+          "ArgumentID"
+        ],
+        "ParentTable": "OperatorArgument",
+        "ParentColumns": [
+          "ArgumentID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperationN554566",
+        "ChildTable": "OperationNode",
+        "ChildColumns": [
+          "OperatorID"
+        ],
+        "ParentTable": "Operator",
+        "ParentColumns": [
+          "OperatorID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperationN727504",
+        "ChildTable": "OperationNode",
+        "ChildColumns": [
+          "OperationVID"
+        ],
+        "ParentTable": "OperationVersion",
+        "ParentColumns": [
+          "OperationVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_OperationOutput_ModuleVersion",
+        "ChildTable": "OperationOutput",
+        "ChildColumns": [
+          "ModuleVID"
+        ],
+        "ParentTable": "ModuleVersion",
+        "ParentColumns": [
+          "ModuleVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_OperationOutput_OperationVersion",
+        "ChildTable": "OperationOutput",
+        "ChildColumns": [
+          "OperationVID"
+        ],
+        "ParentTable": "OperationVersion",
+        "ParentColumns": [
+          "OperationVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_OperationOutput_Owner",
+        "ChildTable": "OperationOutput",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperationS602068",
+        "ChildTable": "OperationScope",
+        "ChildColumns": [
+          "OperationVID"
+        ],
+        "ParentTable": "OperationVersion",
+        "ParentColumns": [
+          "OperationVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_OperationScope_CreatedRelease",
+        "ChildTable": "OperationScope",
+        "ChildColumns": [
+          "CreatedReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperationS606932",
+        "ChildTable": "OperationScopeComposition",
+        "ChildColumns": [
+          "ModuleVID"
+        ],
+        "ParentTable": "ModuleVersion",
+        "ParentColumns": [
+          "ModuleVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperationS658414",
+        "ChildTable": "OperationScopeComposition",
+        "ChildColumns": [
+          "OperationScopeID"
+        ],
+        "ParentTable": "OperationScope",
+        "ParentColumns": [
+          "OperationScopeID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperationV135889",
+        "ChildTable": "OperationVersion",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperationV331822",
+        "ChildTable": "OperationVersion",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperationV552560",
+        "ChildTable": "OperationVersion",
+        "ChildColumns": [
+          "OperationID"
+        ],
+        "ParentTable": "Operation",
+        "ParentColumns": [
+          "OperationID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperationV693332",
+        "ChildTable": "OperationVersion",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_OperationVersion",
+        "ChildTable": "OperationVersionData",
+        "ChildColumns": [
+          "OperationVID"
+        ],
+        "ParentTable": "OperationVersion",
+        "ParentColumns": [
+          "OperationVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOperatorAr930098",
+        "ChildTable": "OperatorArgument",
+        "ChildColumns": [
+          "OperatorID"
+        ],
+        "ParentTable": "Operator",
+        "ParentColumns": [
+          "OperatorID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKOrganisati59058",
+        "ChildTable": "Organisation",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKProperty396814",
+        "ChildTable": "Property",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKProperty442698",
+        "ChildTable": "Property",
+        "ChildColumns": [
+          "DataTypeID"
+        ],
+        "ParentTable": "DataType",
+        "ParentColumns": [
+          "DataTypeID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKProperty578267",
+        "ChildTable": "Property",
+        "ChildColumns": [
+          "PropertyID"
+        ],
+        "ParentTable": "Item",
+        "ParentColumns": [
+          "ItemID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Property_Owner",
+        "ChildTable": "Property",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKPropertyCa118836",
+        "ChildTable": "PropertyCategory",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKPropertyCa323720",
+        "ChildTable": "PropertyCategory",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKPropertyCa732103",
+        "ChildTable": "PropertyCategory",
+        "ChildColumns": [
+          "CategoryID"
+        ],
+        "ParentTable": "Category",
+        "ParentColumns": [
+          "CategoryID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKPropertyCa906402",
+        "ChildTable": "PropertyCategory",
+        "ChildColumns": [
+          "PropertyID"
+        ],
+        "ParentTable": "Property",
+        "ParentColumns": [
+          "PropertyID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKReference310449",
+        "ChildTable": "Reference",
+        "ChildColumns": [
+          "ConceptGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKReference764763",
+        "ChildTable": "Reference",
+        "ChildColumns": [
+          "SubdivisionID"
+        ],
+        "ParentTable": "Subdivision",
+        "ParentColumns": [
+          "SubdivisionID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKRelatedCon174029",
+        "ChildTable": "RelatedConcept",
+        "ChildColumns": [
+          "ConceptRelationID"
+        ],
+        "ParentTable": "ConceptRelation",
+        "ParentColumns": [
+          "ConceptRelationID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKRelatedCon732301",
+        "ChildTable": "RelatedConcept",
+        "ChildColumns": [
+          "ConceptGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKRelease352135",
+        "ChildTable": "Release",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Release_Owner",
+        "ChildTable": "Release",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubCategor106944",
+        "ChildTable": "SubCategory",
+        "ChildColumns": [
+          "CategoryID"
+        ],
+        "ParentTable": "Category",
+        "ParentColumns": [
+          "CategoryID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubCategor997555",
+        "ChildTable": "SubCategory",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_SubCategory_Owner",
+        "ChildTable": "SubCategory",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubCategor420859",
+        "ChildTable": "SubCategoryItem",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubCategor541932",
+        "ChildTable": "SubCategoryItem",
+        "ChildColumns": [
+          "ArithmeticOperatorID"
+        ],
+        "ParentTable": "Operator",
+        "ParentColumns": [
+          "OperatorID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubCategor651879",
+        "ChildTable": "SubCategoryItem",
+        "ChildColumns": [
+          "ComparisonOperatorID"
+        ],
+        "ParentTable": "Operator",
+        "ParentColumns": [
+          "OperatorID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubCategor693348",
+        "ChildTable": "SubCategoryItem",
+        "ChildColumns": [
+          "SubCategoryVID"
+        ],
+        "ParentTable": "SubCategoryVersion",
+        "ParentColumns": [
+          "SubCategoryVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubCategor855005",
+        "ChildTable": "SubCategoryItem",
+        "ChildColumns": [
+          "ItemID"
+        ],
+        "ParentTable": "Item",
+        "ParentColumns": [
+          "ItemID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubCategor168279",
+        "ChildTable": "SubCategoryVersion",
+        "ChildColumns": [
+          "SubCategoryID"
+        ],
+        "ParentTable": "SubCategory",
+        "ParentColumns": [
+          "SubCategoryID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubCategor727730",
+        "ChildTable": "SubCategoryVersion",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubCategor801303",
+        "ChildTable": "SubCategoryVersion",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubdivisio226639",
+        "ChildTable": "Subdivision",
+        "ChildColumns": [
+          "DocumentVID"
+        ],
+        "ParentTable": "DocumentVersion",
+        "ParentColumns": [
+          "DocumentVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubdivisio562876",
+        "ChildTable": "Subdivision",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSubdivisio763080",
+        "ChildTable": "Subdivision",
+        "ChildColumns": [
+          "SubdivisionTypeID"
+        ],
+        "ParentTable": "SubdivisionType",
+        "ParentColumns": [
+          "SubdivisionTypeID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Subdivision_Owner",
+        "ChildTable": "Subdivision",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSuperCateg746780",
+        "ChildTable": "SuperCategoryComposition",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSuperCateg782253",
+        "ChildTable": "SuperCategoryComposition",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSuperCateg825110",
+        "ChildTable": "SuperCategoryComposition",
+        "ChildColumns": [
+          "SuperCategoryID"
+        ],
+        "ParentTable": "Category",
+        "ParentColumns": [
+          "CategoryID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKSuperCateg831013",
+        "ChildTable": "SuperCategoryComposition",
+        "ChildColumns": [
+          "CategoryID"
+        ],
+        "ParentTable": "Category",
+        "ParentColumns": [
+          "CategoryID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTable335524",
+        "ChildTable": "Table",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Table_Owner",
+        "ChildTable": "Table",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableAssoc424624",
+        "ChildTable": "TableAssociation",
+        "ChildColumns": [
+          "ChildTableVID"
+        ],
+        "ParentTable": "TableVersion",
+        "ParentColumns": [
+          "TableVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableAssoc473493",
+        "ChildTable": "TableAssociation",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableAssoc546002",
+        "ChildTable": "TableAssociation",
+        "ChildColumns": [
+          "ParentTableVID"
+        ],
+        "ParentTable": "TableVersion",
+        "ParentColumns": [
+          "TableVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableAssoc840717",
+        "ChildTable": "TableAssociation",
+        "ChildColumns": [
+          "SubtypeDiscriminator"
+        ],
+        "ParentTable": "Header",
+        "ParentColumns": [
+          "HeaderID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_TableAssociation_EndRelease",
+        "ChildTable": "TableAssociation",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_TableAssociation_Owner",
+        "ChildTable": "TableAssociation",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_TableAssociation_StartRelease",
+        "ChildTable": "TableAssociation",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableGroup372000",
+        "ChildTable": "TableGroup",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableGroup70556",
+        "ChildTable": "TableGroup",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableGroup95711",
+        "ChildTable": "TableGroup",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_TableGroup_Owner",
+        "ChildTable": "TableGroup",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableGroup263656",
+        "ChildTable": "TableGroupComposition",
+        "ChildColumns": [
+          "TableID"
+        ],
+        "ParentTable": "Table",
+        "ParentColumns": [
+          "TableID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableGroup752891",
+        "ChildTable": "TableGroupComposition",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableGroup776142",
+        "ChildTable": "TableGroupComposition",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableGroup783556",
+        "ChildTable": "TableGroupComposition",
+        "ChildColumns": [
+          "TableGroupID"
+        ],
+        "ParentTable": "TableGroup",
+        "ParentColumns": [
+          "TableGroupID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi275581",
+        "ChildTable": "TableVersion",
+        "ChildColumns": [
+          "AbstractTableID"
+        ],
+        "ParentTable": "Table",
+        "ParentColumns": [
+          "TableID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi41391",
+        "ChildTable": "TableVersion",
+        "ChildColumns": [
+          "KeyID"
+        ],
+        "ParentTable": "CompoundKey",
+        "ParentColumns": [
+          "KeyID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi571493",
+        "ChildTable": "TableVersion",
+        "ChildColumns": [
+          "EndReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi607859",
+        "ChildTable": "TableVersion",
+        "ChildColumns": [
+          "ContextID"
+        ],
+        "ParentTable": "Context",
+        "ParentColumns": [
+          "ContextID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi783926",
+        "ChildTable": "TableVersion",
+        "ChildColumns": [
+          "PropertyID"
+        ],
+        "ParentTable": "Property",
+        "ParentColumns": [
+          "PropertyID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi82258",
+        "ChildTable": "TableVersion",
+        "ChildColumns": [
+          "TableID"
+        ],
+        "ParentTable": "Table",
+        "ParentColumns": [
+          "TableID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi932385",
+        "ChildTable": "TableVersion",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi957540",
+        "ChildTable": "TableVersion",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi257568",
+        "ChildTable": "TableVersionCell",
+        "ChildColumns": [
+          "TableVID"
+        ],
+        "ParentTable": "TableVersion",
+        "ParentColumns": [
+          "TableVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi872294",
+        "ChildTable": "TableVersionCell",
+        "ChildColumns": [
+          "VariableVID"
+        ],
+        "ParentTable": "VariableVersion",
+        "ParentColumns": [
+          "VariableVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi883192",
+        "ChildTable": "TableVersionCell",
+        "ChildColumns": [
+          "CellID"
+        ],
+        "ParentTable": "Cell",
+        "ParentColumns": [
+          "CellID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi102009",
+        "ChildTable": "TableVersionHeader",
+        "ChildColumns": [
+          "ParentHeaderID"
+        ],
+        "ParentTable": "Header",
+        "ParentColumns": [
+          "HeaderID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi622961",
+        "ChildTable": "TableVersionHeader",
+        "ChildColumns": [
+          "HeaderVID"
+        ],
+        "ParentTable": "HeaderVersion",
+        "ParentColumns": [
+          "HeaderVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi692213",
+        "ChildTable": "TableVersionHeader",
+        "ChildColumns": [
+          "HeaderID"
+        ],
+        "ParentTable": "Header",
+        "ParentColumns": [
+          "HeaderID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTableVersi765341",
+        "ChildTable": "TableVersionHeader",
+        "ChildColumns": [
+          "TableVID"
+        ],
+        "ParentTable": "TableVersion",
+        "ParentColumns": [
+          "TableVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTranslatio100921",
+        "ChildTable": "Translation",
+        "ChildColumns": [
+          "AttributeID"
+        ],
+        "ParentTable": "DPMAttribute",
+        "ParentColumns": [
+          "AttributeID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTranslatio481615",
+        "ChildTable": "Translation",
+        "ChildColumns": [
+          "TranslatorID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTranslatio68568",
+        "ChildTable": "Translation",
+        "ChildColumns": [
+          "ConceptGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKTranslatio815983",
+        "ChildTable": "Translation",
+        "ChildColumns": [
+          "LanguageCode"
+        ],
+        "ParentTable": "Language",
+        "ParentColumns": [
+          "LanguageCode"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKUser397109",
+        "ChildTable": "User",
+        "ChildColumns": [
+          "OrgID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKUserRole396295",
+        "ChildTable": "UserRole",
+        "ChildColumns": [
+          "UserID"
+        ],
+        "ParentTable": "User",
+        "ParentColumns": [
+          "UserID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKUserRole532117",
+        "ChildTable": "UserRole",
+        "ChildColumns": [
+          "RoleID"
+        ],
+        "ParentTable": "Role",
+        "ParentColumns": [
+          "RoleID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKVariable129247",
+        "ChildTable": "Variable",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FK_Variable_Owner",
+        "ChildTable": "Variable",
+        "ChildColumns": [
+          "OwnerID"
+        ],
+        "ParentTable": "Organisation",
+        "ParentColumns": [
+          "OrgID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "VariableGeneration_FK",
+        "ChildTable": "VariableGeneration",
+        "ChildColumns": [
+          "ReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKVariableVe350057",
+        "ChildTable": "VariableVersion",
+        "ChildColumns": [
+          "VariableID"
+        ],
+        "ParentTable": "Variable",
+        "ParentColumns": [
+          "VariableID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKVariableVe384231",
+        "ChildTable": "VariableVersion",
+        "ChildColumns": [
+          "KeyID"
+        ],
+        "ParentTable": "CompoundKey",
+        "ParentColumns": [
+          "KeyID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKVariableVe470965",
+        "ChildTable": "VariableVersion",
+        "ChildColumns": [
+          "SubCategoryVID"
+        ],
+        "ParentTable": "SubCategoryVersion",
+        "ParentColumns": [
+          "SubCategoryVID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKVariableVe588427",
+        "ChildTable": "VariableVersion",
+        "ChildColumns": [
+          "StartReleaseID"
+        ],
+        "ParentTable": "Release",
+        "ParentColumns": [
+          "ReleaseID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKVariableVe613582",
+        "ChildTable": "VariableVersion",
+        "ChildColumns": [
+          "RowGUID"
+        ],
+        "ParentTable": "Concept",
+        "ParentColumns": [
+          "ConceptGUID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKVariableVe641695",
+        "ChildTable": "VariableVersion",
+        "ChildColumns": [
+          "PropertyID"
+        ],
+        "ParentTable": "Property",
+        "ParentColumns": [
+          "PropertyID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      },
+      {
+        "Name": "FKVariableVe817762",
+        "ChildTable": "VariableVersion",
+        "ChildColumns": [
+          "ContextID"
+        ],
+        "ParentTable": "Context",
+        "ParentColumns": [
+          "ContextID"
+        ],
+        "UpdateRule": "CASCADE",
+        "DeleteRule": "NO ACTION"
+      }
+    ],
+    "Indexes": [
+      {
+        "Table": "Category",
+        "Name": "FKCategory743377",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Category",
+        "Name": "FKCategory_Release",
+        "Columns": [
+          "CreatedRelease"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Category",
+        "Name": "FK_Category_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Cell",
+        "Name": "FKCell154740",
+        "Columns": [
+          "TableID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Cell",
+        "Name": "FKCell197808",
+        "Columns": [
+          "RowID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Cell",
+        "Name": "FKCell269161",
+        "Columns": [
+          "SheetID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Cell",
+        "Name": "FKCell269422",
+        "Columns": [
+          "ColumnID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Cell",
+        "Name": "FKCell802206",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Cell",
+        "Name": "FK_Cell_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ChangeLog",
+        "Name": "FK_ChangeLog_DPMClass",
+        "Columns": [
+          "ClassID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ChangeLog",
+        "Name": "FK_ChangeLog_Release",
+        "Columns": [
+          "ReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ChangeLogAttribute",
+        "Name": "FK_ChangeLogAttribute_Action",
+        "Columns": [
+          "ActionID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ChangeLogAttribute",
+        "Name": "FK_ChangeLogAttribute_Attribute",
+        "Columns": [
+          "AttributeID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "CompoundItemContext",
+        "Name": "FKCompoundIt265848",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "CompoundItemContext",
+        "Name": "FKCompoundIt363990",
+        "Columns": [
+          "ItemID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "CompoundItemContext",
+        "Name": "FKCompoundIt742108",
+        "Columns": [
+          "ContextID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "CompoundItemContext",
+        "Name": "FKCompoundIt823291",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "CompoundKey",
+        "Name": "FKCompoundKe582932",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "CompoundKey",
+        "Name": "FK_CompoundKey_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Concept",
+        "Name": "FKConcept762157",
+        "Columns": [
+          "ClassID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Concept",
+        "Name": "FKConcept928356",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Context",
+        "Name": "FKContext288100",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Context",
+        "Name": "FK_Context_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ContextComposition",
+        "Name": "FKContextCom783218",
+        "Columns": [
+          "ItemID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ContextComposition",
+        "Name": "FKContextCom82273",
+        "Columns": [
+          "ContextID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ContextComposition",
+        "Name": "FKContextCom93794",
+        "Columns": [
+          "PropertyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "DPMAttribute",
+        "Name": "FKDPMAttribu969215",
+        "Columns": [
+          "ClassID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Document",
+        "Name": "FKDocument532809",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Document",
+        "Name": "FKDocument854565",
+        "Columns": [
+          "OrgID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "DocumentVersion",
+        "Name": "FKDocumentVe733361",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "DocumentVersion",
+        "Name": "FKDocumentVe77896",
+        "Columns": [
+          "DocumentID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Framework",
+        "Name": "FKFramework245233",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Framework",
+        "Name": "FK_Framework_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Header",
+        "Name": "FKHeader347644",
+        "Columns": [
+          "TableID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Header",
+        "Name": "FKHeader666999",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Header",
+        "Name": "FK_Header_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "HeaderVersion",
+        "Name": "FKHeaderVers165467",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "HeaderVersion",
+        "Name": "FKHeaderVers371312",
+        "Columns": [
+          "HeaderID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "HeaderVersion",
+        "Name": "FKHeaderVers395590",
+        "Columns": [
+          "PropertyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "HeaderVersion",
+        "Name": "FKHeaderVers399933",
+        "Columns": [
+          "ContextID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "HeaderVersion",
+        "Name": "FKHeaderVers608023",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "HeaderVersion",
+        "Name": "FKHeaderVers699034",
+        "Columns": [
+          "KeyVariableVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "HeaderVersion",
+        "Name": "FKHeaderVers717070",
+        "Columns": [
+          "SubCategoryVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "HeaderVersion",
+        "Name": "FKHeaderVers859687",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Item",
+        "Name": "FKItem609261",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Item",
+        "Name": "FK_Item_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ItemCategory",
+        "Name": "FKItemCatego390588",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ItemCategory",
+        "Name": "FKItemCatego525178",
+        "Columns": [
+          "CategoryID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ItemCategory",
+        "Name": "FKItemCatego833144",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ItemCategory",
+        "Name": "FKItemCatego931286",
+        "Columns": [
+          "ItemID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "KeyComposition",
+        "Name": "FKKeyComposi60275",
+        "Columns": [
+          "KeyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "KeyComposition",
+        "Name": "FKKeyComposi605606",
+        "Columns": [
+          "VariableVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "KeyHeaderMapping",
+        "Name": "FKKeyHeaderM108065",
+        "Columns": [
+          "PrimaryKeyHeaderID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "KeyHeaderMapping",
+        "Name": "FKKeyHeaderM189933",
+        "Columns": [
+          "AssociationID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "KeyHeaderMapping",
+        "Name": "FKKeyHeaderM636398",
+        "Columns": [
+          "ForeignKeyHeaderID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Module",
+        "Name": "FKModule154031",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Module",
+        "Name": "FKModule328191",
+        "Columns": [
+          "FrameworkID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Module",
+        "Name": "FK_Module_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ModuleParameters",
+        "Name": "FKModulePara120772",
+        "Columns": [
+          "VariableVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ModuleParameters",
+        "Name": "FKModulePara783919",
+        "Columns": [
+          "ModuleVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ModuleVersion",
+        "Name": "FKModuleVers207386",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ModuleVersion",
+        "Name": "FKModuleVers404440",
+        "Columns": [
+          "GlobalKeyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ModuleVersion",
+        "Name": "FKModuleVers49266",
+        "Columns": [
+          "ModuleID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ModuleVersion",
+        "Name": "FKModuleVers649942",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ModuleVersion",
+        "Name": "FKModuleVers675097",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ModuleVersionComposition",
+        "Name": "FKModuleVers2767",
+        "Columns": [
+          "TableVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ModuleVersionComposition",
+        "Name": "FKModuleVers724892",
+        "Columns": [
+          "ModuleVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "ModuleVersionComposition",
+        "Name": "FKModuleVers801841",
+        "Columns": [
+          "TableID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperandReference",
+        "Name": "FKOperandRef200461",
+        "Columns": [
+          "VariableID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperandReference",
+        "Name": "FKOperandRef220623",
+        "Columns": [
+          "PropertyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperandReference",
+        "Name": "FKOperandRef468801",
+        "Columns": [
+          "ItemID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperandReference",
+        "Name": "FKOperandRef7492",
+        "Columns": [
+          "SubCategoryID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperandReference",
+        "Name": "FKOperandRef996703",
+        "Columns": [
+          "NodeID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperandReference",
+        "Name": "FK_OperandReference_OperationVersion",
+        "Columns": [
+          "OperationVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperandReferenceLocation",
+        "Name": "FKOperandRef286522",
+        "Columns": [
+          "OperandReferenceID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperandReferenceLocation",
+        "Name": "FKOperandRef881860",
+        "Columns": [
+          "CellID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Operation",
+        "Name": "FKOperation195728",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Operation",
+        "Name": "FK_Operation_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationCodePrefix",
+        "Name": "FK__Operation__Frame__22401542",
+        "Columns": [
+          "FrameworkID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationNode",
+        "Name": "FKOperationN128256",
+        "Columns": [
+          "ArgumentID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationNode",
+        "Name": "FKOperationN554566",
+        "Columns": [
+          "OperatorID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationNode",
+        "Name": "FKOperationN727504",
+        "Columns": [
+          "OperationVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationOutput",
+        "Name": "FK_OperationOutput_ModuleVersion",
+        "Columns": [
+          "ModuleVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationOutput",
+        "Name": "FK_OperationOutput_OperationVersion",
+        "Columns": [
+          "OperationVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationOutput",
+        "Name": "FK_OperationOutput_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationScope",
+        "Name": "FKOperationS602068",
+        "Columns": [
+          "OperationVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationScope",
+        "Name": "FK_OperationScope_CreatedRelease",
+        "Columns": [
+          "CreatedReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationScopeComposition",
+        "Name": "FKOperationS606932",
+        "Columns": [
+          "ModuleVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationScopeComposition",
+        "Name": "FKOperationS658414",
+        "Columns": [
+          "OperationScopeID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationVersion",
+        "Name": "FKOperationV135889",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationVersion",
+        "Name": "FKOperationV331822",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationVersion",
+        "Name": "FKOperationV552560",
+        "Columns": [
+          "OperationID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationVersion",
+        "Name": "FKOperationV693332",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationVersion",
+        "Name": "OutputVariableID",
+        "Columns": [
+          "OutputVariableID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperationVersionData",
+        "Name": "FK_OperationVersion",
+        "Columns": [
+          "OperationVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "OperatorArgument",
+        "Name": "FKOperatorAr930098",
+        "Columns": [
+          "OperatorID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Organisation",
+        "Name": "FKOrganisati59058",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Property",
+        "Name": "FKProperty396814",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Property",
+        "Name": "FKProperty442698",
+        "Columns": [
+          "DataTypeID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Property",
+        "Name": "FKProperty578267",
+        "Columns": [
+          "PropertyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Property",
+        "Name": "FK_Property_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "PropertyCategory",
+        "Name": "FKPropertyCa118836",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "PropertyCategory",
+        "Name": "FKPropertyCa323720",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "PropertyCategory",
+        "Name": "FKPropertyCa732103",
+        "Columns": [
+          "CategoryID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "PropertyCategory",
+        "Name": "FKPropertyCa906402",
+        "Columns": [
+          "PropertyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Reference",
+        "Name": "FKReference310449",
+        "Columns": [
+          "ConceptGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Reference",
+        "Name": "FKReference764763",
+        "Columns": [
+          "SubdivisionID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "RelatedConcept",
+        "Name": "FKRelatedCon174029",
+        "Columns": [
+          "ConceptRelationID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "RelatedConcept",
+        "Name": "FKRelatedCon732301",
+        "Columns": [
+          "ConceptGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Release",
+        "Name": "FKRelease352135",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Release",
+        "Name": "FK_Release_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategory",
+        "Name": "FKSubCategor106944",
+        "Columns": [
+          "CategoryID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategory",
+        "Name": "FKSubCategor997555",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategory",
+        "Name": "FK_SubCategory_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategoryItem",
+        "Name": "FKSubCategor420859",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategoryItem",
+        "Name": "FKSubCategor541932",
+        "Columns": [
+          "ArithmeticOperatorID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategoryItem",
+        "Name": "FKSubCategor651879",
+        "Columns": [
+          "ComparisonOperatorID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategoryItem",
+        "Name": "FKSubCategor693348",
+        "Columns": [
+          "SubCategoryVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategoryItem",
+        "Name": "FKSubCategor855005",
+        "Columns": [
+          "ItemID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategoryVersion",
+        "Name": "FKSubCategor168279",
+        "Columns": [
+          "SubCategoryID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategoryVersion",
+        "Name": "FKSubCategor727730",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SubCategoryVersion",
+        "Name": "FKSubCategor801303",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Subdivision",
+        "Name": "FKSubdivisio226639",
+        "Columns": [
+          "DocumentVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Subdivision",
+        "Name": "FKSubdivisio562876",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Subdivision",
+        "Name": "FKSubdivisio763080",
+        "Columns": [
+          "SubdivisionTypeID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Subdivision",
+        "Name": "FK_Subdivision_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SuperCategoryComposition",
+        "Name": "FKSuperCateg746780",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SuperCategoryComposition",
+        "Name": "FKSuperCateg782253",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SuperCategoryComposition",
+        "Name": "FKSuperCateg825110",
+        "Columns": [
+          "SuperCategoryID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "SuperCategoryComposition",
+        "Name": "FKSuperCateg831013",
+        "Columns": [
+          "CategoryID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Table",
+        "Name": "FKTable335524",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Table",
+        "Name": "FK_Table_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableAssociation",
+        "Name": "FKTableAssoc424624",
+        "Columns": [
+          "ChildTableVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableAssociation",
+        "Name": "FKTableAssoc473493",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableAssociation",
+        "Name": "FKTableAssoc546002",
+        "Columns": [
+          "ParentTableVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableAssociation",
+        "Name": "FKTableAssoc840717",
+        "Columns": [
+          "SubtypeDiscriminator"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableAssociation",
+        "Name": "FK_TableAssociation_EndRelease",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableAssociation",
+        "Name": "FK_TableAssociation_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableAssociation",
+        "Name": "FK_TableAssociation_StartRelease",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableGroup",
+        "Name": "FKTableGroup372000",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableGroup",
+        "Name": "FKTableGroup70556",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableGroup",
+        "Name": "FKTableGroup95711",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableGroup",
+        "Name": "FK_TableGroup_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableGroupComposition",
+        "Name": "FKTableGroup263656",
+        "Columns": [
+          "TableID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableGroupComposition",
+        "Name": "FKTableGroup752891",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableGroupComposition",
+        "Name": "FKTableGroup776142",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableGroupComposition",
+        "Name": "FKTableGroup783556",
+        "Columns": [
+          "TableGroupID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersion",
+        "Name": "FKTableVersi275581",
+        "Columns": [
+          "AbstractTableID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersion",
+        "Name": "FKTableVersi41391",
+        "Columns": [
+          "KeyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersion",
+        "Name": "FKTableVersi571493",
+        "Columns": [
+          "EndReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersion",
+        "Name": "FKTableVersi607859",
+        "Columns": [
+          "ContextID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersion",
+        "Name": "FKTableVersi783926",
+        "Columns": [
+          "PropertyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersion",
+        "Name": "FKTableVersi82258",
+        "Columns": [
+          "TableID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersion",
+        "Name": "FKTableVersi932385",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersion",
+        "Name": "FKTableVersi957540",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersionCell",
+        "Name": "FKTableVersi257568",
+        "Columns": [
+          "TableVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersionCell",
+        "Name": "FKTableVersi872294",
+        "Columns": [
+          "VariableVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersionCell",
+        "Name": "FKTableVersi883192",
+        "Columns": [
+          "CellID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersionHeader",
+        "Name": "FKTableVersi102009",
+        "Columns": [
+          "ParentHeaderID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersionHeader",
+        "Name": "FKTableVersi622961",
+        "Columns": [
+          "HeaderVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersionHeader",
+        "Name": "FKTableVersi692213",
+        "Columns": [
+          "HeaderID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "TableVersionHeader",
+        "Name": "FKTableVersi765341",
+        "Columns": [
+          "TableVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Translation",
+        "Name": "FKTranslatio100921",
+        "Columns": [
+          "AttributeID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Translation",
+        "Name": "FKTranslatio481615",
+        "Columns": [
+          "TranslatorID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Translation",
+        "Name": "FKTranslatio68568",
+        "Columns": [
+          "ConceptGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Translation",
+        "Name": "FKTranslatio815983",
+        "Columns": [
+          "LanguageCode"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "User",
+        "Name": "FKUser397109",
+        "Columns": [
+          "OrgID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "UserRole",
+        "Name": "FKUserRole396295",
+        "Columns": [
+          "UserID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "UserRole",
+        "Name": "FKUserRole532117",
+        "Columns": [
+          "RoleID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Variable",
+        "Name": "FKVariable129247",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "Variable",
+        "Name": "FK_Variable_Owner",
+        "Columns": [
+          "OwnerID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "VariableGeneration",
+        "Name": "VariableGeneration_FK",
+        "Columns": [
+          "ReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "VariableVersion",
+        "Name": "FKVariableVe350057",
+        "Columns": [
+          "VariableID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "VariableVersion",
+        "Name": "FKVariableVe384231",
+        "Columns": [
+          "KeyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "VariableVersion",
+        "Name": "FKVariableVe470965",
+        "Columns": [
+          "SubCategoryVID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "VariableVersion",
+        "Name": "FKVariableVe588427",
+        "Columns": [
+          "StartReleaseID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "VariableVersion",
+        "Name": "FKVariableVe613582",
+        "Columns": [
+          "RowGUID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "VariableVersion",
+        "Name": "FKVariableVe641695",
+        "Columns": [
+          "PropertyID"
+        ],
+        "Unique": false
+      },
+      {
+        "Table": "VariableVersion",
+        "Name": "FKVariableVe817762",
+        "Columns": [
+          "ContextID"
+        ],
+        "Unique": false
+      }
+    ]
+  }
+}

@@ -1,11 +1,17 @@
 using System.Globalization;
 using EbaDpm.Converter.Core.Access;
-using EbaDpm.Converter.Core.Access.Dpm20;
 using EbaDpm.Converter.Core.Layouts;
-using EbaDpm.Converter.Core.Mapping;
-using EbaDpm.Converter.Core.Mapping.Dpm20;
 using EbaDpm.Converter.Core.Sqlite;
 using EbaDpm.Converter.Core.Validation;
+using EbaDpm.Converter.Distribution.Access;
+using EbaDpm.Converter.Distribution.Access.Dpm20;
+using EbaDpm.Converter.Distribution.Layouts;
+using EbaDpm.Converter.Distribution.Mapping;
+using EbaDpm.Converter.Distribution.Mapping.Dpm20;
+using EbaDpm.Converter.Distribution.Sqlite;
+using EbaDpm.Converter.Distribution.Validation;
+using EbaDpm.Converter.Native.Layouts;
+using EbaDpm.Converter.Native.Validation;
 using Microsoft.Data.Sqlite;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -40,17 +46,17 @@ public static partial class CliRunner
     private static readonly string[] ValueOptions =
     [
         "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--release", "--report",
-        "--validate", "--reference", "--layouts", "--extract-layouts", "--out", "--dictionary",
+        "--validate", "--reference", "--layouts", "--extract-layouts", "--out", "--dictionary", "--target",
     ];
 
     private static readonly string[] ListTaxonomiesOptions = ["--list-taxonomies", "--source", "--release", "--plain"];
-    private static readonly string[] SchemaOnlyOptions = ["--schema-only", "--output", "--overwrite", "--plain"];
+    private static readonly string[] SchemaOnlyOptions = ["--schema-only", "--output", "--overwrite", "--target", "--plain"];
     private static readonly string[] ExtractLayoutsOptions = ["--extract-layouts", "--out", "--dictionary", "--overwrite", "--plain"];
     private static readonly string[] ValidateOptions = ["--validate", "--reference", "--layouts", "--report", "--plain"];
     private static readonly string[] ConvertOptions =
     [
         "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--all", "--overwrite", "--report",
-        "--verbose", "--release", "--plain",
+        "--verbose", "--release", "--target", "--plain",
     ];
 
     /// <summary>
@@ -114,8 +120,10 @@ public static partial class CliRunner
             config.AddExample("--source", "<input.accdb>", "--output", "<directory>");
             config.AddExample("--source", "<input.accdb>", "--output", "<file.db>", "--release", "<code>", "--overwrite");
             config.AddExample("--source", "<dpm1.accdb>", "--output", "<file.db>", "--releases", "4.0,4.1");
+            config.AddExample("--source", "<dpm2.accdb>", "--output", "<file.db>", "--target", "native");
             config.AddExample("--list-taxonomies", "--source", "<input.accdb>");
             config.AddExample("--schema-only", "--output", "<file.db>");
+            config.AddExample("--schema-only", "--output", "<file.db>", "--target", "native");
             config.AddExample("--validate", "<generated.db>", "--layouts", "<layouts.db>", "--report", "<report.json>");
             config.AddExample("--extract-layouts", "<directory>", "--out", "<layouts.db>", "--dictionary", "<dictionary.db>");
         });
@@ -471,6 +479,16 @@ public static partial class CliRunner
         if (FindUnrecognized(settings, mode: null, ConvertOptions) is { } unrecognized)
         {
             return ArgumentError(stderr, unrecognized);
+        }
+
+        if (!TryParseTarget(settings.Target, out var target, out var targetError))
+        {
+            return ArgumentError(stderr, targetError);
+        }
+
+        if (target == OutputTarget.Native)
+        {
+            return RunConvertNative(settings, stdout, stderr);
         }
 
         if (!TryRequire(settings.Source, "--source", out var source, out var sourceError))
@@ -989,6 +1007,16 @@ public static partial class CliRunner
             return ArgumentError(stderr, unrecognized);
         }
 
+        if (!TryParseTarget(settings.Target, out var target, out var targetError))
+        {
+            return ArgumentError(stderr, targetError);
+        }
+
+        if (target == OutputTarget.Native)
+        {
+            return RunSchemaOnlyNative(settings, output, stdout, stderr);
+        }
+
         try
         {
             var tableCount = SchemaCreator.Create(output, settings.Overwrite);
@@ -1023,7 +1051,7 @@ public static partial class CliRunner
         // --dictionary is REQUIRED on the CLI. Without it a single-term "(code)" cannot be
         // classified (metric vs key dimension) nor can "(domain:member)" be validated - and a
         // fallback that mislabels hundreds of cells is worse than refusing. (The library,
-        // LayoutExtractor.Extract, keeps dictionaryPath optional: several tests deliberately
+        // LayoutExtractor.Extract, keeps the dictionary optional: several tests deliberately
         // document what is lost without a dictionary.)
         if (!TryRequire(settings.Dictionary, "--dictionary", out var dictionaryPath, out var dictionaryError))
         {
@@ -1051,7 +1079,10 @@ public static partial class CliRunner
             Phases.Run(stdout, ["Extract layouts"], phases =>
                 summary = phases.Run(
                     "Extract layouts",
-                    () => LayoutExtractor.Extract(inputDirectory, outputPath, settings.Overwrite, dictionaryPath)));
+                    () => LayoutExtractor.Extract(inputDirectory, outputPath, settings.Overwrite,
+                        () => NativeOutputDetector.IsNativeOutput(dictionaryPath)
+                            ? NativeLayoutDictionaryLoader.Load(dictionaryPath)
+                            : DistributionLayoutDictionaryLoader.Load(dictionaryPath))));
 
             stdout.WriteLine($"Layout repository created in '{outputPath}'.");
             stdout.WriteLine(
@@ -1154,7 +1185,8 @@ public static partial class CliRunner
     {
         var generatedPath = settings.ValidatePath!;
 
-        if (FindUnrecognized(settings, "--validate", ValidateOptions) is { } unrecognized)
+        // --source is accepted here and checked below: it applies to a native output only.
+        if (FindUnrecognized(settings, "--validate", [.. ValidateOptions, "--source"]) is { } unrecognized)
         {
             return ArgumentError(stderr, unrecognized);
         }
@@ -1187,19 +1219,57 @@ public static partial class CliRunner
 
         try
         {
-            Validator.Result result = null!;
+            // The validator is chosen by the kind of output: a native DPM 2.0 output has its own rule set.
+            var native = NativeOutputDetector.IsNativeOutput(generatedPath);
+            if (!native && settings.Source is not null)
+            {
+                return ArgumentError(stderr, "--source applies to --validate only for a native output.");
+            }
+
+            if (native && referencePath is not null)
+            {
+                return ArgumentError(stderr, "--reference does not apply to a native output: plane B has no reference export for the native output.");
+            }
+
+            if (native && settings.Source is { } sourcePath && !File.Exists(sourcePath))
+            {
+                stderr.Error($"source file '{sourcePath}' does not exist.");
+                return ExitArgumentError;
+            }
+
+            ValidationReport report = null!;
+            int exitCode = 0;
             Phases.Run(stdout, ["Validate"], phases =>
-                result = phases.Run("Validate", () => Validator.Run(generatedPath, referencePath, layoutsPath)));
-            ValidationConsoleReport.Print(stdout, result.Report);
+                phases.Run("Validate", () =>
+                {
+                    if (native)
+                    {
+                        report = NativeValidator.Validate(generatedPath, settings.Source, layoutsPath);
+                        exitCode = report.Summary.ExitCode;
+                    }
+                    else
+                    {
+                        var result = Validator.Run(generatedPath, referencePath, layoutsPath);
+                        report = result.Report;
+                        exitCode = result.ExitCode;
+                    }
+                }));
+            ValidationConsoleReport.Print(stdout, report);
 
             if (reportPath is not null)
             {
-                WriteReport(reportPath, result.Report);
+                WriteReport(reportPath, report);
             }
 
-            return result.ExitCode;
+            return exitCode;
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+        catch (AceProviderNotFoundException ex)
+        {
+            stderr.Error(ex.Message);
+            return ExitArgumentError;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException or UnauthorizedAccessException
+                                       or NotSupportedException or Microsoft.Data.Sqlite.SqliteException or System.Data.OleDb.OleDbException)
         {
             stderr.Error(ex.Message);
             return ExitArgumentError;

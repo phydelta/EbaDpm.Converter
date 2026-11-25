@@ -44,7 +44,7 @@ touches conversion or validation, run that suite locally and report the result i
 ## Prerequisites
 
 - Windows x64
-- .NET 10 SDK
+- .NET 11 SDK
 - A **64-bit** Access database engine (`Microsoft.ACE.OLEDB.16.0` or `12.0`): 64-bit Microsoft
   Office, or the Microsoft Access Database Engine 2016 Redistributable (x64) on machines without
   Office. It is needed to run the converter and the data-dependent tests; the test project is x64
@@ -59,7 +59,11 @@ Warnings are treated as errors.
 
 ## Test
 
-The test project is `tests/EbaDpm.Converter.Tests` (xUnit). Tests fall into two groups:
+The tests are xUnit projects that follow the source split: `tests/EbaDpm.Converter.Core.Tests`,
+`tests/EbaDpm.Converter.Distribution.Tests` and `tests/EbaDpm.Converter.Native.Tests`. A test goes to
+the project of the most specific thing it needs, so deleting a pipeline deletes its tests. Helpers
+shared by more than one test project (the `[DataFact]`/`[AceFact]` attributes, `RepoPaths`, fabricated
+inputs) live in `tests/EbaDpm.Converter.Testing`. Tests fall into two groups:
 
 | Suite | Needs | How to run |
 |---|---|---|
@@ -81,7 +85,8 @@ The full suite converts several large Access databases and takes several minutes
 have the data files, so it runs only the fast suite; the data-dependent suite is the contributor's
 responsibility. Use the fast suite while iterating (with `--filter` for the data tests of the area
 you touch), and run the full suite **once per pull request** that changes
-`src/EbaDpm.Converter.Core` (readers, mapping, writer, validation, layouts or their resources) or
+`src/EbaDpm.Converter.Core`, `src/EbaDpm.Converter.Distribution` or `src/EbaDpm.Converter.Native`
+(readers, mapping, writer, validation, layouts or their resources) or
 a dependency the conversion uses, after the last change and before asking for review. Pull
 requests limited to documentation, CI, the CLI or tests need only the fast suite, plus any data
 test they add or change. The release pull request runs the full suite once more as a
@@ -100,7 +105,7 @@ Never modify the data files; tests treat them as read-only.
   exactly as defined, never renamed or "improved". The same applies to DPM codes (`MET`, `qTR`,
   `COREP 4.2`...) and to property keys stored in the output.
 - **The schema DDL is a contract.** Changes to
-  [`dpm-distribution-schema.sql`](src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql)
+  [`dpm-distribution-schema.sql`](src/EbaDpm.Converter.Distribution/Resources/dpm-distribution-schema.sql)
   change the output format and need a strong justification.
 - **Read the semantics, do not infer them from names.** Before changing how a table is mapped,
   check the documented meaning of its columns ([docs/target-schema.md](docs/target-schema.md),
@@ -115,7 +120,7 @@ Never modify the data files; tests treat them as read-only.
 
 ## Validation checks and known exceptions
 
-- New invariants belong in plane A (`src/EbaDpm.Converter.Core/Validation/Checks`), with a stable
+- New invariants belong in plane A (`src/EbaDpm.Converter.Distribution/Validation/Checks`), with a stable
   check code (`A-XXX-nn`) and a clear statement.
 - A known exception must name **one object by its exact business key**, for one specific check,
   with the reason and the evidence. Never relax a threshold or exclude by pattern.

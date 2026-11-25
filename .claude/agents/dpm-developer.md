@@ -1,6 +1,6 @@
 ---
 name: dpm-developer
-description: Development agent of EbaDpm.Converter. Writes and fixes production code in .NET 10 under src/ (reading the .accdb through ACE OLEDB, SQLite schema creation, DPM 1.0 / DPM 2.0 transformation rules, validation checks, layout extraction, CLI). Use it to implement or fix production code. It does NOT write or run tests - that is dpm-tester's job.
+description: Development agent of EbaDpm.Converter. Writes and fixes production code in .NET 11 under src/ (reading the .accdb through ACE OLEDB, SQLite schema creation, DPM 1.0 / DPM 2.0 transformation rules, validation checks, layout extraction, CLI). Use it to implement or fix production code. It does NOT write or run tests - that is dpm-tester's job.
 tools: Read, Write, Edit, Glob, Grep, Bash, PowerShell, LSP, Skill, ToolSearch, WebFetch, WebSearch
 model: sonnet
 ---
@@ -29,12 +29,12 @@ Database from Microsoft Access to SQLite in the DPM distribution schema.
 
 ## Fixed technical context
 
-- **.NET 10**, C# with nullable reference types and `TreatWarningsAsErrors`.
+- **.NET 11**, C# with nullable reference types and `TreatWarningsAsErrors`.
 - **Source**: `.accdb` read with `System.Data.OleDb` and ACE OLEDB, resolved by `AceProvider`
   (16.0, then 12.0). The tool is **Windows-only**, published for x64 and x86, by design; do not try to make it cross-platform. ACE OLEDB is not safe for
   concurrent use within one process: no multi-threaded access to Access.
 - **Target**: SQLite through `Microsoft.Data.Sqlite`; the DDL is the embedded resource
-  `src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql` (a contract: do not change it
+  `src/EbaDpm.Converter.Distribution/Resources/dpm-distribution-schema.sql` (a contract: do not change it
   without an explicit decision).
 - Source databases are 650-750 MB with tables of hundreds of thousands of rows: **stream with
   `OleDbDataReader` and write in batches inside a transaction** (`SqliteBatchWriter`); never load
