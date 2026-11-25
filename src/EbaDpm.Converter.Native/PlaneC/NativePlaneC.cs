@@ -63,12 +63,12 @@ public static class NativePlaneC
 
         // The releases of the layouts that the file has, and the table versions to load for them.
         var releaseIds = new Dictionary<string, long>(StringComparer.Ordinal);
-        foreach (var label in sheets.Select(s => s.ReleaseLabel).Distinct(StringComparer.Ordinal))
+        var knownReleases = sheets.Select(s => s.ReleaseLabel).Distinct(StringComparer.Ordinal)
+            .Select(label => (Label: label, Found: releases.TryGetId(label, out var id), Id: id))
+            .Where(r => r.Found);
+        foreach (var (label, _, id) in knownReleases)
         {
-            if (releases.TryGetId(label, out var id))
-            {
-                releaseIds[label] = id;
-            }
+            releaseIds[label] = id;
         }
 
         var tableVids = new HashSet<long>();
@@ -205,14 +205,14 @@ public static class NativePlaneC
         }
 
         var unresolvedItems = new List<CheckSample>();
-        var statement = CDps01Statement;
+        var notes = new List<string>();
         foreach (var release in evaluated.Order(StringComparer.Ordinal))
         {
             var census = censuses.FirstOrDefault(c => c.CorpusRelease == release);
             if (census is null)
             {
-                statement += $"; no native census declared for release {release}: evaluated with an EMPTY census " +
-                             "(every violation is a failure, nothing can expire)";
+                notes.Add($"; no native census declared for release {release}: evaluated with an EMPTY census " +
+                          "(every violation is a failure, nothing can expire)");
             }
 
             var byKey = comparison.Violations.Where(v => v.Release == release)
@@ -227,6 +227,7 @@ public static class NativePlaneC
             }
         }
 
+        var statement = CDps01Statement + string.Concat(notes);
         var signatures = comparison.ByRelease.Values.Sum(s => s.SignaturesCompared);
         if (signatures == 0 && unresolvedItems.Count == 0)
         {
@@ -400,7 +401,7 @@ public static class NativePlaneC
                 "universe, and nothing can have expired. See C-MHR-02 for the reason."), evaluated, matched);
         }
 
-        var statement = CMhr01Statement;
+        var notes = new List<string>();
         var unresolvedItems = new List<CheckSample>();
         foreach (var release in result.ComparedByRelease.Where(kv => kv.Value > 0).Select(kv => kv.Key).Order(StringComparer.Ordinal))
         {
@@ -408,8 +409,8 @@ public static class NativePlaneC
             var census = censuses.FirstOrDefault(c => c.CorpusRelease == release);
             if (census is null)
             {
-                statement += $"; no native census declared for release {release}: evaluated with an EMPTY census " +
-                             "(every violation is a failure, nothing can expire)";
+                notes.Add($"; no native census declared for release {release}: evaluated with an EMPTY census " +
+                          "(every violation is a failure, nothing can expire)");
             }
 
             var byKey = result.Violations.Where(v => v.Unit.ReleaseLabel == release)
@@ -424,6 +425,7 @@ public static class NativePlaneC
             }
         }
 
+        var statement = CMhr01Statement + string.Concat(notes);
         return (CheckResult.FromViolationCount(
             "C-MHR-01", ValidationPlane.C, ValidationLayer.Critical, "HeaderVersion", statement,
             total, unresolvedItems.Count, elapsedMs, unresolvedItems,

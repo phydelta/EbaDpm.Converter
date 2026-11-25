@@ -21,6 +21,12 @@ public static class NativeValidator
     /// <summary>The value of <see cref="ValidationReport.OutputKind"/> of this validation.</summary>
     public const string OutputKind = "native";
 
+    /// <summary>
+    /// Validates a native output: plane A (internal invariants) always, the checks that need the Access source
+    /// only when <paramref name="accdbPath"/> is given (reported as skipped otherwise, never as passed), and
+    /// plane C only when <paramref name="layoutsPath"/> is given. The file is copied to a temporary file and
+    /// never modified.
+    /// </summary>
     /// <param name="nativePath">The native output (SQLite).</param>
     /// <param name="accdbPath">The DPM 2.0 Access database it was converted from; optional.</param>
     /// <param name="layoutsPath">A layout repository (<c>--extract-layouts</c>); adds plane C.</param>

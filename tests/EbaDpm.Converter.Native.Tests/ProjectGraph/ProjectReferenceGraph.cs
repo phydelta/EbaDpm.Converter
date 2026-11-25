@@ -35,17 +35,13 @@ public sealed class ProjectReferenceGraph
             }
 
             var name = Path.GetFileNameWithoutExtension(file);
-            var targets = new HashSet<string>(StringComparer.Ordinal);
             var document = XDocument.Load(file);
-            foreach (var item in document.Descendants().Where(e => e.Name.LocalName == "ProjectReference"))
-            {
-                var include = item.Attribute("Include")?.Value;
-                if (!string.IsNullOrWhiteSpace(include))
-                {
-                    var normalised = include.Replace('\\', '/');
-                    targets.Add(Path.GetFileNameWithoutExtension(normalised));
-                }
-            }
+            var targets = document.Descendants()
+                .Where(e => e.Name.LocalName == "ProjectReference")
+                .Select(item => item.Attribute("Include")?.Value)
+                .Where(include => !string.IsNullOrWhiteSpace(include))
+                .Select(include => Path.GetFileNameWithoutExtension(include!.Replace('\\', '/')))
+                .ToHashSet(StringComparer.Ordinal);
 
             edges[name] = targets;
         }

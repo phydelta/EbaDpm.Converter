@@ -130,9 +130,10 @@ internal static class NativeEqualityChecker
         var sheetFiltered = term.ZCode is not null && term.ZCode != "0000";
         var sheetIds = sheetFiltered ? HeaderIds(table, term.ZCode!) : null;
 
-        if ((rowIds.Count == 0 && term.RowCode != OpenSentinel)
-            || (columnIds.Count == 0 && term.ColumnCode != OpenSentinel)
-            || (sheetFiltered && sheetIds!.Count == 0 && term.ZCode != OpenSentinel))
+        var rowUnresolved = rowIds.Count == 0 && term.RowCode != OpenSentinel;
+        var columnUnresolved = columnIds.Count == 0 && term.ColumnCode != OpenSentinel;
+        var sheetUnresolved = sheetFiltered && sheetIds!.Count == 0 && term.ZCode != OpenSentinel;
+        if (rowUnresolved || columnUnresolved || sheetUnresolved)
         {
             return ("cell unresolved", null);
         }

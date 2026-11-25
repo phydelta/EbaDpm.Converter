@@ -73,12 +73,9 @@ internal static class NativeOutputFile
     public static void Discard(string path)
     {
         SqliteConnection.ClearAllPools();
-        foreach (var candidate in new[] { path, path + "-shm", path + "-wal", path + "-journal" })
+        foreach (var candidate in new[] { path, path + "-shm", path + "-wal", path + "-journal" }.Where(File.Exists))
         {
-            if (File.Exists(candidate))
-            {
-                File.Delete(candidate);
-            }
+            File.Delete(candidate);
         }
     }
 

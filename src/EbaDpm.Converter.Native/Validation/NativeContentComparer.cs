@@ -299,7 +299,7 @@ internal static class NativeContentComparer
         null => "NULL",
         string text => "'" + NativeCheckSupport.Shorten(text, 60) + "'",
         long number => number.ToString(CultureInfo.InvariantCulture),
-        var other => Convert.ToString(other, CultureInfo.InvariantCulture) + $" ({other.GetType().Name})",
+        object other => Convert.ToString(other, CultureInfo.InvariantCulture) + $" ({other.GetType().Name})",
     };
 
     private static string DescribeColumns(NativeTable table, object?[] row, List<int> columns)

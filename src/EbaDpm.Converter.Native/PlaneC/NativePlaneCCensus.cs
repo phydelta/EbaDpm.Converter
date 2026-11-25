@@ -116,10 +116,11 @@ internal static class NativePlaneCCensuses
                 continue;
             }
 
-            if ((parts.Length != 3 && parts.Length != 4)
-                || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[2])
-                || (parts[1] != "contradicts" && parts[1] != "no-match")
-                || (parts.Length == 4 && string.IsNullOrWhiteSpace(parts[3])))
+            var wrongColumnCount = parts.Length != 3 && parts.Length != 4;
+            var missingRequiredField = string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[2]);
+            var unknownType = parts[1] != "contradicts" && parts[1] != "no-match";
+            var emptyReason = parts.Length == 4 && string.IsNullOrWhiteSpace(parts[3]);
+            if (wrongColumnCount || missingRequiredField || unknownType || emptyReason)
             {
                 throw new InvalidOperationException(
                     $"Malformed row in {sourceName}: '{line}' - expected TableCode, Type (contradicts|no-match), " +
