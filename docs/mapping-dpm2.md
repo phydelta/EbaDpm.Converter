@@ -8,7 +8,7 @@ cells, the special treatment of the metric — are shared with
 [mapping-dpm1.md](mapping-dpm1.md) and only summarised here. Rules that depend on the
 **source** are rebuilt from scratch.
 
-Loaders run in this order (`src/EbaDpm.Converter.Core/Mapping/Dpm20/`):
+Loaders run in this order (`src/EbaDpm.Converter.Distribution/Mapping/Dpm20/`):
 
 | Loader | Target tables |
 |---|---|

@@ -5,7 +5,7 @@ model, plus one **extension table**, `mOrdinateMetricRestriction` (see
 [Extension tables](#extension-tables)). The DDL is embedded in the assembly:
 
 ```
-src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql
+src/EbaDpm.Converter.Distribution/Resources/dpm-distribution-schema.sql
 ```
 
 `Sqlite/SchemaCreator.cs` executes that file to create an empty database (also available on its

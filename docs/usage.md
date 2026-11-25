@@ -155,7 +155,7 @@ EbaDpm.Converter --schema-only --output "<output.db>" [--overwrite]
 ```
 
 Creates the 45 tables of the distribution schema, empty, from
-[`dpm-distribution-schema.sql`](../src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql).
+[`dpm-distribution-schema.sql`](../src/EbaDpm.Converter.Distribution/Resources/dpm-distribution-schema.sql).
 No Access database is needed.
 
 ## Validate

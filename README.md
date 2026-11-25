@@ -41,7 +41,7 @@ on any other SQLite edition existing.
   EBA release, or into the file of a single release with `--release`. DPM 1.0 databases are
   converted into one file, selecting by taxonomy code, taxonomy key or DPM release.
 - **Exact target schema.** The output is created from an embedded DDL
-  ([`dpm-distribution-schema.sql`](src/EbaDpm.Converter.Core/Resources/dpm-distribution-schema.sql))
+  ([`dpm-distribution-schema.sql`](src/EbaDpm.Converter.Distribution/Resources/dpm-distribution-schema.sql))
   and is structurally identical to the distribution schema.
 - **Reproducible output.** The same input and parameters produce the same content; the file is
   vacuumed at the end so its size is stable too.
@@ -60,7 +60,7 @@ on any other SQLite edition existing.
 | Windows | The tool is Windows-only because of the Access provider below |
 | Microsoft Office, 32-bit or 64-bit | Provides the Access database engine (`Microsoft.ACE.OLEDB.16.0` or `12.0`) used to read the `.accdb`. The tool picks the provider itself, 16.0 first, and runs with the architecture of the installed Office |
 | *or* Microsoft Access Database Engine 2016 Redistributable | Alternative on machines without Office. It registers the same providers. It is a system component and cannot be bundled |
-| .NET 10 SDK | Only to build from source. The self-contained executable needs no .NET installation |
+| .NET 11 SDK | Only to build from source. The self-contained executable needs no .NET installation |
 
 ## Download
 

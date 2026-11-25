@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace EbaDpm.Converter.Core.Validation.PlaneC;
 
 /// <summary>
-/// The plane C normalization. It is DIFFERENT from the 8 of <see cref="Normalization"/>: those are
+/// The plane C normalization. It is DIFFERENT from the 8 of <c>Normalization</c> (distribution project): those are
 /// the CLOSED list of plane B; this one belongs to plane C (against the Annotated Table Layout) and
 /// is not mixed with that list.
 ///

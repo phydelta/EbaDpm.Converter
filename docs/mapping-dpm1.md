@@ -3,7 +3,7 @@
 This document describes how the DPM 1.0 pipeline fills each target table. It is organised by
 target table, in the order the loaders run:
 
-| Loader (`src/EbaDpm.Converter.Core/Mapping/`) | Target tables |
+| Loader (`src/EbaDpm.Converter.Distribution/Mapping/`) | Target tables |
 |---|---|
 | `SkeletonLoader` | `mOwner`, `mOwnerParent`, `mLanguage`, `mReportingFramework`, `mTaxonomy`, `mRelease`, `mConcept` (part) |
 | `DictionaryLoader` | `mDomain`, `mMember`, `mDimension`, `mMetric`, `mHierarchy`, `mHierarchyNode`, `mConceptTranslation` (part) |

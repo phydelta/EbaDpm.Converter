@@ -163,7 +163,7 @@ every stale one individually; the JSON report lists all of them object by object
 
 The layout comparison has its own list of known divergences, kept as data rather than code:
 one file per release,
-[`plane-c-known-divergences-<release>.tsv`](../src/EbaDpm.Converter.Core/Resources/) (today
+[`plane-c-known-divergences-<release>.tsv`](../src/EbaDpm.Converter.Distribution/Resources/) (today
 `plane-c-known-divergences-4.2.tsv`), embedded in the assembly. Each line names a table code, the divergence type (`contradicts`: the
 layout gives a dimension another member; `no-match`: no output signature contains the layout
 signature) and the exact layout signature. A `C-MHR-01` divergence has its own type, `hierarchy`,

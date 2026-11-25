@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>EbaDpm.Converter.Native</RootNamespace>
+    <!-- Windows-only, x64 or x86 (depends on ACE OLEDB 16.0 or 12.0 through the shared project). -->
+    <SupportedOSPlatform>windows</SupportedOSPlatform>
+  </PropertyGroup>
+
+  <!-- The native DPM 2.0 pipeline: references ONLY the shared project, never the distribution one. -->
+  <ItemGroup>
+    <ProjectReference Include="..\EbaDpm.Converter.Core\EbaDpm.Converter.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EbaDpm.Converter" />
+    <InternalsVisibleTo Include="EbaDpm.Converter.Native.Tests" />
+  </ItemGroup>
+
+</Project>

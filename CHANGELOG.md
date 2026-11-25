@@ -6,6 +6,12 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Changed
+
+- **.NET 11.** The solution targets `net11.0` and `global.json` pins the .NET 11 SDK (11.0.100).
+  Building from source needs the .NET 11 SDK; the self-contained executables need no .NET
+  installation.
+
 ## 3.0.0 - 2026-11-20
 
 ### Changed

@@ -5,30 +5,59 @@
 ```text
 EbaDpm.Converter.sln
 ├─ src/
-│  ├─ EbaDpm.Converter.Cli/        Console entry point (assembly name: EbaDpm.Converter)
-│  │    CliRunner.cs               Argument parsing, mode dispatch, console output, exit codes
-│  └─ EbaDpm.Converter.Core/       Class library with all the logic
-│       Access/                    Reading the .accdb through ACE OLEDB
-│         Dpm20/                   DPM 2.0 reader and row types
-│       Mapping/                   DPM 1.0 transformation into the distribution schema
-│         Dpm20/                   DPM 2.0 transformation into the distribution schema
-│       Sqlite/                    Schema creation and batched writing
-│       Validation/                --validate: planes A, B and C, known exceptions, report
-│         Checks/                  Check families
-│         PlaneC/                  Layout comparison (signatures, equality rules, release matching)
-│       Layouts/                   --extract-layouts: layout workbooks into a SQLite repository
-│         Xlsx/                    Minimal .xlsx reader (no third-party dependency)
-│       Resources/                 Embedded resources
-│         dpm-distribution-schema.sql        DDL of the 45 target tables
-│         plane-c-known-divergences-4.2.tsv  Known layout divergences for release 4.2
+│  ├─ EbaDpm.Converter.Cli/            Console entry point (assembly name: EbaDpm.Converter)
+│  │    CliRunner.cs                   Argument parsing, mode dispatch, console output, exit codes
+│  ├─ EbaDpm.Converter.Core/           Shared library: what any pipeline needs, nothing of the 45 tables
+│  │    Access/                        ACE provider resolution, source model detection
+│  │    Sqlite/                        Batched writing (SqliteBatchWriter)
+│  │    Validation/                    Report and check result types; plane C signature and layout reader
+│  │    Layouts/                       --extract-layouts: layout workbooks into a SQLite repository
+│  │      Xlsx/                        Minimal .xlsx reader (no third-party dependency)
+│  ├─ EbaDpm.Converter.Distribution/   The existing pipeline: DPM 1.0 and DPM 2.0 into the 45-table schema
+│  │    Access/                        DPM 1.0 reader
+│  │      Dpm20/                       DPM 2.0 reader and row types
+│  │    Mapping/                       DPM 1.0 transformation into the distribution schema
+│  │      Dpm20/                       DPM 2.0 transformation into the distribution schema
+│  │    Sqlite/                        Schema creation (SchemaCreator)
+│  │    Layouts/                       Loader of the layout dictionary from a 45-table SQLite file
+│  │    Validation/                    --validate: planes A, B and C, known exceptions
+│  │      Checks/                      Check families
+│  │      PlaneC/                      Layout comparison (equality rules, release matching)
+│  │    Resources/                     Embedded resources
+│  │      dpm-distribution-schema.sql        DDL of the 45 target tables
+│  │      plane-c-known-divergences-4.2.tsv  Known layout divergences for release 4.2
+│  └─ EbaDpm.Converter.Native/         The native DPM 2.0 pipeline (empty for now)
 └─ tests/
-   └─ EbaDpm.Converter.Tests/      xUnit tests: unit, integration, schema, validation
+   ├─ EbaDpm.Converter.Core.Tests/         xUnit tests of the shared project
+   ├─ EbaDpm.Converter.Distribution.Tests/ xUnit tests: unit, integration, schema, validation, existing CLI modes
+   ├─ EbaDpm.Converter.Native.Tests/       xUnit tests of the native pipeline; project-graph rules
+   └─ EbaDpm.Converter.Testing/            shared test support (skip attributes, RepoPaths, fabricated inputs)
 ```
 
+The boundaries are enforced by project references, not by convention:
+
+```text
+Cli ──► Distribution ──► Core
+ ├────► Native ────────► Core
+ └────► Core
+```
+
+`Core` references neither `Distribution` nor `Native`, and `Native` never references
+`Distribution`. Embedded resource names follow the project: `EbaDpm.Converter.Distribution.Resources.*`.
+`LayoutDictionary` (Core) only holds the codes the layout extractor needs; the loader that fills
+it from a 45-table SQLite file (`DistributionLayoutDictionaryLoader`) lives in `Distribution`, and
+`LayoutExtractor.Extract` receives a factory for the dictionary.
+
+### Removal path
+
+Removing the existing pipeline is deleting `EbaDpm.Converter.Distribution` and its test project,
+plus the CLI modes that use it (conversion to the 45 tables, `--validate`, and the layout
+dictionary loader call in `--extract-layouts`). `Core` and `Native` do not change.
+
 External dependencies are limited to `System.Data.OleDb` (reading Access through ACE OLEDB) and
-`Microsoft.Data.Sqlite` (writing and reading SQLite) in Core, and `Spectre.Console` and
-`Spectre.Console.Cli` (argument parsing, tables, progress and colours; both MIT) in the CLI only:
-Core has no console dependency. Both projects target .NET 10 on Windows;
+`Microsoft.Data.Sqlite` (writing and reading SQLite) in the library projects, and `Spectre.Console`
+and `Spectre.Console.Cli` (argument parsing, tables, progress and colours; both MIT) in the CLI
+only: the libraries have no console dependency. All projects target .NET 11 on Windows;
 the executable is published for x64 and x86.
 
 ## Conversion pipeline

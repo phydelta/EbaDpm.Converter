@@ -1,11 +1,15 @@
 using System.Globalization;
 using EbaDpm.Converter.Core.Access;
-using EbaDpm.Converter.Core.Access.Dpm20;
 using EbaDpm.Converter.Core.Layouts;
-using EbaDpm.Converter.Core.Mapping;
-using EbaDpm.Converter.Core.Mapping.Dpm20;
 using EbaDpm.Converter.Core.Sqlite;
 using EbaDpm.Converter.Core.Validation;
+using EbaDpm.Converter.Distribution.Access;
+using EbaDpm.Converter.Distribution.Access.Dpm20;
+using EbaDpm.Converter.Distribution.Layouts;
+using EbaDpm.Converter.Distribution.Mapping;
+using EbaDpm.Converter.Distribution.Mapping.Dpm20;
+using EbaDpm.Converter.Distribution.Sqlite;
+using EbaDpm.Converter.Distribution.Validation;
 using Microsoft.Data.Sqlite;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -1023,7 +1027,7 @@ public static partial class CliRunner
         // --dictionary is REQUIRED on the CLI. Without it a single-term "(code)" cannot be
         // classified (metric vs key dimension) nor can "(domain:member)" be validated - and a
         // fallback that mislabels hundreds of cells is worse than refusing. (The library,
-        // LayoutExtractor.Extract, keeps dictionaryPath optional: several tests deliberately
+        // LayoutExtractor.Extract, keeps the dictionary optional: several tests deliberately
         // document what is lost without a dictionary.)
         if (!TryRequire(settings.Dictionary, "--dictionary", out var dictionaryPath, out var dictionaryError))
         {
@@ -1051,7 +1055,8 @@ public static partial class CliRunner
             Phases.Run(stdout, ["Extract layouts"], phases =>
                 summary = phases.Run(
                     "Extract layouts",
-                    () => LayoutExtractor.Extract(inputDirectory, outputPath, settings.Overwrite, dictionaryPath)));
+                    () => LayoutExtractor.Extract(inputDirectory, outputPath, settings.Overwrite,
+                        () => DistributionLayoutDictionaryLoader.Load(dictionaryPath))));
 
             stdout.WriteLine($"Layout repository created in '{outputPath}'.");
             stdout.WriteLine(
