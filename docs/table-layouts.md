@@ -106,7 +106,7 @@ to the one extracted with the 45-table dictionary of release 4.4 (all `Layout*` 
 does not know the release of the layout: a code that is a dimension in 4.2 and a metric in a later
 release (`qINC`, `qNCO`, `qCCP`) resolves as a metric. Measured on 2026-11-25 with the 4.4 file and
 the 4.2 layouts: 10 of 11,515 declarations differ (for example `C_27.00` `D9` `qINC`). To extract
-the layouts of a release before 4.4, use a 45-table dictionary of that release.
+the layouts of a release before 4.4, use a 45-table dictionary of that release (per-release resolution from a native file: #110).
 
 ## The layout repository
 
