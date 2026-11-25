@@ -5,9 +5,9 @@ anything that is not one of the other modes is a conversion.
 
 | Mode | Purpose |
 |---|---|
-| [Convert](#convert) | Convert an Access DPM database into a SQLite database in the distribution schema |
+| [Convert](#convert) | Convert an Access DPM database into a SQLite database in the distribution schema, or ([`--target native`](#native-output)) into the native DPM 2.0 output |
 | [`--list-taxonomies`](#list-taxonomies) | List the taxonomies an Access database contains, with their selectors |
-| [`--schema-only`](#schema-only) | Create an empty database with the 45 tables of the distribution schema |
+| [`--schema-only`](#schema-only) | Create an empty database with the 45 tables of the distribution schema (or the native baseline schema with `--target native`) |
 | [`--validate`](#validate) | Validate a generated database (planes A, B and C) |
 | [`--extract-layouts`](#extract-layouts) | Build a SQLite repository from the EBA Annotated Table Layout workbooks |
 | `--help`, `-h`, `-?`, `/?` | Print the help and exit with code 0 |
@@ -133,6 +133,56 @@ EbaDpm.Converter --source "DPM2 Database_v 4_4.accdb" --output eba-4.2.db --rele
 EbaDpm.Converter --source "DPM 1.0 Database_v4_1.accdb" --output dpm1.db --releases 4.0,4.1
 ```
 
+## Native output
+
+```text
+EbaDpm.Converter --source "<dpm2.accdb>" --output <file.db> --target native
+                 [--overwrite] [--report <path>] [--verbose] [--plain]
+EbaDpm.Converter --schema-only --output <file.db> --target native [--overwrite]
+```
+
+`--target <distribution|native>` chooses the output schema of a conversion and of `--schema-only`.
+`distribution` is the default and is the 45-table schema described in the rest of this page; every
+command line without `--target` behaves as before. Values are lower case; anything else is an error
+that lists the valid ones. `--target` with any other mode (`--list-taxonomies`, `--validate`,
+`--extract-layouts`) is an error, like any other option that belongs to another mode.
+
+`--target native` writes an image of the DPM 2.0 Access database in one SQLite file: the same table
+and column names, rows, IDs and values, every release in the file, nothing derived. What it
+contains, the type mapping and the keys are in [target-schema-native.md](target-schema-native.md).
+
+| Option | Description |
+|---|---|
+| `--source <path>` | Required. A DPM 2.0 Access database that contains release 4.4 (the baseline) |
+| `--output <path>` | Required. The SQLite file to create (a directory is an error). The file is built beside it and moved into place when complete, so a failed conversion leaves no partial file |
+| `--overwrite` | Replace the output file if it exists. Without it an existing file is an error and nothing is written |
+| `--report`, `--verbose`, `--plain` | As for the other conversions |
+
+With `--schema-only`, the empty baseline (4.4) schema, with its indexes, is created; no Access
+database is needed.
+
+Errors (exit code 1, nothing written):
+
+- `--release`: the native output holds every release of the source in one file.
+- `--taxonomies`, `--taxonomykeys`, `--releases`, `--all`: they do not apply, the whole database is copied.
+- A DPM 1.0 source: the native output exists only for DPM 2.0 sources.
+- A source whose `Release` table has no row with code `4.4` (the 4.2.1 and 4.3 publications): the
+  native output starts from the 4.4 schema. The message names the current release of the source.
+- An Access column type that is not in the type mapping: the message names the column.
+
+The conversion reports its stages and each table copied (rows and time), then a summary: tables and
+rows written, the excluded tables found in the source, the foreign keys declared and not declared,
+the indexes, the schema differences against the baseline (a later publication that changes the
+schema converts with its own schema; the differences are listed and never fail the conversion), and
+the time and size of the file.
+
+```powershell
+EbaDpm.Converter --source "DPM2 Database_v 4_4.accdb" --output dpm2-native.db --target native
+EbaDpm.Converter --schema-only --output native-empty.db --target native
+```
+
+Measured on the 4.4 database (2026-11-25, x64): about 45 seconds and a 599 MB file (59 tables, 5,568,105 rows). Figures of one publication and one machine, not of the format.
+
 ## List taxonomies
 
 ```text
@@ -156,7 +206,8 @@ EbaDpm.Converter --schema-only --output "<output.db>" [--overwrite]
 
 Creates the 45 tables of the distribution schema, empty, from
 [`dpm-distribution-schema.sql`](../src/EbaDpm.Converter.Distribution/Resources/dpm-distribution-schema.sql).
-No Access database is needed.
+No Access database is needed. With `--target native` it creates the empty [native schema](#native-output)
+(baseline 4.4) instead.
 
 ## Validate
 

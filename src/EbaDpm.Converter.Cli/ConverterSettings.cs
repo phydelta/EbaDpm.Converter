@@ -20,7 +20,7 @@ public sealed class ConverterSettings : CommandSettings
     public string? Source { get; init; }
 
     [CommandOption("--output <PATH>")]
-    [Description("Convert and --schema-only: the SQLite database to create. DPM 2.0 without --release: a DIRECTORY (created if missing) that receives one file dpm-<release code>.db per release.")]
+    [Description("Convert and --schema-only: the SQLite database to create. With --target native: the file path. DPM 2.0 without --release: a DIRECTORY (created if missing) that receives one file dpm-<release code>.db per release.")]
     public string? Output { get; init; }
 
     [CommandOption("--taxonomies <LIST>")]
@@ -40,8 +40,12 @@ public sealed class ConverterSettings : CommandSettings
     public bool All { get; init; }
 
     [CommandOption("--release <CODE>")]
-    [Description("DPM 2.0 only: convert only the release with that Release.Code (e.g. 4.3); --output is then the file path. A release in which no exportable module version starts is an error. An error with a DPM 1.0 source. Also narrows --list-taxonomies.")]
+    [Description("DPM 2.0 only: convert only the release with that Release.Code (e.g. 4.3); --output is then the file path. A release in which no exportable module version starts is an error. An error with a DPM 1.0 source and with --target native. Also narrows --list-taxonomies.")]
     public string? Release { get; init; }
+
+    [CommandOption("--target <TARGET>")]
+    [Description("Convert and --schema-only: the output schema. distribution (default): the 45-table DPM distribution schema. native: the DPM 2.0 Access database table for table (the same tables, columns, rows and IDs, every release in one file); DPM 2.0 sources that contain release 4.4 or later only; --output is a file path; --release and the DPM 1.0 selectors do not apply. With --schema-only: the empty baseline (4.4) schema.")]
+    public string? Target { get; init; }
 
     [CommandOption("--overwrite")]
     [Description("Replace output files that already exist (convert, --schema-only, --extract-layouts). Without it an existing output file is an error and, for DPM 2.0 without --release, nothing is written.")]
@@ -62,7 +66,7 @@ public sealed class ConverterSettings : CommandSettings
     public bool ListTaxonomies { get; init; }
 
     [CommandOption("--schema-only")]
-    [Description("Mode: create an empty database with the 45 tables of the distribution schema in --output. No Access database is needed.")]
+    [Description("Mode: create an empty database with the 45 tables of the distribution schema in --output (with --target native: the empty native schema, baseline 4.4). No Access database is needed.")]
     public bool SchemaOnly { get; init; }
 
     [CommandOption("--validate <PATH>")]
@@ -120,6 +124,7 @@ public sealed class ConverterSettings : CommandSettings
         Add(Releases is not null, "--releases");
         Add(All, "--all");
         Add(Release is not null, "--release");
+        Add(Target is not null, "--target");
         Add(Overwrite, "--overwrite");
         Add(Report is not null, "--report");
         Add(Verbose, "--verbose");

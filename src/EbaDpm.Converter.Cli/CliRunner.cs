@@ -44,17 +44,17 @@ public static partial class CliRunner
     private static readonly string[] ValueOptions =
     [
         "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--release", "--report",
-        "--validate", "--reference", "--layouts", "--extract-layouts", "--out", "--dictionary",
+        "--validate", "--reference", "--layouts", "--extract-layouts", "--out", "--dictionary", "--target",
     ];
 
     private static readonly string[] ListTaxonomiesOptions = ["--list-taxonomies", "--source", "--release", "--plain"];
-    private static readonly string[] SchemaOnlyOptions = ["--schema-only", "--output", "--overwrite", "--plain"];
+    private static readonly string[] SchemaOnlyOptions = ["--schema-only", "--output", "--overwrite", "--target", "--plain"];
     private static readonly string[] ExtractLayoutsOptions = ["--extract-layouts", "--out", "--dictionary", "--overwrite", "--plain"];
     private static readonly string[] ValidateOptions = ["--validate", "--reference", "--layouts", "--report", "--plain"];
     private static readonly string[] ConvertOptions =
     [
         "--source", "--output", "--taxonomies", "--taxonomykeys", "--releases", "--all", "--overwrite", "--report",
-        "--verbose", "--release", "--plain",
+        "--verbose", "--release", "--target", "--plain",
     ];
 
     /// <summary>
@@ -118,8 +118,10 @@ public static partial class CliRunner
             config.AddExample("--source", "<input.accdb>", "--output", "<directory>");
             config.AddExample("--source", "<input.accdb>", "--output", "<file.db>", "--release", "<code>", "--overwrite");
             config.AddExample("--source", "<dpm1.accdb>", "--output", "<file.db>", "--releases", "4.0,4.1");
+            config.AddExample("--source", "<dpm2.accdb>", "--output", "<file.db>", "--target", "native");
             config.AddExample("--list-taxonomies", "--source", "<input.accdb>");
             config.AddExample("--schema-only", "--output", "<file.db>");
+            config.AddExample("--schema-only", "--output", "<file.db>", "--target", "native");
             config.AddExample("--validate", "<generated.db>", "--layouts", "<layouts.db>", "--report", "<report.json>");
             config.AddExample("--extract-layouts", "<directory>", "--out", "<layouts.db>", "--dictionary", "<dictionary.db>");
         });
@@ -475,6 +477,16 @@ public static partial class CliRunner
         if (FindUnrecognized(settings, mode: null, ConvertOptions) is { } unrecognized)
         {
             return ArgumentError(stderr, unrecognized);
+        }
+
+        if (!TryParseTarget(settings.Target, out var target, out var targetError))
+        {
+            return ArgumentError(stderr, targetError);
+        }
+
+        if (target == OutputTarget.Native)
+        {
+            return RunConvertNative(settings, stdout, stderr);
         }
 
         if (!TryRequire(settings.Source, "--source", out var source, out var sourceError))
@@ -991,6 +1003,16 @@ public static partial class CliRunner
         if (FindUnrecognized(settings, "--schema-only", SchemaOnlyOptions) is { } unrecognized)
         {
             return ArgumentError(stderr, unrecognized);
+        }
+
+        if (!TryParseTarget(settings.Target, out var target, out var targetError))
+        {
+            return ArgumentError(stderr, targetError);
+        }
+
+        if (target == OutputTarget.Native)
+        {
+            return RunSchemaOnlyNative(settings, output, stdout, stderr);
         }
 
         try

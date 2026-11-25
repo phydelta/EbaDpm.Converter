@@ -109,8 +109,9 @@ columns and are copied as stored.
 - **Primary keys** as declared in Access (on 4.4 every exported table has one; 19 are composite,
   for example `ContextComposition (ContextID, PropertyID)` and `TableVersionCell (TableVID, CellID)`).
 - **Foreign keys** from the Access relationships, with their rules (`ON UPDATE CASCADE`, and
-  `ON DELETE CASCADE` where Access declares it). On 4.4 there are 179 relationships, all on one
-  column. A relationship whose table on either side is excluded is not declared. Foreign keys are
+  `ON DELETE CASCADE` where Access declares it). On 4.4 the user tables have 178 relationships, all on one column (the OLE DB schema lists 179:
+  the extra one links two Access system tables). A relationship whose table on either side is excluded is not declared:
+  on 4.4, 170 are declared and 8 are not (the change-log tables and `VariableGeneration`). Foreign keys are
   declared but the file is loaded with enforcement off; their integrity is checked by `--validate`
   (`PRAGMA foreign_key_check`).
 - **Indexes**: every non-primary-key index that Access declares on an exported table, with the same
@@ -123,7 +124,8 @@ columns and are copied as stored.
 
 (2026-11-25, `DPM2 Database_v 4_4_20261006.accdb`; figures of one publication, not of the format.)
 
-- 59 tables exported, 11 excluded.
+- 59 tables exported, 11 excluded; 5,568,105 rows; 170 foreign keys and 168 indexes (all of them
+  Access indexes: Access already indexes every relationship column).
 - Largest tables: `ContextComposition` 1,757,180 rows, `Concept` 837,042, `OperandReference`
   623,060, `OperandReferenceLocation` 588,878, `TableVersionCell` 407,898, `VariableVersion`
   299,573.

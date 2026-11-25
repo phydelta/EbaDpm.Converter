@@ -11,6 +11,13 @@
     <ProjectReference Include="..\EbaDpm.Converter.Core\EbaDpm.Converter.Core.csproj" />
   </ItemGroup>
 
+  <!-- The catalogue of the 4.4 Access database: the baseline of the native output. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\native-baseline-4.4.json">
+      <LogicalName>EbaDpm.Converter.Native.Resources.native-baseline-4.4.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="EbaDpm.Converter" />
     <InternalsVisibleTo Include="EbaDpm.Converter.Native.Tests" />
