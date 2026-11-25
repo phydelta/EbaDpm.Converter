@@ -117,8 +117,9 @@ internal static class NativePlaneCCensuses
             }
 
             var wrongColumnCount = parts.Length != 3 && parts.Length != 4;
-            var missingRequiredField = string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[2]);
-            var unknownType = parts[1] != "contradicts" && parts[1] != "no-match";
+            // The guards keep the original short-circuit: parts[1] and parts[2] exist only with 3 or 4 columns.
+            var missingRequiredField = !wrongColumnCount && (string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[2]));
+            var unknownType = !wrongColumnCount && parts[1] != "contradicts" && parts[1] != "no-match";
             var emptyReason = parts.Length == 4 && string.IsNullOrWhiteSpace(parts[3]);
             if (wrongColumnCount || missingRequiredField || unknownType || emptyReason)
             {
